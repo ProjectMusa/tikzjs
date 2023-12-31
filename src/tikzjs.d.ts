@@ -1,10 +1,15 @@
-declare function peg$SyntaxError(message: any, expected: any, found: any, location: any): any;
+declare function peg$SyntaxError(
+  message: any,
+  expected: any,
+  found: any,
+  location: any,
+): any;
 declare class peg$SyntaxError {
-    constructor(message: any, expected: any, found: any, location: any);
-    format(sources: any): string;
+  constructor(message: any, expected: any, found: any, location: any);
+  format(sources: any): string;
 }
 declare namespace peg$SyntaxError {
-    function buildMessage(expected: any, found: any): string;
+  function buildMessage(expected: any, found: any): string;
 }
-declare function peg$parse(input: any, options: any|undefined ): any;
+declare function peg$parse(input: any, options: any | undefined): any;
 export { peg$SyntaxError as SyntaxError, peg$parse as parse };
