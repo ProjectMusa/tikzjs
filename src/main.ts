@@ -1,9 +1,5 @@
-import { SyntaxError, parse } from './tikzjs'
+import { SyntaxError, parse } from './parser/tikzjs'
 
-console.log(parse('1+1', {}))
-
-module.exports = {
-  parse: (s: string) => {
-    return parse(s, {})
-  },
+export function runWorker(s: string): Object {
+  return parse(s, {})
 }

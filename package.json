@@ -2,29 +2,34 @@
   "name": "tikzjs",
   "version": "0.1.0",
   "description": "",
-  "main": "dist/main.js",
-  "type": "module",
+  "main": "main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "gen": "peggy src/tikzjs.pegjs &&  tsc src/tikzjs.js --declaration --allowJs --emitDeclarationOnly",
+    "test": "jest",
+    "gen": "peggy src/parser/tikzjs.pegjs &&  tsc src/parser/tikzjs.js --declaration --allowJs --emitDeclarationOnly",
     "build": "./node_modules/.bin/tsc",
     "clean": "rm -rf ./dist",
     "start": "node ./dist/main.js"
   },
-  "author": "",
+  "author": "Linax Dio",
   "license": "ISC",
   "dependencies": {
     "peggy": "^3.0.2"
   },
   "devDependencies": {
+    "@types/jest": "^29.5.11",
     "@types/jsdom": "^16.2.4",
     "@types/yargs": "^17.0.15",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
-    "typescript": "^5.3.3",
     "eslint": "^8.45.0",
     "eslint-config-prettier": "^8.8.0",
     "eslint-plugin-prettier": "^5.0.0",
-    "prettier": "^3.0.0"
+    "jest": "^29.7.0",
+    "ts-jest": "^29.1.1",
+    "prettier": "^3.0.0",
+    "typescript": "^5.3.3"
+  },
+  "exports": {
+    ".": "./dist/main.js"
   }
 }
