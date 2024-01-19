@@ -1,5 +1,4 @@
 import { runWorker } from '../src/main'
-import { TikzRoot } from '../src/parser/TikzRoot'
 
 const beautifyReplacer = () => {
   const seen = new WeakSet()
@@ -59,7 +58,7 @@ test('path_--_test', () => {
 })
 
 test('path_-|_test', () => {
-  const result = runWorker('\\tikz[]{\\path[draw](0,0)-|++(1,1 cm);}')
+  const result = runWorker('\\tikz[]{\\path[draw](0,0)-|++(1,1 cm)--++(2,2cm);}')
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })

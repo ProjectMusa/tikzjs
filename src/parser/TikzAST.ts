@@ -36,15 +36,11 @@ export class AstNode implements AstLocatable {
     return this._location
   }
 
-  parent(): AstLocatable | undefined {
+  parent(): AstNode | undefined {
     return this._parent
   }
 
-  children(): AstLocatable[] {
+  children(): AstNode[] {
     return this._children
-  }
-
-  render<GeneratorType extends GeneratorInterface>(g: GeneratorType) {
-    g.render(this)
   }
 }
