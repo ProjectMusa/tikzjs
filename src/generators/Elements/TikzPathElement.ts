@@ -87,6 +87,7 @@ export class TikzPathElement implements ElementInterface {
     let group = document.createElement('g')
     for (let subPath of this._subpaths) {
       group.append(...subPath.render())
+      group.setAttribute('fill', 'none')
     }
     return [group]
   }
