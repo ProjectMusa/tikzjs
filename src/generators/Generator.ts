@@ -1,4 +1,3 @@
-import { AstNode } from '../parser/TikzAST'
 import { TikzRoot } from '../parser/TikzRoot'
 import { Context } from './Context'
 import { RootElementSVG } from './Elements/RootElementSVG'
@@ -11,8 +10,8 @@ export enum EGenerators {
 class GeneratorSVG {
   generate(root: TikzRoot) {
     let ctx = new Context()
-    ctx.generator = EGenerators.svg
-    return new RootElementSVG().render(root, ctx)
+    let rootElement = new RootElementSVG(ctx, root)
+    return rootElement.render()
   }
 }
 

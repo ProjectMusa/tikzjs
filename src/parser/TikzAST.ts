@@ -18,12 +18,10 @@ interface AstLocatable {
 }
 
 export class AstNode implements AstLocatable {
-  _type: string
   _location: AstLocation
   _parent: AstNode | undefined
   _children: AstNode[]
   constructor(location: AstLocation, children: AstNode[]) {
-    this._type = 'base'
     this._location = location
     this._parent = undefined
     this._children = children

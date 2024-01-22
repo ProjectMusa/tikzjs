@@ -11,7 +11,7 @@ import {
   TikzCoordinateOffset,
 } from './TikzRoot'
 
-const factory = {
+export const factory = {
   tikzRoot: TikzRoot,
   tikzInline: TikzInline,
   tikzPicture: TikzPicture,
@@ -23,5 +23,3 @@ const factory = {
   tikzLineOperation: TikzLineOperation,
   tikzOption: TikzOption,
 }
-
-export default factory

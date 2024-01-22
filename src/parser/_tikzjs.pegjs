@@ -1,5 +1,5 @@
 {
-  const ft = require('./factory.ts').default
+  const ft = require('./factory').factory
   function err_not_impl(s) {
     return `${s} is not implemented`
   }

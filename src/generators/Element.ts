@@ -1,6 +1,11 @@
 import { AstNode } from '../parser/TikzAST'
+import { TikzRoot } from '../parser/TikzRoot'
 import { Context } from './Context'
 
-export interface ElementInterface<DeriveNode extends AstNode> {
-  render(n: DeriveNode, ctx?: Context): Node[]
+export interface ElementInterface {
+  render(): HTMLElement[]
 }
+
+// export interface ElementConstructorInterface<DeriveNode extends AstNode> {
+//   new (n: DeriveNode, ctx: Context): ElementInterface
+// }
