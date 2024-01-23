@@ -93,8 +93,8 @@ export enum ECoordinateMoveType {
 
 const move_type_map: { [name: string]: ECoordinateMoveType } = {
   '': ECoordinateMoveType.absolute,
-  '+': ECoordinateMoveType.relative,
-  '++': ECoordinateMoveType.relativePass,
+  '++': ECoordinateMoveType.relative,
+  '+': ECoordinateMoveType.relativePass,
 }
 
 export class TikzCoordinate extends TikzPathOperation {
