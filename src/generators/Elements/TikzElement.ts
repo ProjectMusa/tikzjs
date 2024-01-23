@@ -22,6 +22,7 @@ export class TikzInlineElement implements ElementInterface {
       let svg = document.createElement('svg')
       svg.classList.add('inline')
       svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      svg.setAttribute('viewBox', '-100 -100 200 200')
       // TOOD compute global geometry
       // svg.style.width = width + 'em'
       // svg.style.height = height + 'em'
