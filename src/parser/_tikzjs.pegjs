@@ -121,14 +121,14 @@ operation_list
 path_operation
   = c:path_coordinate { return c; }
   / l:line_operation { return l; }
-  // / curve_operation
+  / g:grid_operation { return g; }
+  / b:curve_operation { return b; }
   // / topath_operation
   // / node_operation
   // / rectangle_operation
   // / circle_operation
   // / ellipse_operation
   // / arc_operation
-  // / grid_operation
   // / foreach_operation
   // / let_operation
 
@@ -145,6 +145,18 @@ hv_corner_operation
 
 vh_corner_operation 
   = ws '|-' ws
+
+grid_operation
+  = grid_operation_head {return new ft.tikzGridOperation(location(), []); }
+
+grid_operation_head
+  = ws 'grid' ws
+
+curve_operation
+  = dotdot curve_control c:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c); }
+  / dotdot curve_control c0:path_coordinate and c1:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c0, c1); }
+
+curve_control = ws 'controls' ws
 
 /////////////////// Primitives ////////////////////////
 
@@ -174,6 +186,8 @@ dot = ws '.' ws
 
 tight_dot = '.'
 
+dotdot = ws '..' ws
+
 plus = '+'
 
 plusplus = '++'
@@ -183,6 +197,8 @@ ws "whitespace" = [ \t\n\r]*
 in = ws 'in' ws 
 
 at = ws 'at' ws
+
+and = ws 'and' ws
 
 number
   = decimal_integer_literal tight_dot decimal_digit* {

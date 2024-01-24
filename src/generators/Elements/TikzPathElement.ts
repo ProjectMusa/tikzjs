@@ -2,6 +2,8 @@ import {
   ECoordinateMoveType,
   ESimpleLineType,
   TikzCoordinate,
+  TikzCurveOperation,
+  TikzGridOperation,
   TikzLineOperation,
   TikzNodeOperation,
   TikzPath,
@@ -9,10 +11,8 @@ import {
 } from '../../parser/TikzRoot'
 import { Context } from '../Context'
 import { ElementInterface } from '../Element'
-interface AbsoluteCoordinate {
-  x: number
-  y: number
-}
+import { AbsoluteCoordinate } from '../utils'
+import { toAbsoluteCoordinate } from '../utils'
 
 export class TikzPathElement implements ElementInterface {
   _ast: TikzPath
@@ -46,7 +46,7 @@ export class TikzPathElement implements ElementInterface {
         let newNode = new TikzNodeElement(
           ctx,
           current,
-          subPath.peekCoordinate() ? subPath.peekCoordinate() : { x: 0, y: 0 },
+          move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
         )
         const newAbsC = newNode.absoluteCoordinate()
         if (!newAbsC) throw console.error('')
@@ -70,6 +70,24 @@ export class TikzPathElement implements ElementInterface {
 
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
+      } else if (current instanceof TikzGridOperation) {
+        if (!subPath.ableToInsertNewPart())
+          throw console.log('new subPathPath part encounterd when last path end undefined')
+        const startCoordinate = subPath.peekCoordinate()
+        if (!startCoordinate) {
+          throw console.log(`Unknown start coordinate for TikzGridOperation ${JSON.stringify(current)}`)
+        }
+        let newGridElement = new TikzGridElement(startCoordinate, undefined)
+        subPath.pushPart(newGridElement)
+      } else if (current instanceof TikzCurveOperation) {
+        if (!subPath.ableToInsertNewPart())
+          throw console.log('new subPathPath part encounterd when last path end undefined')
+        const startCoordinate = subPath.peekCoordinate()
+        if (!startCoordinate) {
+          throw console.log(`Unknown start coordinate for TikzCurveOperation ${JSON.stringify(current)}`)
+        }
+        let newCurveElement = new TikzCurveToElement(startCoordinate, undefined, current._c0, current._c1)
+        subPath.pushPart(newCurveElement)
       } else {
         throw console.error('Unknown Operation on TikzPath')
       }
@@ -88,6 +106,7 @@ export class TikzPathElement implements ElementInterface {
     for (let subPath of this._subpaths) {
       group.append(...subPath.render())
       group.setAttribute('fill', 'none')
+      group.setAttribute('stroke', 'black')
     }
     return [group]
   }
@@ -104,26 +123,8 @@ export class TikzNodeElement implements ElementInterface {
     this._ctx = ctx
     this._ast = coordinate
     if (coordinate && baseC) {
-      this._absolute_coordinate = this.toAbsoluteCoordinate(coordinate, baseC)
+      this._absolute_coordinate = toAbsoluteCoordinate(coordinate, baseC)
     }
-  }
-
-  toAbsoluteCoordinate(coordinate: TikzCoordinate, baseC: AbsoluteCoordinate): AbsoluteCoordinate | undefined {
-    let offsets = coordinate.offsets()
-    if (offsets.length === 2) {
-      // 2D coordinate input
-      if (coordinate._cs_type === 'canvas') {
-        return {
-          x: offsets[0]._offset + baseC.x,
-          y: offsets[1]._offset + baseC.y,
-        }
-      } else {
-        throw console.error('Unknow coordinate system encountered')
-      }
-    } else if (offsets.length === 3) {
-      throw console.error('3D coordiniate is currently not supported')
-    }
-    return undefined
   }
 
   setAlias(alias: string) {
@@ -159,10 +160,85 @@ export class TikzLineToElement implements TikzSubPathPart {
     this._line_type = line_type
   }
   renderD(): string {
-    return `L ${this._end?.x} ${this._end?.y}\n`
+    if (this._line_type === ESimpleLineType.horizontal2vertical) return `H ${this._end?.x} V ${this._end?.y}`
+    else if (this._line_type === ESimpleLineType.vertical2horizontal) return `V ${this._end?.y} H ${this._end?.x}`
+    else return `L ${this._end?.x} ${this._end?.y}`
   }
 }
 
+export class TikzGridElement implements TikzSubPathPart {
+  _start?: AbsoluteCoordinate
+  _end?: AbsoluteCoordinate
+  _step_vec: AbsoluteCoordinate = { x: 10, y: 10 }
+  constructor(start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, step?: AbsoluteCoordinate) {
+    this._start = start
+    this._end = end
+    if (step) this._step_vec = step
+  }
+  renderD(): string {
+    if (!this._end || !this._start) throw console.error('start end still undefined in render stage')
+    const xsign: boolean = (this._end.x - this._start.x) * this._step_vec.x > 0
+    const ysign: boolean = (this._end.y - this._start.y) * this._step_vec.y > 0
+    let xNum = Math.floor(Math.abs(this._end.x - this._start.x) / Math.abs(this._step_vec.x)) + 1
+    let yNum = Math.floor(Math.abs(this._end.y - this._start.y) / Math.abs(this._step_vec.y)) + 1
+    let result: string[] = []
+    let xRange = Array.from(Array(xNum).keys())
+    let yRange = Array.from(Array(yNum).keys())
+    for (let xIdx of xRange) {
+      let Head = xsign ? this._start.x + this._step_vec.x * xIdx : this._start.x - this._step_vec.x * xIdx
+      result.push(`M ${Head} ${this._start.y}`)
+      result.push(`V ${this._end.y}`)
+    }
+    for (let yIdx of yRange) {
+      let Head = ysign ? this._start.y + this._step_vec.y * yIdx : this._start.y - this._step_vec.y * yIdx
+      result.push(`M ${this._start.x} ${Head}`)
+      result.push(`H ${this._end.x}`)
+    }
+    result.push(`M ${this._start.x} ${this._end.y} H ${this._end.x}`)
+    result.push(`M ${this._end.x} ${this._start.y} V ${this._end.y}`)
+    return result.join(' ')
+  }
+}
+
+export class TikzCurveToElement implements TikzSubPathPart {
+  _start?: AbsoluteCoordinate
+  _end?: AbsoluteCoordinate
+  _control0?: TikzCoordinate
+  _control1?: TikzCoordinate
+  constructor(
+    start?: AbsoluteCoordinate,
+    end?: AbsoluteCoordinate,
+    control0?: TikzCoordinate,
+    control1?: TikzCoordinate,
+  ) {
+    this._start = start
+    this._end = end
+    this._control0 = control0
+    this._control1 = control1
+    // special rules:
+    // First, a relative first control point is taken relative to the beginning of the curve.
+    // Second, a relative second control point is taken relative to the end of the curve.
+    // Third control point is not pushed into stack
+  }
+  renderD(): string {
+    if (!this._end || !this._start || !this._control0)
+      throw console.error('start/end/control0 still undefined in render stage')
+    const absC0 =
+      this._control0.moveType() === ECoordinateMoveType.absolute
+        ? toAbsoluteCoordinate(this._control0, { x: 0, y: 0 })
+        : toAbsoluteCoordinate(this._control0, this._start)
+    if (!this._control1) {
+      // quadratic bezier
+      return `Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
+    } else {
+      const absC1 =
+        this._control1.moveType() === ECoordinateMoveType.absolute
+          ? toAbsoluteCoordinate(this._control1, { x: 0, y: 0 })
+          : toAbsoluteCoordinate(this._control1, this._end)
+      return `C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
+    }
+  }
+}
 export class TikzSubPathElement implements ElementInterface {
   // sub path
   // regard less wether it is streight lines or curves arcs
@@ -206,15 +282,17 @@ export class TikzSubPathElement implements ElementInterface {
 
   render(): HTMLElement[] {
     let subPath = document.createElement('path')
+    let dlist: string[] = []
     let d: string = ''
     let bFirst = true
     for (let part of this._parts) {
       if (bFirst) {
-        d = `M ${part._start?.x} ${part._start?.y}\n`
+        dlist.push(`M ${part._start?.x} ${part._start?.y}`)
         bFirst = false
       }
-      d = d.concat(part.renderD())
+      dlist.push(part.renderD())
     }
+    d = dlist.join(' ')
     subPath.setAttribute('d', d)
     return [subPath]
   }

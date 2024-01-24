@@ -62,3 +62,21 @@ test('path_-|_test', () => {
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
+
+test('grid_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw](0,0) grid (1,1 cm) -- ++(2,2cm);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
+
+test('bezier_quadra_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw](0,0).. controls  (1,1 cm) .. (2,2cm);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
+
+test('bezier_cubic_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw](0,0).. controls  (1,1 cm) and (3,3) .. (2,2cm);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})

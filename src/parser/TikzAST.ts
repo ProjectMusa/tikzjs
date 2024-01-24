@@ -21,6 +21,7 @@ export class AstNode implements AstLocatable {
   _location: AstLocation
   _parent: AstNode | undefined
   _children: AstNode[]
+  _type: string = 'base'
   constructor(location: AstLocation, children: AstNode[]) {
     this._location = location
     this._parent = undefined

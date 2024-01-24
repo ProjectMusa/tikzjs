@@ -4,11 +4,12 @@ import {
   TikzRoot,
   TikzLiteral,
   TikzPath,
-  TikzPathOperation,
   TikzOption,
+  TikzGridOperation,
   TikzLineOperation,
   TikzCoordinate,
   TikzCoordinateOffset,
+  TikzCurveOperation,
 } from './TikzRoot'
 
 export const factory = {
@@ -19,7 +20,8 @@ export const factory = {
   tikzPath: TikzPath,
   tikzCoordinate: TikzCoordinate,
   tikzCoordinateOffset: TikzCoordinateOffset,
-  tikzPathOperation: TikzPathOperation,
   tikzLineOperation: TikzLineOperation,
+  tikzGridOperation: TikzGridOperation,
+  tikzCurveOperation: TikzCurveOperation,
   tikzOption: TikzOption,
 }
