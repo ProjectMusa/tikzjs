@@ -80,3 +80,9 @@ test('bezier_cubic_test', () => {
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
+
+test('to_path_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw](0,0) to[] (2,2cm);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
