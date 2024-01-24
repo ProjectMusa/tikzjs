@@ -201,15 +201,18 @@ at = ws 'at' ws
 and = ws 'and' ws
 
 number
-  = decimal_integer_literal tight_dot decimal_digit* {
+  = signed_integer_literal tight_dot decimal_digit* {
       return parseFloat(text());
     }
   / tight_dot decimal_digit+ {
       return parseFloat(text());
     }
-  / decimal_integer_literal {
+  / signed_integer_literal {
       return  parseFloat(text());
     }
+
+signed_integer_literal
+  = [+-]? decimal_integer_literal
 
 decimal_integer_literal
   = "0"
