@@ -175,6 +175,15 @@ export class TikzCurveOperation extends TikzPathOperation {
   }
 }
 
+export class TikzToPathOperation extends TikzPathOperation {
+  _options: TikzOption[]
+  constructor(location: AstLocation, options: TikzOption[]) {
+    super(location)
+    this._type = this.constructor.name
+    this._options = options
+  }
+}
+
 export class TikzNodeOperation extends TikzPathOperation {
   constructor(location: AstLocation) {
     super(location)

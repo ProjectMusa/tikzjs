@@ -123,7 +123,7 @@ path_operation
   / l:line_operation { return l; }
   / g:grid_operation { return g; }
   / b:curve_operation { return b; }
-  // / topath_operation
+  / t:topath_operation { return t; }
   // / node_operation
   // / rectangle_operation
   // / circle_operation
@@ -147,7 +147,7 @@ vh_corner_operation
   = ws '|-' ws
 
 grid_operation
-  = grid_operation_head {return new ft.tikzGridOperation(location(), []); }
+  = grid_operation_head opt:tikzoption {return new ft.tikzGridOperation(location(), opt); }
 
 grid_operation_head
   = ws 'grid' ws
@@ -157,6 +157,9 @@ curve_operation
   / dotdot curve_control c0:path_coordinate and c1:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c0, c1); }
 
 curve_control = ws 'controls' ws
+
+topath_operation
+  = to opt:tikzoption { return new ft.tikzToPathOperation(location(), opt); }
 
 /////////////////// Primitives ////////////////////////
 
@@ -197,6 +200,8 @@ ws "whitespace" = [ \t\n\r]*
 in = ws 'in' ws 
 
 at = ws 'at' ws
+
+to = ws 'to' ws
 
 and = ws 'and' ws
 
