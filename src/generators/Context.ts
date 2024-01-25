@@ -1,4 +1,4 @@
-import { TikzNodeElement } from './Elements/TikzPathElement'
+import { TikzNodeElement } from './Elements/TikzNodeElement'
 import { EGenerators } from './Generator'
 
 export class Context {
