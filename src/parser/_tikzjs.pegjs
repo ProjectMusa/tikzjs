@@ -31,12 +31,11 @@ tikzoption
 option_list "option list" 
   = x:(option|.., comma|) comma? { return x; }
 
-option "global option"
-  = b:bool_option { return ft.tikzOption(location(), b); }// TODO add  override option
-  // / ov: override_option
+option "tikz option"
+  = b:bool_option { return ft.tikzOption(location(), b); } //TODO add  override option
+  // / ov:override_option { return ft.tikzOption(location(), ov); }
 
-
-bool_option "global bool option" //TODO add more options
+bool_option "bool option" //TODO add more options
   = 'draw'
 
 tikzcontent
@@ -111,7 +110,7 @@ path_head
   // / '\\shade'
   // / '\\shadedraw'
   // / '\\clip'
-  // //shor hand for node shapes
+  // //short hand for node shapes
   // / '\\node'
   // / '\\matrix'
 
@@ -124,7 +123,8 @@ path_operation
   / g:grid_operation { return g; }
   / b:curve_operation { return b; }
   / t:topath_operation { return t; }
-  // / node_operation
+  / n:node_operation { return n; }
+  // / e:edge_operation { return e; }
   // / rectangle_operation
   // / circle_operation
   // / ellipse_operation
@@ -132,6 +132,8 @@ path_operation
   // / foreach_operation
   // / let_operation
 
+
+////////// line operations /////////////
 line_operation
   = streight_line_operation { return new ft.tikzLineOperation(location(), '--'); }
   / hv_corner_operation { return new ft.tikzLineOperation(location(), '-|'); }
@@ -146,22 +148,51 @@ hv_corner_operation
 vh_corner_operation 
   = ws '|-' ws
 
+////////// grid operations /////////////
 grid_operation
   = grid_operation_head opt:tikzoption {return new ft.tikzGridOperation(location(), opt); }
 
 grid_operation_head
   = ws 'grid' ws
 
+
+//////// curve operations /////////////
 curve_operation
   = dotdot curve_control c:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c); }
   / dotdot curve_control c0:path_coordinate and c1:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c0, c1); }
 
 curve_control = ws 'controls' ws
 
+////////// to-path operations /////////////
 topath_operation
   = to opt:tikzoption { return new ft.tikzToPathOperation(location(), opt); }
 
+// ///////// node operations //////////////
+// node_operation
+//   = node_head opt:tikzOption at:node_at cnt:node_content
+
+// node_at
+//   = at c:path_coordinate { return c; }
+//   / ws { return undefined; }
+
+// // We don't parse latex here just make sure it is bracket balanced
+// node_content
+//   = rbrace latex_inline lbrace
+//   / ws { return undefined; }
+
+
+
+
 /////////////////// Primitives ////////////////////////
+
+math_shift
+  = ws '$' ws
+
+inline_math_begin
+  = ws '\(' ws
+
+inline_math_end 
+  = ws '\)' ws
 
 lpar = ws "(" ws
 
