@@ -2,9 +2,13 @@ class GroupChecker {
   _stack: string[] = []
   _scopeStack: string[] = []
   _currentStack: string[] = this._stack
+  _silent: boolean = true
+  setSilent(bSilent: boolean) {
+    this._silent = bSilent
+  }
   checkValid(trial: string): boolean {
     // check trial string can be pushed into stack
-    console.log(`check with ${trial}`)
+    if (!this._silent) console.log(`check with ${trial}`)
 
     if (trial === '$') {
       return (
@@ -27,6 +31,7 @@ class GroupChecker {
     return false
   }
   toggleMathScope(mStr: string): string | undefined {
+    if (!this._silent) console.log(`try to toggle mathscope with ${mStr}`)
     if (!this.checkValid(mStr)) return
     let snap = this._currentStack.join(',')
     if (this._currentStack === this._stack) {
@@ -40,14 +45,14 @@ class GroupChecker {
   }
 
   beginGroup(lStr: string): string | undefined {
-    console.log(`begin group with ${lStr}`)
+    if (!this._silent) console.log(`begin group with ${lStr}`)
     if (!this.checkValid(lStr)) return
     let snap = this._currentStack.join(',')
     this._currentStack.push(lStr)
     return snap
   }
   endGroup(rStr: string): string | undefined {
-    console.log(`try to end group ${this._currentStack.at(-1)} with ${rStr}`)
+    if (!this._silent) console.log(`try to end group ${this._currentStack.at(-1)} with ${rStr}`)
     if (!this.checkValid(rStr)) return
     this._currentStack.pop()
     let snap = this._currentStack.join(',')

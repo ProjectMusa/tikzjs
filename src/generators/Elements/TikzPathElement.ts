@@ -5,10 +5,11 @@ import {
   TikzCurveOperation,
   TikzGridOperation,
   TikzLineOperation,
+  TikzToPathOperation,
   TikzNodeOperation,
-  TikzPath,
   TikzPathOperation,
-} from '../../parser/TikzRoot'
+} from '../../parser/TikzPathOperations'
+import { TikzPath } from '../../parser/TikzPath'
 import { Context } from '../Context'
 import { ElementInterface } from '../Element'
 import { AbsoluteCoordinate } from '../utils'

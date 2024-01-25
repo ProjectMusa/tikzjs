@@ -1,20 +1,17 @@
+import { TikzInline, TikzPicture, TikzRoot } from './TikzRoot'
+import { TikzLiteral } from './TikzLiteral'
+import { TikzPath } from './TikzPath'
+import { TikzOption } from './TikzOptions'
 import {
-  TikzInline,
-  TikzPicture,
-  TikzRoot,
-  TikzLiteral,
-  TikzPath,
-  TikzOption,
-  TikzGridOperation,
-  TikzLineOperation,
   TikzCoordinate,
   TikzCoordinateOffset,
+  TikzLineOperation,
+  TikzGridOperation,
   TikzCurveOperation,
   TikzToPathOperation,
   TikzNodeOperation,
-} from './TikzRoot'
-
-import { group_checker } from './Parser'
+} from './TikzPathOperations'
+import { group_checker } from './group_checker'
 
 export const factory = {
   tikzRoot: TikzRoot,

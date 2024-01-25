@@ -1,4 +1,4 @@
-import { TikzCoordinate } from '../parser/TikzRoot'
+import { TikzCoordinate } from '../parser/TikzPathOperations'
 
 export interface AbsoluteCoordinate {
   x: number
