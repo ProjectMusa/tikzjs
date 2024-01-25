@@ -185,8 +185,14 @@ export class TikzToPathOperation extends TikzPathOperation {
 }
 
 export class TikzNodeOperation extends TikzPathOperation {
-  constructor(location: AstLocation) {
+  _coordinate?: TikzCoordinate
+  _contents?: string
+  _options: TikzOption[]
+  constructor(location: AstLocation, options: TikzOption[], coordinate?: TikzCoordinate, contents?: string) {
     super(location)
     this._type = this.constructor.name
+    this._options = options
+    this._coordinate = coordinate
+    this._contents = contents
   }
 }

@@ -1,5 +1,6 @@
 {
   const ft = require('./factory').factory
+  const gc = require('./factory').g
   function err_not_impl(s) {
     return `${s} is not implemented`
   }
@@ -10,19 +11,19 @@ start
   / p:tikzpicture { return new ft.tikzRoot(location(), [p]) }
 
 tikz  
-  = tikzhead opt:tikzoption lbrace cnt:tikzcontent rbrace { return new ft.tikzInline(location(), opt, cnt); }
+  = tikzhead opt:tikzoption l:lbrace cnt:tikzcontent r:rbrace { return new ft.tikzInline(location(), opt, cnt); }
 
 tikzpicture 
   = tikzpicturehead opt:tikzoption cnt:tikzcontent tikzpicturetail { return new ft.tikzPicture(location(), opt, cnt); }
 
 tikzhead 
-  = ws ('\\tikz'/'\\tikzjs') ws 
+  = ws ('\\tikz'/'\\tikzjs') ws
 
 tikzpicturehead 
-  = begin lbrace ('tikzpicture'/'tikzjspicture') rbrace 
+  = begin l:lbrace ('tikzpicture'/'tikzjspicture') r:rbrace { gc.beginGroup('@env_tikzpicture'); }
 
 tikzpicturetail
-  = end lbrace ('tikzpicture'/'tikzjspicture') rbrace
+  = end lbrace ('tikzpicture'/'tikzjspicture') rbrace { gc.endGroup('@env_tikzpicture'); }
 
 tikzoption 
   = lbracket list:option_list rbracket { return list; }
@@ -168,73 +169,96 @@ topath_operation
   = to opt:tikzoption { return new ft.tikzToPathOperation(location(), opt); }
 
 // ///////// node operations //////////////
-// node_operation
-//   = node_head opt:tikzOption at:node_at cnt:node_content
+node_operation
+  = node_head opt:tikzoption at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, at, cnt)}
 
-// node_at
-//   = at c:path_coordinate { return c; }
-//   / ws { return undefined; }
+node_head = ws 'node' ws
 
-// // We don't parse latex here just make sure it is bracket balanced
-// node_content
-//   = rbrace latex_inline lbrace
-//   / ws { return undefined; }
+node_at
+  = at c:path_coordinate { return c; }
+  / ws { return undefined; }
 
+//
+node_content
+  = lbrace li:latex_inline rbrace { return li; }
+  / ws { return undefined; }
 
+latex_inline
+  = x:(latex_plain / latex_math)+ { return text(); }
+
+latex_plain
+  = p:(latex_plain_primitive)+ { return p.join('-'); }
+
+// this rule must always return a string
+latex_plain_primitive "primitive" =
+      char
+    / hyphen
+    / decimal_digit
+    / punctuation
+    / quotes
+    
+
+latex_math 
+  = math_shift m:(latex_math_primitive)+ math_shift { return m.join(''); }
+  / inline_math_begin m:(latex_math_primitive)+ inline_math_end { return m.join(''); }
+
+latex_math_primitive =
+    latex_plain_primitive
+    / alignment_tab
+    / superscript
+    / subscript
+    / escape identifier
+    / lbrace  rbrace
+    / lbrace (latex_math_primitive)+ rbrace
+
+identifier =
+    $char+
 
 
 /////////////////// Primitives ////////////////////////
+punctuation "punctuation"   = p:[.,;:\*/()!?=+<>]                
+macro_parameter "parameter" = "#"                                
+quotes      "quotes"        = q:[`']                            
+utf8_char   "utf8 char"     = !(latex_math_primitive)
+                               u:.                              
+hyphen      "hyphen"        = "-"                               
+ctrl_sym    "control symbol"= escape c:[$%#&{}_\-,/@]    
+char        "letter"        = c:[a-z]i                          
+line_break   "line_break"   = ws '\\\\' ws
+escape       "escape"       = '\\'
+ctrl_space "latex space"    = ws'\\ 'ws
 
-math_shift
-  = ws '$' ws
 
-inline_math_begin
-  = ws '\(' ws
 
-inline_math_end 
-  = ws '\)' ws
 
-lpar = ws "(" ws
-
-rpar = ws ")" ws
-
-rbrace = ws '}' ws
-
-lbrace = ws '{' ws
-
-lbracket = ws '[' ws
-
+/* text tokens - symbols that generate output */
+alignment_tab "alignment"   = ws '&'ws
+superscript "supperscript"  = ws '^' ws
+subscript   "subscript"     = ws '_' ws
+math_shift  "latex inline"  = ws '$' ws &{ return gc.checkValid('$'); } { return gc.toggleMathScope('$'); }
+inline_math_begin = ws '\\(' ws &{ return sgc.checkValid('\\('); } { return gc.toggleMathScope('\\('); }
+inline_math_end = ws '\\)' ws &{ return gc.checkValid('\\)'); } { return gc.toggleMathScope('\\)'); }
+lpar = ws "(" ws 
+rpar = ws ")" ws 
+rbrace = ws '}' ws &{ return gc.checkValid('rbrace'); } { return gc.endGroup('rbrace'); }
+lbrace = ws '{' ws &{ return gc.checkValid('lbrace'); } { return gc.beginGroup('lbrace'); }
+lbracket = ws '[' ws 
 rbracket =ws ']' ws
-
 comma = ws ',' ws
-
 colon = ws ':' ws
-
 semicolon = ws ';' ws
-
 eq = ws '=' ws
-
 double_dots = ws '..' ws 
-
 dot = ws '.' ws
-
 tight_dot = '.'
-
 dotdot = ws '..' ws
-
-plus = '+'
-
-plusplus = '++'
-
-ws "whitespace" = [ \t\n\r]*
-
+plus = ws '+' ws
+plusplus = ws '++' ws
 in = ws 'in' ws 
-
 at = ws 'at' ws
-
 to = ws 'to' ws
-
 and = ws 'and' ws
+ws "whitespace" = [ \t\n\r]*
 
 number
   = signed_integer_literal tight_dot decimal_digit* {

@@ -11,7 +11,10 @@ import {
   TikzCoordinateOffset,
   TikzCurveOperation,
   TikzToPathOperation,
+  TikzNodeOperation,
 } from './TikzRoot'
+
+import { group_checker } from './Parser'
 
 export const factory = {
   tikzRoot: TikzRoot,
@@ -25,5 +28,8 @@ export const factory = {
   tikzGridOperation: TikzGridOperation,
   tikzCurveOperation: TikzCurveOperation,
   tikzToPathOperation: TikzToPathOperation,
+  tikzNodeOperation: TikzNodeOperation,
   tikzOption: TikzOption,
 }
+
+export const g = group_checker
