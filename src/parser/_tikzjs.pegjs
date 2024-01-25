@@ -187,7 +187,7 @@ latex_inline
   = x:(latex_plain / latex_math)+ { return text(); }
 
 latex_plain
-  = p:(latex_plain_primitive)+ { return p.join('-'); }
+  = p:(latex_plain_primitive)+ { return p.join(''); }
 
 // this rule must always return a string
 latex_plain_primitive "primitive" =
@@ -196,6 +196,9 @@ latex_plain_primitive "primitive" =
     / decimal_digit
     / punctuation
     / quotes
+    / escape identifier
+    / lbrace  rbrace
+    / lbrace (latex_plain_primitive)+ rbrace
     
 
 latex_math 
