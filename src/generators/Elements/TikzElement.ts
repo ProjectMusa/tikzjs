@@ -31,6 +31,9 @@ export class TikzInlineElement implements ElementInterface {
       for (let pathElement of this._contents) {
         svg.append(...pathElement.render())
       }
+      for (let nodeElement of this._ctx._nodes) {
+        svg.append(...nodeElement.render())
+      }
       result.push(svg)
     } else if (this._ctx.generator === EGenerators.html) {
       // TODO for html add overlay path svg

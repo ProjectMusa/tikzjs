@@ -376,7 +376,7 @@ function peg$parse(input, options) {
   var peg$f44 = function(m) { return m.join(''); };
   var peg$f45 = function() { return gc.checkValid('$'); };
   var peg$f46 = function() { return gc.toggleMathScope('$'); };
-  var peg$f47 = function() { return sgc.checkValid('\\('); };
+  var peg$f47 = function() { return gc.checkValid('\\('); };
   var peg$f48 = function() { return gc.toggleMathScope('\\('); };
   var peg$f49 = function() { return gc.checkValid('\\)'); };
   var peg$f50 = function() { return gc.toggleMathScope('\\)'); };

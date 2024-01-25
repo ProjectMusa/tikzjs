@@ -14,6 +14,35 @@ import { ElementInterface } from '../Element'
 import { AbsoluteCoordinate } from '../utils'
 import { toAbsoluteCoordinate } from '../utils'
 
+//
+//  Load all the needed components
+//
+const { mathjax } = require('mathjax-full/js/mathjax.js')
+const { TeX } = require('mathjax-full/js/input/tex.js')
+const { SVG } = require('mathjax-full/js/output/svg.js')
+const { jsdomAdaptor } = require('mathjax-full/js/adaptors/jsdomAdaptor.js')
+const { RegisterHTMLHandler } = require('mathjax-full/js/handlers/html.js')
+
+const { AllPackages } = require('mathjax-full/js/input/tex/AllPackages.js')
+
+const { JSDOM } = require('jsdom')
+const adaptor = jsdomAdaptor(JSDOM)
+RegisterHTMLHandler(adaptor)
+
+const MathJaxTex = new TeX({
+  packages: AllPackages,
+  inlineMath: [
+    ['$', '$'],
+    ['\\(', '\\)'],
+  ],
+})
+const MathJaxSVG = new SVG({ fontCache: 'none' })
+const MathJaxDoc = mathjax.document('', { InputJax: MathJaxTex, OutputJax: MathJaxSVG })
+
+//
+//  Let MathJax know these are loaded
+//
+
 export class TikzPathElement implements ElementInterface {
   _ast: TikzPath
   _ctx: Context
@@ -70,6 +99,25 @@ export class TikzPathElement implements ElementInterface {
 
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
+        if (current._coordinate) {
+          // with known coordinate
+          const move_type = current._coordinate.moveType()
+          if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinate() === undefined) {
+            throw console.error('Relave Coordinate Encountered but coordinate_stack is empty')
+          }
+          let newNode = new TikzNodeElement(
+            ctx,
+            current._coordinate,
+            move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
+          )
+          newNode.setLaTeX(current._contents)
+          ctx.pushuNode(newNode)
+        } else {
+          // with known coordinate
+          let newNode = new TikzNodeElement(ctx, current._coordinate, { x: 0, y: 0 })
+          newNode.setLaTeX(current._contents)
+          ctx.pushuNode(newNode)
+        }
       } else if (current instanceof TikzGridOperation) {
         if (!subPath.ableToInsertNewPart())
           throw console.log('new subPathPath part encounterd when last path end undefined')
@@ -117,7 +165,7 @@ export class TikzNodeElement implements ElementInterface {
   _ctx: Context
   _alias?: string
   _absolute_coordinate?: AbsoluteCoordinate
-  latex?: string
+  _latex?: string
 
   constructor(ctx: Context, coordinate?: TikzCoordinate, baseC?: AbsoluteCoordinate) {
     this._ctx = ctx
@@ -130,6 +178,9 @@ export class TikzNodeElement implements ElementInterface {
   setAlias(alias: string) {
     this._alias = alias
   }
+  setLaTeX(latex?: string) {
+    this._latex = latex
+  }
 
   setOffsets(offset: AbsoluteCoordinate) {
     this._absolute_coordinate = offset
@@ -140,7 +191,21 @@ export class TikzNodeElement implements ElementInterface {
   }
 
   render(): HTMLElement[] {
-    return []
+    // no boundary if not option draw
+    // no text if no latex
+    if (this._latex) {
+      let svg = document.createElement('svg')
+      const node = MathJaxDoc.convert(this._latex || '', {
+        display: false,
+        em: 16,
+        ex: 8,
+        containerWidth: 500,
+      })
+      svg.innerHTML = adaptor.innerHTML(node)
+
+      console.log(svg.innerHTML)
+      return [svg]
+    } else return []
   }
 }
 

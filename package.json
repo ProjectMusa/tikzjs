@@ -13,8 +13,10 @@
   "author": "Linax Dio",
   "license": "ISC",
   "dependencies": {
+    "@types/mathjax": "^0.0.40",
     "jsdom": "^23.2.0",
-    "mathjax": "^3.2.2"
+    "mathjax": "^3.2.2",
+    "mathjax-full": "^3.2.2"
   },
   "devDependencies": {
     "@types/jest": "^29.5.11",
