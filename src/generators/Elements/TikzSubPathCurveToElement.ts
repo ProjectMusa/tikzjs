@@ -48,7 +48,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
           this._end.x,
           this._start.y,
         )
-        let bezierBox = this._bezier.bbox()
+        let bezierBox: BBox = this._bezier.bbox()
         let box: BoundingBox = {
           lowerLeft: {
             x: bezierBox.x.min,
