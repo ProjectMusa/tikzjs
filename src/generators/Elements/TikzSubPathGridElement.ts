@@ -1,9 +1,9 @@
 import { TikzSubPathPart } from './TikzSubPathElement'
-import { AbsoluteCoordinate } from '../utils'
+import { AbsoluteCoordinate, toAbsoluteCoordinate, toAbsoluteOffset } from '../utils'
 export class TikzSubPathGridElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
-  _step_vec: AbsoluteCoordinate = { x: 10, y: 10 }
+  _step_vec: AbsoluteCoordinate = { x: 38, y: 38 }
   constructor(start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, step?: AbsoluteCoordinate) {
     this._start = start
     this._end = end
