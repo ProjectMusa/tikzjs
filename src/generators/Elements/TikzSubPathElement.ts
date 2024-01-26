@@ -1,13 +1,16 @@
-import { AbsoluteCoordinate } from '../utils'
+import { AbsoluteCoordinate, assembleBoundingBox } from '../utils'
 import { ElementInterface } from '../Element'
+import { GeometryInterface } from '../utils'
 import { Context } from '../Context'
-export interface TikzSubPathPart {
+import { BoundingBox } from '../utils'
+
+export interface TikzSubPathPart extends GeometryInterface {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
   renderD(): string
 }
 
-export class TikzSubPathElement implements ElementInterface {
+export class TikzSubPathElement implements ElementInterface, GeometryInterface {
   // sub path
   // regard less wether it is streight lines or curves arcs
   // render with svg tag <path>
@@ -26,6 +29,10 @@ export class TikzSubPathElement implements ElementInterface {
         return part._end !== undefined && part._start !== undefined
       })
     )
+  }
+
+  computeBoundingBox(): BoundingBox | undefined {
+    return assembleBoundingBox(this._parts)
   }
 
   ableToInsertNewPart() {

@@ -5,9 +5,43 @@ export interface AbsoluteCoordinate {
   x: number
   y: number
 }
+
+export interface BoundingBox {
+  lowerLeft: AbsoluteCoordinate
+  upperRight: AbsoluteCoordinate
+}
+
+export interface GeometryInterface {
+  computeBoundingBox(): BoundingBox | undefined
+}
+
+export function assembleBoundingBox(glist: GeometryInterface[]): BoundingBox | undefined {
+  if (!glist) return
+  let box: BoundingBox | undefined = undefined
+  glist.forEach((part: GeometryInterface) => {
+    let partBox = part.computeBoundingBox()
+    if (box === undefined) {
+      box = partBox
+    } else if (partBox !== undefined) {
+      box = {
+        lowerLeft: {
+          x: Math.min(box.lowerLeft.x, partBox.lowerLeft.x),
+          y: Math.min(box.lowerLeft.y, partBox.lowerLeft.y),
+        },
+        upperRight: {
+          x: Math.max(box.upperRight.x, partBox.upperRight.x),
+          y: Math.max(box.upperRight.y, partBox.upperRight.y),
+        },
+      }
+    }
+  })
+  console.log(JSON.stringify(box))
+  return box
+}
+
 const cm2px: number = 38
 const ex2px: number = 8
-const em2px: number = 18
+const em2px: number = 16
 
 export function toAbsoluteCoordinate(
   coordinate: TikzCoordinate,

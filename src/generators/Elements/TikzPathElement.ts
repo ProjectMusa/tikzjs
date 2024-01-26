@@ -16,7 +16,8 @@ import { TikzSubPathElement } from './TikzSubPathElement'
 import { TikzSubPathLineToElement } from './TikzSubPathLineToElement'
 import { TikzSubPathCurveToElement } from './TikzSubPathCurveToElement'
 import { TikzSubPathGridElement } from './TikzSubPathGridElement'
-export class TikzPathElement implements ElementInterface {
+import { GeometryInterface, BoundingBox, assembleBoundingBox } from '../utils'
+export class TikzPathElement implements ElementInterface, GeometryInterface {
   _ast: TikzPath
   _ctx: Context
   _operations: TikzPathOperation[]
@@ -120,6 +121,10 @@ export class TikzPathElement implements ElementInterface {
     }
 
     if (subPath.valid()) this._subpaths.push(subPath)
+  }
+
+  computeBoundingBox(): BoundingBox | undefined {
+    return assembleBoundingBox(this._subpaths)
   }
 
   render(): HTMLElement[] {

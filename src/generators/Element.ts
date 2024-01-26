@@ -1,6 +1,4 @@
-import { AstNode } from '../parser/TikzAST'
-import { TikzRoot } from '../parser/TikzRoot'
-import { Context } from './Context'
+import { BoundingBox } from './utils'
 
 export interface ElementInterface {
   render(): HTMLElement[]

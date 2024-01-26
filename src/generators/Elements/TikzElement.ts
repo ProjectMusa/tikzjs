@@ -3,11 +3,13 @@ import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzPathElement } from './TikzPathElement'
 import { EGenerators } from '../Generator'
+import { GeometryInterface, BoundingBox, assembleBoundingBox } from '../utils'
 
-export class TikzInlineElement implements ElementInterface {
+export class TikzInlineElement implements ElementInterface, GeometryInterface {
   _ast: TikzInline
   _ctx: Context
   _contents: TikzPathElement[]
+  _padding: number = 20
   constructor(ctx: Context, tikz: TikzInline) {
     this._ast = tikz
     this._ctx = ctx
@@ -16,13 +18,17 @@ export class TikzInlineElement implements ElementInterface {
       this._contents.push(new TikzPathElement(this._ctx, path))
     }
   }
+
+  computeBoundingBox(): BoundingBox | undefined {
+    return assembleBoundingBox(this._contents)
+  }
+
   render(): HTMLElement[] {
     let result: HTMLElement[] = []
     if (this._ctx.generator === EGenerators.svg) {
       let svg = document.createElement('svg')
       svg.classList.add('inline')
       svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-      svg.setAttribute('viewBox', '-100 -100 200 200')
       // TOOD compute global geometry
       // svg.style.width = width + 'em'
       // svg.style.height = height + 'em'
@@ -35,6 +41,15 @@ export class TikzInlineElement implements ElementInterface {
         svg.append(...nodeElement.render())
       }
       result.push(svg)
+      let box = this.computeBoundingBox()
+      if (box) {
+        svg.setAttribute(
+          'viewBox',
+          `${box.lowerLeft.x - this._padding} ${box.lowerLeft.y - this._padding} ${box.upperRight.x - box.lowerLeft.x + 2 * this._padding} ${box.upperRight.y - box.lowerLeft.y + 2 * this._padding}`,
+        )
+      } else {
+        svg.setAttribute('viewBox', '-100 -100 200 200')
+      }
     } else if (this._ctx.generator === EGenerators.html) {
       // TODO for html add overlay path svg
       // add node katex
