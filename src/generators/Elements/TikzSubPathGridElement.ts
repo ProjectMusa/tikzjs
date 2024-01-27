@@ -1,10 +1,10 @@
 import { TikzSubPathPart } from './TikzSubPathElement'
-import { AbsoluteCoordinate, toAbsoluteCoordinate, toAbsoluteOffset } from '../utils'
+import { AbsoluteCoordinate, cm2px, toAbsoluteCoordinate, toAbsoluteOffset } from '../utils'
 import { BoundingBox } from '../utils'
 export class TikzSubPathGridElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
-  _step_vec: AbsoluteCoordinate = { x: 38, y: 38 }
+  _step_vec: AbsoluteCoordinate = { x: cm2px, y: cm2px }
 
   constructor(start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, step?: AbsoluteCoordinate) {
     this._start = start

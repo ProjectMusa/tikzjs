@@ -39,9 +39,9 @@ export function assembleBoundingBox(glist: GeometryInterface[]): BoundingBox | u
   return box
 }
 
-const cm2px: number = 38
-const ex2px: number = 8
-const em2px: number = 16
+export const cm2px: number = 52
+export const ex2px: number = 8
+export const em2px: number = 16
 
 export function toAbsoluteCoordinate(
   coordinate: TikzCoordinate,

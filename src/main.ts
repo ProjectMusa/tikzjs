@@ -16,7 +16,5 @@ if (require.main === module) {
   let strTikz = fs.readFileSync('./sample/test.tikz', 'utf8')
   const ast = runWorker(strTikz)
   const result = generator_svg.generate(ast as TikzRoot)
-  console.log(JSON.stringify(result))
-  console.log(result[0].outerHTML)
   fs.writeFileSync('./sample/test.svg', result[0].outerHTML)
 }
