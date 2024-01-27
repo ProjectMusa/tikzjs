@@ -22,7 +22,8 @@ export class Context {
     this._nodes = base ? base._nodes : []
   }
 
-  pushuNode(node: TikzNodeElement) {
+  pushNode(node: TikzNodeElement) {
+    if (!node._absolute_coordinate) console.error('Trying to push an undefined node into contex')
     this._nodes.push(node)
   }
 }

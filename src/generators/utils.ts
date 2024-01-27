@@ -35,7 +35,6 @@ export function assembleBoundingBox(glist: GeometryInterface[]): BoundingBox | u
       }
     }
   })
-  console.log(JSON.stringify(box))
   return box
 }
 interface ParameterInterface {

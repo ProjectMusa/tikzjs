@@ -2,12 +2,14 @@ import { AbsoluteCoordinate, assembleBoundingBox } from '../utils'
 import { ElementInterface } from '../Element'
 import { GeometryInterface } from '../utils'
 import { Context } from '../Context'
+import { TikzNodeElement } from './TikzNodeElement'
 import { BoundingBox } from '../utils'
 
 export interface TikzSubPathPart extends GeometryInterface {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
   renderD(): string
+  attachNode?(n: TikzNodeElement): void
 }
 
 export class TikzSubPathElement implements ElementInterface, GeometryInterface {

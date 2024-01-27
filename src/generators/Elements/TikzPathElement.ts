@@ -16,7 +16,7 @@ import { TikzSubPathElement } from './TikzSubPathElement'
 import { TikzSubPathLineToElement } from './TikzSubPathLineToElement'
 import { TikzSubPathCurveToElement } from './TikzSubPathCurveToElement'
 import { TikzSubPathGridElement } from './TikzSubPathGridElement'
-import { GeometryInterface, BoundingBox, assembleBoundingBox } from '../utils'
+import { GeometryInterface, BoundingBox, assembleBoundingBox, toAbsoluteCoordinate, AbsoluteCoordinate } from '../utils'
 export class TikzPathElement implements ElementInterface, GeometryInterface {
   _ast: TikzPath
   _ctx: Context
@@ -43,16 +43,16 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
       if (current instanceof TikzCoordinate) {
         // compute the absolute coordinate of node
         const move_type = current.moveType()
-        if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinate() === undefined) {
-          throw console.error('Relave Coordinate Encountered but coordinate_stack is empty')
+        const lastC = subPath.peekCoordinate()
+        if (move_type !== ECoordinateMoveType.absolute && lastC === undefined) {
+          throw console.error('Relative Coordinate Encountered but coordinate_stack is empty')
         }
-        let newNode = new TikzNodeElement(
-          ctx,
-          current,
-          move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
-        )
-        const newAbsC = newNode.absoluteCoordinate()
-        if (!newAbsC) throw console.error('')
+
+        let newAbsC: AbsoluteCoordinate | undefined
+        if (move_type === ECoordinateMoveType.absolute) newAbsC = toAbsoluteCoordinate(current, { x: 0, y: 0 })
+        else if (lastC) newAbsC = toAbsoluteCoordinate(current, lastC)
+
+        if (!newAbsC) throw console.error('Invalid Absolute Coordinaate')
         if (move_type !== ECoordinateMoveType.relativePass) {
           subPath.pushCoordinate(newAbsC)
         }
@@ -77,7 +77,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           // with known coordinate
           const move_type = current._coordinate.moveType()
           if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinate() === undefined) {
-            throw console.error('Relave Coordinate Encountered but coordinate_stack is empty')
+            throw console.error('Relative Coordinate Encountered but coordinate_stack is empty')
           }
           let newNode = new TikzNodeElement(
             ctx,
@@ -85,12 +85,13 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
             move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
           )
           newNode.setLaTeX(current._contents)
-          ctx.pushuNode(newNode)
+          ctx.pushNode(newNode)
         } else {
-          // with known coordinate
-          let newNode = new TikzNodeElement(ctx, current._coordinate, { x: 0, y: 0 })
+          // with no explicit coordinate
+          let newNode = new TikzNodeElement(ctx)
           newNode.setLaTeX(current._contents)
-          ctx.pushuNode(newNode)
+          // ctx.pushNode(newNode)
+          // try to attach it to SubPathPart
         }
       } else if (current instanceof TikzGridOperation) {
         if (!subPath.ableToInsertNewPart())
@@ -116,7 +117,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
 
       if (bSubPathFinish) {
         // Should finish current subPath
-        this._subpaths.push(subPath)
+        if (subPath.valid()) this._subpaths.push(subPath)
       }
     }
 

@@ -2,6 +2,7 @@ import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzCoordinate } from '../../parser/TikzPathOperations'
 import { AbsoluteCoordinate, parseJaxLength, toAbsoluteCoordinate, utils_constants } from '../utils'
+import { TikzOption } from '../../parser/TikzOptions'
 
 //
 //  Load all the needed components
@@ -31,12 +32,14 @@ export class TikzNodeElement implements ElementInterface {
   _ast?: TikzCoordinate
   _ctx: Context
   _alias?: string
-  _absolute_coordinate?: AbsoluteCoordinate = { x: 38, y: -38 }
+  _absolute_coordinate?: AbsoluteCoordinate
   _latex?: string
+  _options: TikzOption[]
 
   constructor(ctx: Context, coordinate?: TikzCoordinate, baseC?: AbsoluteCoordinate) {
     this._ctx = ctx
     this._ast = coordinate
+    this._options = []
     if (coordinate && baseC) {
       this._absolute_coordinate = toAbsoluteCoordinate(coordinate, baseC)
     }
