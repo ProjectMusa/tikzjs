@@ -38,10 +38,23 @@ export function assembleBoundingBox(glist: GeometryInterface[]): BoundingBox | u
   console.log(JSON.stringify(box))
   return box
 }
+interface ParameterInterface {
+  cm2px: number
+  ex2px: number
+  em2px: number
+  mathJaxBaseShift: number
+  mathJaxContainerWidth: number
+  loosenessPrefactor: number
+}
 
-export const cm2px: number = 52
-export const ex2px: number = 8
-export const em2px: number = 16
+export const utils_constants: ParameterInterface = {
+  cm2px: 52,
+  ex2px: 8,
+  em2px: 16,
+  loosenessPrefactor: 0.54,
+  mathJaxBaseShift: 4,
+  mathJaxContainerWidth: 600,
+}
 
 export function toAbsoluteCoordinate(
   coordinate: TikzCoordinate,
@@ -52,8 +65,8 @@ export function toAbsoluteCoordinate(
     // 2D coordinate input
     if (coordinate._cs_type === 'canvas') {
       return {
-        x: cm2px * offsets[0]._offset + baseC.x,
-        y: -cm2px * offsets[1]._offset + baseC.y,
+        x: utils_constants.cm2px * offsets[0]._offset + baseC.x,
+        y: -utils_constants.cm2px * offsets[1]._offset + baseC.y,
       }
     } else {
       throw console.error('Unknow coordinate system encountered')
@@ -66,12 +79,12 @@ export function toAbsoluteCoordinate(
 
 export function toAbsoluteOffset(offset: TikzCoordinateOffset): number {
   if (offset._unit === undefined || offset._unit === 'cm') {
-    return offset._offset * cm2px
+    return offset._offset * utils_constants.cm2px
   }
   return NaN
 }
 
 export function parseJaxLength(length?: string): number {
-  if (!length) return -1
-  return parseFloat(length.replace(/ex/, '')) * ex2px
+  if (!length) return NaN
+  return parseFloat(length.replace(/ex/, '')) * utils_constants.ex2px
 }

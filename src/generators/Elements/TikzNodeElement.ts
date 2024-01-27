@@ -1,7 +1,7 @@
 import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzCoordinate } from '../../parser/TikzPathOperations'
-import { AbsoluteCoordinate, em2px, ex2px, parseJaxLength, toAbsoluteCoordinate } from '../utils'
+import { AbsoluteCoordinate, parseJaxLength, toAbsoluteCoordinate, utils_constants } from '../utils'
 
 //
 //  Load all the needed components
@@ -64,8 +64,8 @@ export class TikzNodeElement implements ElementInterface {
       let group = document.createElement('g')
       const node = MathJaxDoc.convert(this._latex || '', {
         display: false,
-        em: em2px,
-        ex: ex2px,
+        em: utils_constants.em2px,
+        ex: utils_constants.ex2px,
         containerWidth: 600,
       })
       group.innerHTML = adaptor.innerHTML(node)
@@ -77,12 +77,11 @@ export class TikzNodeElement implements ElementInterface {
         let v = parseJaxLength(style?.split(':')[1].slice(0, -1))
         svg.setAttribute('width', `${w}`)
         svg.setAttribute('height', `${h}`)
-        console.log(w, h, v)
         svg.removeAttribute('style')
         if (this._absolute_coordinate)
           group.setAttribute(
             'transform',
-            `translate(${this._absolute_coordinate.x - w / 2} ${this._absolute_coordinate.y - h - v + 0.5 * ex2px})`,
+            `translate(${this._absolute_coordinate.x - w / 2} ${this._absolute_coordinate.y - h - v + utils_constants.mathJaxBaseShift})`,
           )
       }
       return [group]
