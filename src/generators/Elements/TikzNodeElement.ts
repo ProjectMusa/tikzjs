@@ -37,6 +37,7 @@ export class TikzNodeElement implements ElementInterface {
   _mathJaxSvg?: string
   _height?: number
   _width?: number
+  _rotate?: number = 0
   _vertical_align?: number
   _options: TikzOption[]
 
@@ -56,6 +57,7 @@ export class TikzNodeElement implements ElementInterface {
   setAlias(alias: string) {
     this._alias = alias
   }
+
   setLaTeX(latex?: string) {
     this._latex = latex
     let group = document.createElement('g')
@@ -79,15 +81,17 @@ export class TikzNodeElement implements ElementInterface {
     }
   }
 
-  setOffsets(offset: AbsoluteCoordinate) {
-    this._center = offset
-  }
-
   absoluteCoordinate(): AbsoluteCoordinate | undefined {
     return this._center
   }
 
-  tryPoseAgainst(absC: AbsoluteCoordinate): boolean {
+  tryPoseAgainst(absC: AbsoluteCoordinate, normalVec: AbsoluteCoordinate): boolean {
+    // if no options like above/below is set
+    this._center = absC
+    // TODO if not sloped ignore rotate
+    if (normalVec.y < 0) this._rotate = -180 + (Math.acos(normalVec.y) / Math.PI) * 180
+    else this._rotate = -(Math.acos(normalVec.y) / Math.PI) * 180
+    console.log(this._rotate, normalVec.x, normalVec.y)
     return true
   }
 
@@ -101,7 +105,7 @@ export class TikzNodeElement implements ElementInterface {
       if (this._center && this._width && this._height && this._vertical_align)
         group.setAttribute(
           'transform',
-          `translate(${this._center.x - this._width / 2} ${this._center.y - this._height - this._vertical_align + utils_constants.mathJaxBaseShift})`,
+          `rotate(${this._rotate}, ${this._center.x}, ${this._center.y}) translate(${this._center.x - this._width / 2} ${this._center.y - this._height - this._vertical_align + utils_constants.mathJaxBaseShift})`,
         )
 
       return [group]

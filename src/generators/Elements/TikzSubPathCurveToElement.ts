@@ -5,8 +5,10 @@ import { ECoordinateMoveType } from '../../parser/TikzPathOperations'
 import { BoundingBox } from '../utils'
 import { Bezier, BBox } from 'bezier-js'
 import { TikzNodeElement } from './TikzNodeElement'
+import { Context } from '../Context'
 
 export class TikzSubPathCurveToElement implements TikzSubPathPart {
+  _ctx: Context
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
   _control0?: TikzCoordinate
@@ -14,11 +16,13 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   _bezier?: Bezier
   _attachedNodes: TikzNodeElement[] = []
   constructor(
+    ctx: Context,
     start?: AbsoluteCoordinate,
     end?: AbsoluteCoordinate,
     control0?: TikzCoordinate,
     control1?: TikzCoordinate,
   ) {
+    this._ctx = ctx
     this._start = start
     this._end = end
     this._control0 = control0
@@ -48,7 +52,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
           absC1.x,
           absC1.y,
           this._end.x,
-          this._start.y,
+          this._end.y,
         )
         let bezierBox: BBox = this._bezier.bbox()
         let box: BoundingBox = {
@@ -110,7 +114,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
           absC1.x,
           absC1.y,
           this._end.x,
-          this._start.y,
+          this._end.y,
         )
         return true
       }
@@ -120,7 +124,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
           ? toAbsoluteCoordinate(this._control0, { x: 0, y: 0 })
           : toAbsoluteCoordinate(this._control0, this._start)
       if (absC0) {
-        this._bezier = new Bezier(this._start.x, this._start.y, absC0.x, absC0.y, this._end.x, this._start.y)
+        this._bezier = new Bezier(this._start.x, this._start.y, absC0.x, absC0.y, this._end.x, this._end.y)
         return true
       }
     }
@@ -128,6 +132,16 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   }
 
   tryPoseAattachedNodes(): boolean {
+    // attach at 0.5 by default
+    // TODO add more position options
+    if (!this._bezier) console.error('Error, curve is not well-posed')
+    this._attachedNodes.forEach((node: TikzNodeElement) => {
+      let pt = this._bezier?.compute(0.5)
+      let normal = this._bezier?.normal(0.5)
+      let attachCenter: AbsoluteCoordinate = pt ? { x: pt.x, y: pt.y } : { x: 0, y: 0 }
+      let normalVec: AbsoluteCoordinate = normal ? { x: normal.x, y: normal.y } : { x: 0, y: 1 }
+      if (node.tryPoseAgainst(attachCenter, normalVec)) this._ctx.pushNode(node)
+    })
     return true
   }
 }

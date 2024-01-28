@@ -120,7 +120,13 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         if (!startCoordinate) {
           throw console.log(`Unknown start coordinate for TikzCurveOperation ${JSON.stringify(current)}`)
         }
-        let newCurveElement = new TikzSubPathCurveToElement(startCoordinate, undefined, current._c0, current._c1)
+        let newCurveElement = new TikzSubPathCurveToElement(
+          this._ctx,
+          startCoordinate,
+          undefined,
+          current._c0,
+          current._c1,
+        )
         subPath.pushPart(newCurveElement)
       } else {
         throw console.error('Unknown Operation on TikzPath')
