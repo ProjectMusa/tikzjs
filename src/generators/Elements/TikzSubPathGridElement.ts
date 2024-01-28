@@ -1,8 +1,11 @@
 import { TikzSubPathPart } from './TikzSubPathElement'
 import { AbsoluteCoordinate, BoundingBox, utils_constants } from '../utils'
+import { TikzNodeElement } from './TikzNodeElement'
 export class TikzSubPathGridElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
+  _attachedNodes: TikzNodeElement[] = []
+
   _step_vec: AbsoluteCoordinate = { x: utils_constants.cm2px, y: utils_constants.cm2px }
 
   constructor(start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, step?: AbsoluteCoordinate) {
@@ -52,5 +55,21 @@ export class TikzSubPathGridElement implements TikzSubPathPart {
     }
     result.push(`M ${this._end.x} ${this._end.y}`)
     return result.join(' ')
+  }
+
+  attachNode(n: TikzNodeElement): boolean {
+    this._attachedNodes.push(n)
+    return true
+  }
+
+  tryPoseSelf(): boolean {
+    if (this._start && this._end) {
+      return true
+    }
+    return false
+  }
+
+  tryPoseAattachedNodes(): boolean {
+    return true
   }
 }

@@ -4,6 +4,7 @@ import { TikzCoordinate } from '../../parser/TikzPathOperations'
 import { ECoordinateMoveType } from '../../parser/TikzPathOperations'
 import { BoundingBox } from '../utils'
 import { Bezier, BBox } from 'bezier-js'
+import { TikzNodeElement } from './TikzNodeElement'
 
 export class TikzSubPathCurveToElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
@@ -11,6 +12,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   _control0?: TikzCoordinate
   _control1?: TikzCoordinate
   _bezier?: Bezier
+  _attachedNodes: TikzNodeElement[] = []
   constructor(
     start?: AbsoluteCoordinate,
     end?: AbsoluteCoordinate,
@@ -82,5 +84,50 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
           : toAbsoluteCoordinate(this._control1, this._end)
       return `C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
     }
+  }
+
+  attachNode(n: TikzNodeElement): boolean {
+    this._attachedNodes.push(n)
+    return true
+  }
+
+  tryPoseSelf(): boolean {
+    if (this._start && this._end && this._control0 && this._control1) {
+      const absC0 =
+        this._control0.moveType() === ECoordinateMoveType.absolute
+          ? toAbsoluteCoordinate(this._control0, { x: 0, y: 0 })
+          : toAbsoluteCoordinate(this._control0, this._start)
+      const absC1 =
+        this._control1.moveType() === ECoordinateMoveType.absolute
+          ? toAbsoluteCoordinate(this._control1, { x: 0, y: 0 })
+          : toAbsoluteCoordinate(this._control1, this._end)
+      if (absC0 && absC1) {
+        this._bezier = new Bezier(
+          this._start.x,
+          this._start.y,
+          absC0.x,
+          absC0.y,
+          absC1.x,
+          absC1.y,
+          this._end.x,
+          this._start.y,
+        )
+        return true
+      }
+    } else if (this._start && this._end && this._control0) {
+      const absC0 =
+        this._control0.moveType() === ECoordinateMoveType.absolute
+          ? toAbsoluteCoordinate(this._control0, { x: 0, y: 0 })
+          : toAbsoluteCoordinate(this._control0, this._start)
+      if (absC0) {
+        this._bezier = new Bezier(this._start.x, this._start.y, absC0.x, absC0.y, this._end.x, this._start.y)
+        return true
+      }
+    }
+    return false
+  }
+
+  tryPoseAattachedNodes(): boolean {
+    return true
   }
 }

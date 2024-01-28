@@ -42,6 +42,8 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
 
       if (current instanceof TikzCoordinate) {
         // compute the absolute coordinate of node
+        // Todo haandle the path options that may incflunece the coordinates
+        // like \draw[rotate=30] only affect explicit coordinates
         const move_type = current.moveType()
         const lastC = subPath.peekCoordinate()
         if (move_type !== ECoordinateMoveType.absolute && lastC === undefined) {
@@ -61,6 +63,11 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         let lastPart = subPath.peekPart()
         if (lastPart && lastPart._end === undefined) {
           lastPart._end = newAbsC
+          // if lastPart become will-posed
+          // also pose the attached nodes on it
+          if (lastPart.tryPoseSelf()) {
+            lastPart.tryPoseAattachedNodes()
+          }
         }
       } else if (current instanceof TikzLineOperation) {
         if (!subPath.ableToInsertNewPart())
@@ -74,6 +81,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
         if (current._coordinate) {
+          // the parser should asign coordinate for well posed node
           // with known coordinate
           const move_type = current._coordinate.moveType()
           if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinate() === undefined) {
@@ -87,11 +95,14 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           newNode.setLaTeX(current._contents)
           ctx.pushNode(newNode)
         } else {
-          // with no explicit coordinate
+          // with no explicit coordinate, only posible if this is attached to a subPath
           let newNode = new TikzNodeElement(ctx)
           newNode.setLaTeX(current._contents)
-          // ctx.pushNode(newNode)
           // try to attach it to SubPathPart
+          let targetPart = subPath.peekPart()
+          if (targetPart) {
+            targetPart.attachNode(newNode)
+          }
         }
       } else if (current instanceof TikzGridOperation) {
         if (!subPath.ableToInsertNewPart())

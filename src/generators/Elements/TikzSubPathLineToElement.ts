@@ -1,9 +1,11 @@
 import { TikzSubPathPart } from './TikzSubPathElement'
 import { AbsoluteCoordinate, BoundingBox } from '../utils'
 import { ESimpleLineType } from '../../parser/TikzPathOperations'
+import { TikzNodeElement } from './TikzNodeElement'
 export class TikzSubPathLineToElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
+  _attachedNodes: TikzNodeElement[] = []
   _line_type?: ESimpleLineType
   constructor(start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, line_type?: ESimpleLineType) {
     this._start = start
@@ -31,5 +33,21 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
     if (this._line_type === ESimpleLineType.horizontal2vertical) return `H ${this._end?.x} V ${this._end?.y}`
     else if (this._line_type === ESimpleLineType.vertical2horizontal) return `V ${this._end?.y} H ${this._end?.x}`
     else return `L ${this._end?.x} ${this._end?.y}`
+  }
+
+  attachNode(n: TikzNodeElement): boolean {
+    this._attachedNodes.push(n)
+    return true
+  }
+
+  tryPoseSelf(): boolean {
+    if (this._start && this._end && this._line_type !== undefined) {
+      return true
+    }
+    return false
+  }
+
+  tryPoseAattachedNodes(): boolean {
+    return true
   }
 }

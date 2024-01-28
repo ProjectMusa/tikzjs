@@ -23,7 +23,7 @@ export class Context {
   }
 
   pushNode(node: TikzNodeElement) {
-    if (!node._absolute_coordinate) console.error('Trying to push an undefined node into contex')
+    if (!node._center) console.error('Trying to push an undefined node into contex')
     this._nodes.push(node)
   }
 }

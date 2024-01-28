@@ -8,8 +8,14 @@ import { BoundingBox } from '../utils'
 export interface TikzSubPathPart extends GeometryInterface {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
+  _attachedNodes: TikzNodeElement[] // dangling nodes can be attached to SubPathPart
   renderD(): string
-  attachNode?(n: TikzNodeElement): void
+  attachNode(n: TikzNodeElement): boolean // will not influence the geometry
+  tryPoseSelf(): boolean // return is the subpath it self is well-posed
+  tryPoseAattachedNodes(): boolean
+  // when subpath geometry is fixed, pose the dangling nodes attached and push to Context
+  setStartNode?(n: TikzNodeElement): void // influence geometry
+  setEndNode?(n: TikzNodeElement): void // influence geometry
 }
 
 export class TikzSubPathElement implements ElementInterface, GeometryInterface {
