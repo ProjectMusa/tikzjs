@@ -102,7 +102,7 @@ export class TikzNodeElement implements ElementInterface {
       let group = document.createElement('g')
       group.innerHTML = this._mathJaxSvg
 
-      if (this._center && this._width && this._height && this._vertical_align)
+      if (this._center && this._width && this._height && this._vertical_align !== undefined)
         group.setAttribute(
           'transform',
           `rotate(${this._rotate}, ${this._center.x}, ${this._center.y}) translate(${this._center.x - this._width / 2} ${this._center.y - this._height - this._vertical_align + utils_constants.mathJaxBaseShift})`,

@@ -184,35 +184,38 @@ node_content
   / ws { return undefined; }
 
 latex_inline
-  = x:(latex_plain / latex_math)+ { return text(); }
+  = x:(latex_plain / latex_math)+ { return x.join(''); }
 
 latex_plain
-  = p:(latex_plain_primitive)+ { return p.join(''); }
+  = p:(latex_plain_primitive)+ { return `\\text{${text()}}`; }
 
 // this rule must always return a string
 latex_plain_primitive "primitive" =
       char
+    / utf8_char
     / hyphen
-    / decimal_digit
+    / decimal_digit   {return text();}
     / punctuation
     / quotes
-    / escape identifier
+    / escape identifier { return text();}
     / lbrace  rbrace
-    / lbrace (latex_plain_primitive)+ rbrace
+    / lbrace (latex_plain_primitive)+ rbrace { return text(); }
+    / line_break
+    / sp
     
 
 latex_math 
-  = math_shift m:(latex_math_primitive)+ math_shift { return m.join(''); }
-  / inline_math_begin m:(latex_math_primitive)+ inline_math_end { return m.join(''); }
+  = math_shift m:(latex_math_primitive)+ math_shift { return text().slice(1,-1); }
+  / inline_math_begin m:(latex_math_primitive)+ inline_math_end { return text().slice(2,-2); }
 
 latex_math_primitive =
     latex_plain_primitive
     / alignment_tab
     / superscript
     / subscript
-    / escape identifier
+    / escape identifier { return text();}
     / lbrace  rbrace
-    / lbrace (latex_math_primitive)+ rbrace
+    / lbrace (latex_math_primitive)+ rbrace { return text(); }
 
 identifier =
     $char+
@@ -222,13 +225,14 @@ identifier =
 punctuation "punctuation"   = p:[.,;:\*/()!?=+<>]                
 macro_parameter "parameter" = "#"                                
 quotes      "quotes"        = q:[`']                            
-utf8_char   "utf8 char"     = !(latex_math_primitive)
+utf8_char   "utf8 char"     = !(sp/ ctrl_sym/ char/ hyphen / escape / lbrace / rbrace / math_shift / alignment_tab /
+                                superscript / subscript )
                                u:.                              
 hyphen      "hyphen"        = "-"                               
 ctrl_sym    "control symbol"= escape c:[$%#&{}_\-,/@]    
-char        "letter"        = c:[a-z]i                          
+char        "letter"        = c:[a-zA-Z]i                          
 line_break   "line_break"   = ws '\\\\' ws
-escape       "escape"       = '\\'
+escape       "escape"       = '\\' { return '\\'; }
 ctrl_space "latex space"    = ws'\\ 'ws
 
 
@@ -238,13 +242,13 @@ ctrl_space "latex space"    = ws'\\ 'ws
 alignment_tab "alignment"   = ws '&'ws
 superscript "supperscript"  = ws '^' ws
 subscript   "subscript"     = ws '_' ws
-math_shift  "latex inline"  = ws '$' ws &{ return gc.checkValid('$'); } { return gc.toggleMathScope('$'); }
-inline_math_begin = ws '\\(' ws &{ return gc.checkValid('\\('); } { return gc.toggleMathScope('\\('); }
-inline_math_end = ws '\\)' ws &{ return gc.checkValid('\\)'); } { return gc.toggleMathScope('\\)'); }
+math_shift  "latex inline"  = ws '$' ws &{ return gc.checkValid('$'); } { gc.toggleMathScope('$'); return text(); }
+inline_math_begin = ws '\\(' ws &{ return gc.checkValid('\\('); } { gc.toggleMathScope('\\('); return text(); }
+inline_math_end = ws '\\)' ws &{ return gc.checkValid('\\)'); } { gc.toggleMathScope('\\)'); return text(); }
 lpar = ws "(" ws 
 rpar = ws ")" ws 
-rbrace = ws '}' ws &{ return gc.checkValid('rbrace'); } { return gc.endGroup('rbrace'); }
-lbrace = ws '{' ws &{ return gc.checkValid('lbrace'); } { return gc.beginGroup('lbrace'); }
+rbrace = ws '}' ws &{ return gc.checkValid('rbrace'); } {gc.endGroup('rbrace'); return text();}
+lbrace = ws '{' ws &{ return gc.checkValid('lbrace'); } {gc.beginGroup('lbrace'); return text(); }
 lbracket = ws '[' ws 
 rbracket =ws ']' ws
 comma = ws ',' ws
@@ -262,6 +266,7 @@ at = ws 'at' ws
 to = ws 'to' ws
 and = ws 'and' ws
 ws "whitespace" = [ \t\n\r]*
+sp = [ \t]+ {return ' ';}
 
 number
   = signed_integer_literal tight_dot decimal_digit* {
