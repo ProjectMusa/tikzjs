@@ -202,6 +202,8 @@ latex_plain_primitive "primitive" =
     / lbrace (latex_plain_primitive)+ rbrace { return text(); }
     / line_break
     / sp
+    / ctrl_space
+    / ctrl_sym
     
 
 latex_math 

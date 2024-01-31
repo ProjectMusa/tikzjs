@@ -2576,6 +2576,12 @@ function peg$parse(input, options) {
                       s0 = peg$parseline_break();
                       if (s0 === peg$FAILED) {
                         s0 = peg$parsesp();
+                        if (s0 === peg$FAILED) {
+                          s0 = peg$parsectrl_space();
+                          if (s0 === peg$FAILED) {
+                            s0 = peg$parsectrl_sym();
+                          }
+                        }
                       }
                     }
                   }

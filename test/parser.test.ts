@@ -94,3 +94,18 @@ test('node_latex_test', () => {
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
+
+test('node_latex_plaintext_test', () => {
+  const result = runWorker(
+    '\\tikz[]{ \\path[draw](0,0) -- node[draw] {\\textcolor{red}{sd}$x^{\\frac{1}{2}}$} (2,2cm); }',
+  )
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
+
+test('node_latex_plaintext_test_2', () => {
+  const result = runWorker(
+    `\\tikz[]{\\path[draw] (0, 0) node at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};}`)
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
