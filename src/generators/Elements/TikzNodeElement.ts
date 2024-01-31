@@ -24,6 +24,7 @@ const MathJaxDoc = mathjax.document('', {
       ['$', '$'],
       ['\\(', '\\)'],
     ],
+    formatError: (jax:any, err:any) => {throw Error('TeX error: ' + err.message);}
   }),
   OutputJax: new SVG({ fontCache: 'none' }),
 })
@@ -67,6 +68,7 @@ export class TikzNodeElement implements ElementInterface {
       ex: utils_constants.ex2px,
       containerWidth: utils_constants.mathJaxContainerWidth,
     })
+    
     group.innerHTML = adaptor.innerHTML(node)
     let svg = group.firstElementChild
     if (svg !== null) {
