@@ -1,5 +1,6 @@
 import { TikzNodeElement } from './Elements/TikzNodeElement'
 import { EGenerators } from './Generator'
+import { AbsoluteCoordinate } from './utils'
 
 export class Context {
   generator?: EGenerators
@@ -25,5 +26,14 @@ export class Context {
   pushNode(node: TikzNodeElement) {
     if (!node._center) console.error('Trying to push an undefined node into contex')
     this._nodes.push(node)
+  }
+
+  getNodeCoordinate(alias:string, anchor?: string): AbsoluteCoordinate | undefined {
+    for( let nd of this._nodes) {
+      if(nd._alias === alias){
+        return nd.getAnchor(anchor? anchor : 'center')
+      }
+    }
+    return undefined
   }
 }

@@ -4,6 +4,7 @@ import {
   TikzCurveOperation,
   TikzGridOperation,
   TikzLineOperation,
+  TikzNodeAliasCoordinate,
   TikzNodeOperation,
   TikzPathOperation,
 } from '../../parser/TikzPathOperations'
@@ -39,8 +40,25 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
 
     for (let current of this._operations) {
       let bSubPathFinish = false
+      if(current instanceof TikzNodeAliasCoordinate) {
+        let absC = this._ctx.getNodeCoordinate(current._target_alias, current._anchor)
+        if(absC === undefined) {
+          throw console.error(`Unknown node anchor alias ${current._target_alias}.${current._anchor} in current context`)
+        }
+        subPath.pushCoordinate(absC)
 
-      if (current instanceof TikzCoordinate) {
+        // handle _end in SubPathPart
+        let lastPart = subPath.peekPart()
+        if (lastPart && lastPart._end === undefined) {
+          lastPart._end = absC
+          // if lastPart become will-posed
+          // also pose the attached nodes on it
+          if (lastPart.tryPoseSelf()) {
+            lastPart.tryPoseAattachedNodes()
+          }
+        }
+      }
+      else if (current instanceof TikzCoordinate) {
         // compute the absolute coordinate of node
         // Todo haandle the path options that may incflunece the coordinates
         // like \draw[rotate=30] only affect explicit coordinates
@@ -93,6 +111,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
             move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
           )
           newNode.setLaTeX(current._contents)
+          newNode.setAlias(current._alias)
           ctx.pushNode(newNode)
         } else {
           // with no explicit coordinate, only posible if this is attached to a subPath

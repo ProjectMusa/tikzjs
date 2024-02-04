@@ -1,6 +1,5 @@
 import { AstNode, AstLocation } from './TikzAST'
 import { TikzOption } from './TikzOptions'
-import { TikzPathOperation } from './TikzPathOperations'
 import { TikzPath } from './TikzPath'
 export class TikzRoot extends AstNode {
   constructor(location: AstLocation, children: AstNode[]) {

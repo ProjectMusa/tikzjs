@@ -39,6 +39,17 @@ export class TikzCoordinate extends TikzPathOperation {
   }
 }
 
+export class TikzNodeAliasCoordinate extends TikzCoordinate {
+  _target_alias: string
+  _anchor: string
+  constructor(location: AstLocation, alias: string, anchor?: string){
+    super(location, [])
+    this._type = this.constructor.name
+    this._target_alias = alias 
+    this._anchor = anchor? anchor: 'center'
+  }
+}
+
 export class TikzCoordinateOffset extends AstNode {
   _unit?: string
   _offset: number
@@ -103,11 +114,13 @@ export class TikzToPathOperation extends TikzPathOperation {
 export class TikzNodeOperation extends TikzPathOperation {
   _coordinate?: TikzCoordinate
   _contents?: string
+  _alias?: string
   _options: TikzOption[]
-  constructor(location: AstLocation, options: TikzOption[], coordinate?: TikzCoordinate, contents?: string) {
+  constructor(location: AstLocation, options: TikzOption[], alias?:string, coordinate?: TikzCoordinate, contents?: string) {
     super(location)
     this._type = this.constructor.name
     this._options = options
+    this._alias = alias
     this._coordinate = coordinate
     this._contents = contents
   }

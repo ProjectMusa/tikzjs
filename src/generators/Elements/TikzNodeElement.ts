@@ -1,7 +1,7 @@
 import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzCoordinate } from '../../parser/TikzPathOperations'
-import { AbsoluteCoordinate, GeometryInterface, parseJaxLength, toAbsoluteCoordinate, utils_constants } from '../utils'
+import { AbsoluteCoordinate, BoundingBox, GeometryInterface, parseJaxLength, toAbsoluteCoordinate, utils_constants } from '../utils'
 import { TikzOption } from '../../parser/TikzOptions'
 
 //
@@ -29,7 +29,7 @@ const MathJaxDoc = mathjax.document('', {
   OutputJax: new SVG({ fontCache: 'none' }),
 })
 
-export class TikzNodeElement implements ElementInterface {
+export class TikzNodeElement implements ElementInterface, GeometryInterface {
   _ast?: TikzCoordinate
   _ctx: Context
   _alias?: string
@@ -38,6 +38,7 @@ export class TikzNodeElement implements ElementInterface {
   _mathJaxSvg?: string
   _height?: number
   _width?: number
+  _padding: number = 0.1
   _rotate?: number = 0
   _vertical_align?: number
   _options: TikzOption[]
@@ -52,10 +53,15 @@ export class TikzNodeElement implements ElementInterface {
   }
 
   getAnchor(strAnchor: string): AbsoluteCoordinate | undefined {
-    return this._center
+    if(! this._center || ! this._width || !this._height) return undefined
+    if(strAnchor === 'center') return this._center
+    else if(strAnchor === 'west') return {x: this._center.x- this._width* (0.5 + this._padding), y: this._center.y};
+    else if (strAnchor === 'east') return {x: this._center.x + this._width* (0.5 + this._padding), y: this._center.y};
+    else if (strAnchor === 'north') return {x: this._center.x, y:this._center.y - this._height* (0.5 + this._padding)};
+    else if(strAnchor === 'south') return {x: this._center.x, y:this._center.y + this._height* (0.5 + this._padding)};
   }
 
-  setAlias(alias: string) {
+  setAlias(alias?: string) {
     this._alias = alias
   }
 
@@ -92,9 +98,27 @@ export class TikzNodeElement implements ElementInterface {
     this._center = absC
     // TODO if not sloped ignore rotate
     if (normalVec.y < 0) this._rotate = -180 + (Math.acos(normalVec.y) / Math.PI) * 180
-    else this._rotate = -(Math.acos(normalVec.y) / Math.PI) * 180
+    else this._rotate = (Math.acos(normalVec.y) / Math.PI) * 180
     console.log(this._rotate, normalVec.x, normalVec.y)
     return true
+  }
+
+  computeBoundingBox(): BoundingBox | undefined {
+    if(this._center && this._width && this._height)
+    {
+      let box: BoundingBox = {
+        lowerLeft: {
+          x: this._center.x - 0.5* this._width,
+          y: this._center.y - 0.5* this._height,
+        },
+        upperRight: {
+          x: this._center.x + 0.5* this._width,
+          y: this._center.y + 0.5 * this._height,
+        },
+      }
+      return box
+    }
+    return undefined
   }
 
   render(): HTMLElement[] {

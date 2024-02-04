@@ -20,7 +20,7 @@ export class TikzInlineElement implements ElementInterface, GeometryInterface {
   }
 
   computeBoundingBox(): BoundingBox | undefined {
-    return assembleBoundingBox(this._contents)
+    return assembleBoundingBox([...this._contents, ...this._ctx._nodes])
   }
 
   render(): HTMLElement[] {

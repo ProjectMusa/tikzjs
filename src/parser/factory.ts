@@ -10,6 +10,7 @@ import {
   TikzCurveOperation,
   TikzToPathOperation,
   TikzNodeOperation,
+  TikzNodeAliasCoordinate,
 } from './TikzPathOperations'
 import { group_checker } from './group_checker'
 
@@ -21,6 +22,7 @@ export const factory = {
   tikzPath: TikzPath,
   tikzCoordinate: TikzCoordinate,
   tikzCoordinateOffset: TikzCoordinateOffset,
+  tikzNodeAliasCoordinate: TikzNodeAliasCoordinate,
   tikzLineOperation: TikzLineOperation,
   tikzGridOperation: TikzGridOperation,
   tikzCurveOperation: TikzCurveOperation,

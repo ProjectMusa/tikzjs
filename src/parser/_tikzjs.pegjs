@@ -33,7 +33,7 @@ option_list "option list"
   = x:(option|.., comma|) comma? { return x; }
 
 option "tikz option"
-  = b:bool_option { return ft.tikzOption(location(), b); } //TODO add  override option
+  = b:bool_option { return ft.tikzOption(location(), b); }
   // / ov:override_option { return ft.tikzOption(location(), ov); }
 
 bool_option "bool option" //TODO add more options
@@ -64,6 +64,9 @@ path_coordinate
   = c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'' ,c.cs_type); }
   / plus c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'+' ,c.cs_type); }
   / plusplus c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'++' ,c.cs_type); }
+  / a:node_alias { return new ft.tikzNodeAliasCoordinate(location(), a, undefined); }
+  / ac: node_alias_anchor { return new ft.tikzNodeAliasCoordinate(location(), ac[0], ac[1]); }
+
 
 coordinate
   = coordinate_canvas 
@@ -97,10 +100,12 @@ statement_list
 
 statement
   = path_statement
-  // \ foreach_statement
+  // / foreach_statement
 
 path_statement
   = h:path_head opt:tikzoption opr:operation_list semicolon { return new ft.tikzPath(location(), h, opt, opr); }
+  / node_path_statement
+
 
 path_head 
   = '\\path'
@@ -114,6 +119,9 @@ path_head
   // //short hand for node shapes
   // / '\\node'
   // / '\\matrix'
+
+node_path_statement
+  = escape n:node_operation opr:operation_list semicolon { return new ft.tikzPath(location(), '\\node', [], [n, ...opr]) }
 
 operation_list
   = list:(path_operation|.., ws|) { return list; }
@@ -170,9 +178,16 @@ topath_operation
 
 // ///////// node operations //////////////
 node_operation
-  = node_head opt:tikzoption at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, at, cnt)}
+  = node_head opt:tikzoption al:node_alias at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, al, at, cnt)}
+  / node_head opt:tikzoption at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, undefined, at, cnt)}
 
 node_head = ws 'node' ws
+
+node_alias 
+  = lpar name:identifier rpar { return name; }
+
+node_alias_anchor 
+  = lpar name:identifier tight_dot anchor: identifier rpar { return [name, anchor]; }
 
 node_at
   = at c:path_coordinate { return c; }
