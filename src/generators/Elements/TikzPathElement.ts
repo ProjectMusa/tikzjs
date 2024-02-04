@@ -117,6 +117,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           // with no explicit coordinate, only posible if this is attached to a subPath
           let newNode = new TikzNodeElement(ctx)
           newNode.setLaTeX(current._contents)
+          newNode.setAlias(current._alias)
           // try to attach it to SubPathPart
           let targetPart = subPath.peekPart()
           if (targetPart) {
