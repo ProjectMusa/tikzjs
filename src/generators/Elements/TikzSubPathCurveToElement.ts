@@ -80,13 +80,13 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
         : toAbsoluteCoordinate(this._control0, this._start)
     if (!this._control1) {
       // quadratic bezier
-      return `Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
+      return `M ${this._start.x} ${this._start.y}Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
     } else {
       const absC1 =
         this._control1.moveType() === ECoordinateMoveType.absolute
           ? toAbsoluteCoordinate(this._control1, { x: 0, y: 0 })
           : toAbsoluteCoordinate(this._control1, this._end)
-      return `C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
+      return `M ${this._start.x} ${this._start.y} C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
     }
   }
 
@@ -139,7 +139,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
       let pt = this._bezier?.compute(0.5)
       let normal = this._bezier?.normal(0.5)
       let attachCenter: AbsoluteCoordinate = pt ? { x: pt.x, y: pt.y } : { x: 0, y: 0 }
-      let normalVec: AbsoluteCoordinate = normal ? { x: normal.x, y: normal.y } : { x: 0, y: 1 }
+      let normalVec: AbsoluteCoordinate = normal ? { x: normal.x, y: normal.y } : { x: 0, y: -1 }
       if (node.tryPoseAgainst(attachCenter, normalVec)) this._ctx.pushNode(node)
     })
     return true

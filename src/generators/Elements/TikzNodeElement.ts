@@ -1,7 +1,14 @@
 import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzCoordinate } from '../../parser/TikzPathOperations'
-import { AbsoluteCoordinate, BoundingBox, GeometryInterface, parseJaxLength, toAbsoluteCoordinate, utils_constants } from '../utils'
+import {
+  AbsoluteCoordinate,
+  BoundingBox,
+  GeometryInterface,
+  parseJaxLength,
+  toAbsoluteCoordinate,
+  utils_constants,
+} from '../utils'
 import { TikzOption } from '../../parser/TikzOptions'
 
 //
@@ -24,7 +31,9 @@ const MathJaxDoc = mathjax.document('', {
       ['$', '$'],
       ['\\(', '\\)'],
     ],
-    formatError: (jax:any, err:any) => {throw Error('TeX error: ' + err.message);}
+    formatError: (jax: any, err: any) => {
+      throw Error('TeX error: ' + err.message)
+    },
   }),
   OutputJax: new SVG({ fontCache: 'none' }),
 })
@@ -38,9 +47,10 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
   _mathJaxSvg?: string
   _height?: number
   _width?: number
-  _padding: number = 0.1
-  _rotate?: number = 0
+  _padding: number = 8
+  _rotate: number = 0
   _vertical_align?: number
+  _align_vector: AbsoluteCoordinate = { x: 0, y: -1 }
   _options: TikzOption[]
 
   constructor(ctx: Context, coordinate?: TikzCoordinate, baseC?: AbsoluteCoordinate) {
@@ -53,12 +63,28 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
   }
 
   getAnchor(strAnchor: string): AbsoluteCoordinate | undefined {
-    if(! this._center || ! this._width || !this._height) return undefined
-    if(strAnchor === 'center') return this._center
-    else if(strAnchor === 'west') return {x: this._center.x- this._width* (0.5 + this._padding), y: this._center.y};
-    else if (strAnchor === 'east') return {x: this._center.x + this._width* (0.5 + this._padding), y: this._center.y};
-    else if (strAnchor === 'north') return {x: this._center.x, y:this._center.y - this._height* (0.5 + this._padding)};
-    else if(strAnchor === 'south') return {x: this._center.x, y:this._center.y + this._height* (0.5 + this._padding)};
+    if (!this._center || !this._width || !this._height) return undefined
+    if (strAnchor === 'center') return this._center
+    else if (strAnchor === 'west')
+      return {
+        x: this._center.x - (this._width * 0.5 + this._padding) * Math.cos((this._rotate / 180.0) * Math.PI),
+        y: this._center.y - (this._width * 0.5 + this._padding) * Math.sin((this._rotate / 180) * Math.PI),
+      }
+    else if (strAnchor === 'east')
+      return {
+        x: this._center.x + (this._width * 0.5 + this._padding) * Math.cos((this._rotate / 180) * Math.PI),
+        y: this._center.y + (this._width * 0.5 + this._padding) * Math.sin((this._rotate / 180) * Math.PI),
+      }
+    else if (strAnchor === 'north')
+      return {
+        x: this._center.x + (this._height * 0.5 + this._padding) * Math.sin((this._rotate / 180) * Math.PI),
+        y: this._center.y - (this._height * 0.5 + this._padding) * Math.cos((this._rotate / 180) * Math.PI),
+      }
+    else if (strAnchor === 'south')
+      return {
+        x: this._center.x - (this._height * 0.5 + this._padding) * Math.sin((this._rotate / 180) * Math.PI),
+        y: this._center.y + (this._height * 0.5 + this._padding) * Math.cos((this._rotate / 180) * Math.PI),
+      }
   }
 
   setAlias(alias?: string) {
@@ -74,7 +100,7 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
       ex: utils_constants.ex2px,
       containerWidth: utils_constants.mathJaxContainerWidth,
     })
-    
+
     group.innerHTML = adaptor.innerHTML(node)
     let svg = group.firstElementChild
     if (svg !== null) {
@@ -96,23 +122,24 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
   tryPoseAgainst(absC: AbsoluteCoordinate, normalVec: AbsoluteCoordinate): boolean {
     // if no options like above/below is set
     this._center = absC
+    if (normalVec.y < 0) this._align_vector = normalVec
+    else this._align_vector = { x: -normalVec.x, y: -normalVec.y }
     // TODO if not sloped ignore rotate
-    if (normalVec.y < 0) this._rotate = -180 + (Math.acos(normalVec.y) / Math.PI) * 180
-    else this._rotate = (Math.acos(normalVec.y) / Math.PI) * 180
-    console.log(this._rotate, normalVec.x, normalVec.y)
+    // if (normalVec.y < 0) this._rotate = -180 + (Math.acos(normalVec.y) / Math.PI) * 180
+    // else this._rotate = (Math.acos(normalVec.y) / Math.PI) * 180
+    this._rotate = 90 - (Math.acos(this._align_vector.x) / Math.PI) * 180
     return true
   }
 
   computeBoundingBox(): BoundingBox | undefined {
-    if(this._center && this._width && this._height)
-    {
+    if (this._center && this._width && this._height) {
       let box: BoundingBox = {
         lowerLeft: {
-          x: this._center.x - 0.5* this._width,
-          y: this._center.y - 0.5* this._height,
+          x: this._center.x - 0.5 * this._width,
+          y: this._center.y - 0.5 * this._height,
         },
         upperRight: {
-          x: this._center.x + 0.5* this._width,
+          x: this._center.x + 0.5 * this._width,
           y: this._center.y + 0.5 * this._height,
         },
       }
@@ -120,7 +147,9 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
     }
     return undefined
   }
-
+  getAttachPosition(): number {
+    return 0.5
+  }
   render(): HTMLElement[] {
     // no boundary if not option draw
     // no text if no latex

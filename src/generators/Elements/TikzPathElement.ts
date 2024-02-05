@@ -40,10 +40,12 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
 
     for (let current of this._operations) {
       let bSubPathFinish = false
-      if(current instanceof TikzNodeAliasCoordinate) {
+      if (current instanceof TikzNodeAliasCoordinate) {
         let absC = this._ctx.getNodeCoordinate(current._target_alias, current._anchor)
-        if(absC === undefined) {
-          throw console.error(`Unknown node anchor alias ${current._target_alias}.${current._anchor} in current context`)
+        if (absC === undefined) {
+          throw console.error(
+            `Unknown node anchor alias ${current._target_alias}.${current._anchor} in current context`,
+          )
         }
         subPath.pushCoordinate(absC)
 
@@ -57,8 +59,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
             lastPart.tryPoseAattachedNodes()
           }
         }
-      }
-      else if (current instanceof TikzCoordinate) {
+      } else if (current instanceof TikzCoordinate) {
         // compute the absolute coordinate of node
         // Todo haandle the path options that may incflunece the coordinates
         // like \draw[rotate=30] only affect explicit coordinates
@@ -89,12 +90,12 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         }
       } else if (current instanceof TikzLineOperation) {
         if (!subPath.ableToInsertNewPart())
-          throw console.log('new subPathPath part encounterd when last path end undefined')
+          throw console.log('new subPath part encounterd when last path end undefined')
         const startCoordinate = subPath.peekCoordinate()
         if (!startCoordinate) {
           throw console.log(`Unknown start coordinate for TikzLineOperation ${JSON.stringify(current)}`)
         }
-        let newLineToElement = new TikzSubPathLineToElement(startCoordinate, undefined, current._line_type)
+        let newLineToElement = new TikzSubPathLineToElement(this._ctx, startCoordinate, undefined, current._line_type)
 
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
@@ -135,7 +136,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         subPath.pushPart(newGridElement)
       } else if (current instanceof TikzCurveOperation) {
         if (!subPath.ableToInsertNewPart())
-          throw console.log('new subPathPath part encounterd when last path end undefined')
+          throw console.log('new subPath part encounterd when last path end undefined')
         const startCoordinate = subPath.peekCoordinate()
         if (!startCoordinate) {
           throw console.log(`Unknown start coordinate for TikzCurveOperation ${JSON.stringify(current)}`)
