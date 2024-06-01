@@ -16,6 +16,10 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
     this._line_type = line_type
   }
 
+  /**
+   * Computes the bounding box of the line segment defined by the start and end points.
+   * @returns The bounding box of the line segment, or undefined if either the start or end point is missing.
+   */
   computeBoundingBox(): BoundingBox | undefined {
     if (this._start && this._end) {
       let box: BoundingBox = {
@@ -40,6 +44,12 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
     else return `M ${this._start?.x} ${this._start?.y} L ${this._end?.x} ${this._end?.y}`
   }
 
+  /**
+   * Attaches a TikzNodeElement to the current TikzSubPathLineToElement.
+   *
+   * @param n The TikzNodeElement to attach.
+   * @returns A boolean indicating whether the attachment was successful.
+   */
   attachNode(n: TikzNodeElement): boolean {
     this._attachedNodes.push(n)
     return true
@@ -52,6 +62,10 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
     return false
   }
 
+  /**
+   * Tries to pose the attached nodes based on the start and end points of the line element.
+   * @returns A boolean indicating whether the attached nodes were successfully posed.
+   */
   tryPoseAattachedNodes(): boolean {
     if (this._start && this._end && this._line_type !== undefined) {
       let corner: AbsoluteCoordinate

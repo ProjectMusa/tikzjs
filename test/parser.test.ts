@@ -105,28 +105,32 @@ test('node_latex_plaintext_test', () => {
 
 test('node_latex_plaintext_test_2', () => {
   const result = runWorker(
-    `\\tikz[]{\\path[draw] (0, 0) node at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};}`)
+    `\\tikz[]{\\path[draw] (0, 0) node at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};}`,
+  )
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
 
 test('node_alias_test', () => {
   const result = runWorker(
-    `\\tikz[]{\\path[draw] (0, 0) node (a) at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};}`)
+    `\\tikz[]{\\path[draw] (0, 0) node (a) at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};}`,
+  )
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
 
 test('node_alias_test_2', () => {
   const result = runWorker(
-    `\\tikz[]{\\path[draw] node (a) at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (1,1) -- (a);}`)
+    `\\tikz[]{\\path[draw] node (a) at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (1,1) -- (a);}`,
+  )
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
 
 test('node_alias_anchor_test', () => {
   const result = runWorker(
-    `\\tikz[]{\\path[draw] node (a) at (0, 0) {$\\@\\$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (a.east) -- (a.west);}`)
+    `\\tikz[]{\\path[draw] node (a) at (0, 0) {$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (a.east) -- (a.west);}`,
+  )
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })

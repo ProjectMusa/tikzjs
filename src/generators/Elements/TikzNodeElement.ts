@@ -125,8 +125,6 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
     if (normalVec.y < 0) this._align_vector = normalVec
     else this._align_vector = { x: -normalVec.x, y: -normalVec.y }
     // TODO if not sloped ignore rotate
-    // if (normalVec.y < 0) this._rotate = -180 + (Math.acos(normalVec.y) / Math.PI) * 180
-    // else this._rotate = (Math.acos(normalVec.y) / Math.PI) * 180
     this._rotate = 90 - (Math.acos(this._align_vector.x) / Math.PI) * 180
     return true
   }

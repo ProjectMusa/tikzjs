@@ -39,3 +39,21 @@ test('svg_node_latex_test', () => {
   console.log(result[0].outerHTML)
   expect(result)
 })
+
+test('svg_node_alias_test', () => {
+  const ast = runWorker(
+    '\\tikz[]{\\path[draw] node (a) at (0, 0) {$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (1,1) -- (a);}',
+  )
+  const result = generator_svg.generate(ast as TikzRoot)
+  console.log(result[0].outerHTML)
+  expect(result)
+})
+
+test('svg_node_alias_anchor_test', () => {
+  const ast = runWorker(
+    '\\tikz[]{\\path[draw] node (a) at (0, 0) {$zx\\ \\left(\\begin{pmatrix} x & y \\\\ z & w \\end{pmatrix} \\right.$};\n \\path[draw] (a.east) -- (a.west);}',
+  )
+  const result = generator_svg.generate(ast as TikzRoot)
+  console.log(result[0].outerHTML)
+  expect(result)
+})
