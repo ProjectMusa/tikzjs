@@ -18,11 +18,11 @@ import { TikzSubPathLineToElement } from './TikzSubPathLineToElement'
 import { TikzSubPathCurveToElement } from './TikzSubPathCurveToElement'
 import { TikzSubPathGridElement } from './TikzSubPathGridElement'
 import { GeometryInterface, BoundingBox, assembleBoundingBox, toAbsoluteCoordinate, AbsoluteCoordinate } from '../utils'
+import { boolean, string } from 'yargs'
 export class TikzPathElement implements ElementInterface, GeometryInterface {
   _ast: TikzPath
   _ctx: Context
   _operations: TikzPathOperation[]
-  _nodes: TikzNodeElement[]
   _subpaths: TikzSubPathElement[]
   constructor(ctx: Context, path: TikzPath) {
     // in the constructor
@@ -33,7 +33,6 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
     this._ast = path
     this._ctx = ctx
     this._operations = path._operation_list
-    this._nodes = []
     this._subpaths = []
 
     let subPath = new TikzSubPathElement(this._ctx)
@@ -47,12 +46,22 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
             `Unknown node anchor alias ${current._target_alias}.${current._anchor} in current context`,
           )
         }
-        subPath.pushCoordinate(absC)
+
+        var nd = this._ctx.getNode(current._target_alias)
+        if (current._anchor === undefined) {
+          subPath.pushNodeAlias(current._target_alias) // push alias to coordinate stack
+        } else {
+          subPath.pushCoordinate(absC)
+        }
 
         // handle _end in SubPathPart
         let lastPart = subPath.peekPart()
         if (lastPart && lastPart._end === undefined) {
-          lastPart._end = absC
+          if (lastPart.setEndNode !== undefined && nd) {
+            lastPart.setEndNode(nd)
+          } else {
+            lastPart._end = absC
+          }
           // if lastPart become will-posed
           // also pose the attached nodes on it
           if (lastPart.tryPoseSelf()) {
@@ -91,19 +100,27 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
       } else if (current instanceof TikzLineOperation) {
         if (!subPath.ableToInsertNewPart())
           throw console.log('new subPath part encounterd when last path end undefined')
-        const startCoordinate = subPath.peekCoordinate()
+        const start = subPath.peekCoordinateOrNodeAlias()
+        var startCoordinate: AbsoluteCoordinate | undefined = undefined
+        var startNode: TikzNodeElement | undefined = undefined
+        if (typeof start === 'string') {
+          startCoordinate = this._ctx.getNodeCoordinate(start)
+          startNode = this._ctx.getNode(start)
+        } else {
+          startCoordinate = start as AbsoluteCoordinate
+        }
         if (!startCoordinate) {
-          throw console.log(`Unknown start coordinate for TikzLineOperation ${JSON.stringify(current)}`)
+          throw console.log(`Unknown start for TikzLineOperation ${JSON.stringify(current)}`)
         }
         let newLineToElement = new TikzSubPathLineToElement(this._ctx, startCoordinate, undefined, current._line_type)
-
+        if (startNode) newLineToElement.setStartNode(startNode)
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
         if (current._coordinate) {
           // the parser should asign coordinate for well posed node
           // with known coordinate
           const move_type = current._coordinate.moveType()
-          if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinate() === undefined) {
+          if (move_type !== ECoordinateMoveType.absolute && subPath.peekCoordinateOrNodeAlias() === undefined) {
             throw console.error('Relative Coordinate Encountered but coordinate_stack is empty')
           }
           let newNode = new TikzNodeElement(
@@ -137,9 +154,17 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
       } else if (current instanceof TikzCurveOperation) {
         if (!subPath.ableToInsertNewPart())
           throw console.log('new subPath part encounterd when last path end undefined')
-        const startCoordinate = subPath.peekCoordinate()
+        const start = subPath.peekCoordinateOrNodeAlias()
+        var startCoordinate: AbsoluteCoordinate | undefined = undefined
+        var startNode: TikzNodeElement | undefined = undefined
+        if (typeof start === 'string') {
+          startCoordinate = this._ctx.getNodeCoordinate(start)
+          startNode = this._ctx.getNode(start)
+        } else {
+          startCoordinate = start as AbsoluteCoordinate
+        }
         if (!startCoordinate) {
-          throw console.log(`Unknown start coordinate for TikzCurveOperation ${JSON.stringify(current)}`)
+          throw console.log(`Unknown start for TikzLineOperation ${JSON.stringify(current)}`)
         }
         let newCurveElement = new TikzSubPathCurveToElement(
           this._ctx,
@@ -148,6 +173,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           current._c0,
           current._c1,
         )
+        if (startNode) newCurveElement.setStartNode(startNode)
         subPath.pushPart(newCurveElement)
       } else {
         throw console.error('Unknown Operation on TikzPath')

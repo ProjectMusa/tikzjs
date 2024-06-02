@@ -11,6 +11,8 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   _ctx: Context
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
+  _startNode?: TikzNodeElement
+  _endNode?: TikzNodeElement
   _control0?: TikzCoordinate
   _control1?: TikzCoordinate
   _bezier?: Bezier
@@ -93,6 +95,17 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   attachNode(n: TikzNodeElement): boolean {
     this._attachedNodes.push(n)
     return true
+  }
+
+  setEndNode(n: TikzNodeElement): void {
+    this._endNode = n
+    // temporary solution
+    this._end = n.getAnchor('center')
+  }
+
+  setStartNode(n: TikzNodeElement): void {
+    this._startNode = n
+    this._start = n.getAnchor('center')
   }
 
   tryPoseSelf(): boolean {

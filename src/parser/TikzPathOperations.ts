@@ -1,3 +1,4 @@
+import { TikzNodeElement } from '../generators/Elements/TikzNodeElement'
 import { AstNode, AstLocation } from './TikzAST'
 import { TikzOption } from './TikzOptions'
 
@@ -41,12 +42,12 @@ export class TikzCoordinate extends TikzPathOperation {
 
 export class TikzNodeAliasCoordinate extends TikzCoordinate {
   _target_alias: string
-  _anchor: string
-  constructor(location: AstLocation, alias: string, anchor?: string){
+  _anchor?: string
+  constructor(location: AstLocation, alias: string, anchor?: string) {
     super(location, [])
     this._type = this.constructor.name
-    this._target_alias = alias 
-    this._anchor = anchor? anchor: 'center'
+    this._target_alias = alias
+    this._anchor = anchor
   }
 }
 
@@ -94,6 +95,8 @@ export class TikzGridOperation extends TikzPathOperation {
 export class TikzCurveOperation extends TikzPathOperation {
   _c0: TikzCoordinate
   _c1?: TikzCoordinate
+  _n0?: TikzNodeElement
+  _n1?: TikzNodeElement
   constructor(location: AstLocation, c0: TikzCoordinate, c1?: TikzCoordinate) {
     super(location)
     this._type = this.constructor.name
@@ -116,7 +119,13 @@ export class TikzNodeOperation extends TikzPathOperation {
   _contents?: string
   _alias?: string
   _options: TikzOption[]
-  constructor(location: AstLocation, options: TikzOption[], alias?:string, coordinate?: TikzCoordinate, contents?: string) {
+  constructor(
+    location: AstLocation,
+    options: TikzOption[],
+    alias?: string,
+    coordinate?: TikzCoordinate,
+    contents?: string,
+  ) {
     super(location)
     this._type = this.constructor.name
     this._options = options

@@ -38,6 +38,12 @@ const MathJaxDoc = mathjax.document('', {
   OutputJax: new SVG({ fontCache: 'none' }),
 })
 
+export enum EShapeType {
+  rectangle = 'rectangle',
+  circle = 'circle',
+  ellipse = 'ellipse',
+}
+
 export class TikzNodeElement implements ElementInterface, GeometryInterface {
   _ast?: TikzCoordinate
   _ctx: Context
@@ -50,6 +56,7 @@ export class TikzNodeElement implements ElementInterface, GeometryInterface {
   _padding: number = 8
   _rotate: number = 0
   _vertical_align?: number
+  _shape: EShapeType = EShapeType.rectangle
   _align_vector: AbsoluteCoordinate = { x: 0, y: -1 }
   _options: TikzOption[]
 

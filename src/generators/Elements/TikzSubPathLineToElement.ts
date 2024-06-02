@@ -7,6 +7,8 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
   _ctx: Context
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
+  _startNode?: TikzNodeElement
+  _endNode?: TikzNodeElement
   _attachedNodes: TikzNodeElement[] = []
   _line_type?: ESimpleLineType
   constructor(ctx: Context, start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, line_type?: ESimpleLineType) {
@@ -53,6 +55,16 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
   attachNode(n: TikzNodeElement): boolean {
     this._attachedNodes.push(n)
     return true
+  }
+
+  setEndNode(n: TikzNodeElement): void {
+    this._endNode = n
+    this._end = n.getAnchor('center')
+  }
+
+  setStartNode(n: TikzNodeElement): void {
+    this._startNode = n
+    this._start = n.getAnchor('center')
   }
 
   tryPoseSelf(): boolean {

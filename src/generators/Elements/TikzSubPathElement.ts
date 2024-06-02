@@ -11,8 +11,8 @@ export interface TikzSubPathPart extends GeometryInterface {
   _attachedNodes: TikzNodeElement[] // dangling nodes can be attached to SubPathPart
   renderD(): string
   attachNode(n: TikzNodeElement): boolean // will not influence the geometry
-  tryPoseSelf(): boolean // return is the subpath it self is well-posed
-  tryPoseAattachedNodes(): boolean
+  tryPoseSelf(): boolean // return true if the subpath it self is well-posed
+  tryPoseAattachedNodes(): boolean // return true if all attached nodes are well-posed
   // when subpath geometry is fixed, pose the dangling nodes attached and push to Context
   setStartNode?(n: TikzNodeElement): void // influence geometry
   setEndNode?(n: TikzNodeElement): void // influence geometry
@@ -23,7 +23,7 @@ export class TikzSubPathElement implements ElementInterface, GeometryInterface {
   // regard less wether it is streight lines or curves arcs
   // render with svg tag <path>
   _parts: TikzSubPathPart[] = []
-  _coordinate_stack: AbsoluteCoordinate[] = []
+  _coordinate_stack: (AbsoluteCoordinate | string)[] = []
   _ctx: Context
 
   constructor(ctx: Context) {
@@ -51,12 +51,25 @@ export class TikzSubPathElement implements ElementInterface, GeometryInterface {
     this._coordinate_stack.push(absC)
   }
 
+  pushNodeAlias(alias: string) {
+    this._coordinate_stack.push(alias)
+  }
+
   pushPart(part: TikzSubPathPart) {
     this._parts.push(part)
   }
 
-  peekCoordinate(): AbsoluteCoordinate | undefined {
+  peekCoordinateOrNodeAlias(): AbsoluteCoordinate | string | undefined {
     return this._coordinate_stack.at(-1)
+  }
+
+  peekCoordinate(): AbsoluteCoordinate | undefined {
+    let top = this._coordinate_stack.at(-1)
+    if (typeof top === 'string') {
+      return this._ctx.getNodeCoordinate(top)
+    } else {
+      return top
+    }
   }
 
   peekPart(): TikzSubPathPart | undefined {
