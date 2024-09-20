@@ -15,6 +15,7 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
   _endNode?: TikzNodeElement
   _control0?: TikzCoordinate
   _control1?: TikzCoordinate
+  _newMove: boolean = true
   _bezier?: Bezier
   _attachedNodes: TikzNodeElement[] = []
   constructor(
@@ -82,13 +83,17 @@ export class TikzSubPathCurveToElement implements TikzSubPathPart {
         : toAbsoluteCoordinate(this._control0, this._start)
     if (!this._control1) {
       // quadratic bezier
-      return `M ${this._start.x} ${this._start.y}Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
+      return this._newMove
+        ? `M ${this._start.x} ${this._start.y}Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
+        : `Q ${absC0?.x} ${absC0?.y} ${this._end.x} ${this._end.y}`
     } else {
       const absC1 =
         this._control1.moveType() === ECoordinateMoveType.absolute
           ? toAbsoluteCoordinate(this._control1, { x: 0, y: 0 })
           : toAbsoluteCoordinate(this._control1, this._end)
-      return `M ${this._start.x} ${this._start.y} C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
+      return this._newMove
+        ? `M ${this._start.x} ${this._start.y} C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
+        : `C ${absC0?.x} ${absC0?.y} ${absC1?.x} ${absC1?.y} ${this._end.x} ${this._end.y}`
     }
   }
 

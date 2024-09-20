@@ -9,6 +9,7 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
   _end?: AbsoluteCoordinate
   _startNode?: TikzNodeElement
   _endNode?: TikzNodeElement
+  _newMove: boolean = true
   _attachedNodes: TikzNodeElement[] = []
   _line_type?: ESimpleLineType
   constructor(ctx: Context, start?: AbsoluteCoordinate, end?: AbsoluteCoordinate, line_type?: ESimpleLineType) {
@@ -40,10 +41,17 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
 
   renderD(): string {
     if (this._line_type === ESimpleLineType.horizontal2vertical)
-      return `M ${this._start?.x} ${this._start?.y} H ${this._end?.x} V ${this._end?.y}`
+      return this._newMove
+        ? `M ${this._start?.x} ${this._start?.y} H ${this._end?.x} V ${this._end?.y}`
+        : `H ${this._end?.x} V ${this._end?.y}`
     else if (this._line_type === ESimpleLineType.vertical2horizontal)
-      return `M ${this._start?.x} ${this._start?.y} V ${this._end?.y} H ${this._end?.x}`
-    else return `M ${this._start?.x} ${this._start?.y} L ${this._end?.x} ${this._end?.y}`
+      return this._newMove
+        ? `M ${this._start?.x} ${this._start?.y} V ${this._end?.y} H ${this._end?.x}`
+        : `V ${this._end?.y} H ${this._end?.x}`
+    else
+      return this._newMove
+        ? `M ${this._start?.x} ${this._start?.y} L ${this._end?.x} ${this._end?.y}`
+        : `L ${this._end?.x} ${this._end?.y}`
   }
 
   /**

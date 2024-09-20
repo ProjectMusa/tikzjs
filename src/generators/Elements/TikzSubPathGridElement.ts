@@ -5,6 +5,7 @@ export class TikzSubPathGridElement implements TikzSubPathPart {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
   _attachedNodes: TikzNodeElement[] = []
+  _newMove: boolean = true
 
   _step_vec: AbsoluteCoordinate = { x: utils_constants.cm2px, y: utils_constants.cm2px }
 

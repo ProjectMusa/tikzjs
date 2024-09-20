@@ -11,6 +11,7 @@ export interface TikzSubPathPart extends GeometryInterface {
   _start?: AbsoluteCoordinate
   _end?: AbsoluteCoordinate
   _attachedNodes: TikzNodeElement[] // dangling nodes can be attached to SubPathPart
+  _newMove: boolean
   renderD(): string
   attachNode(n: TikzNodeElement): boolean // will not influence the geometry
   tryPoseSelf(): boolean // return true if the subpath it self is well-posed

@@ -4,6 +4,7 @@
 import { runWorker } from '../src/main'
 import { generator_svg } from '../src/generators/Generator'
 import { TikzRoot } from '../src/parser/TikzRoot'
+import { Generate } from '..'
 
 test('svg_path_-|_test', () => {
   const ast = runWorker('\\tikz[]{\\path[draw](0,0)-|++(1,1 cm)--++(2,2cm);}')
@@ -59,8 +60,7 @@ test('svg_node_alias_anchor_test', () => {
 })
 
 test('svg_arrow_test', () => {
-  const ast = runWorker('\\tikz[]{\\path[draw, <->] (0,0) -- (1,1);}')
-  const result = generator_svg.generate(ast as TikzRoot)
-  console.log(result[0].outerHTML)
+  let result = Generate('\\tikz[]{\\path[draw, <->] (0,0) -- (1,1);}')
+  console.log(result)
   expect(result)
 })

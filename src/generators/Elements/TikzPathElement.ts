@@ -39,6 +39,8 @@ export class TikzPathElement implements OptionableElementInterface, GeometryInte
     for (let option of path._option_list) {
       this.applyOption(option)
     }
+
+    let newMove = true
     let subPath = new TikzSubPathElement(this._subCtx)
 
     for (let current of this._operations) {
@@ -69,8 +71,12 @@ export class TikzPathElement implements OptionableElementInterface, GeometryInte
           // if lastPart become will-posed
           // also pose the attached nodes on it
           if (lastPart.tryPoseSelf()) {
+            newMove = false
             lastPart.tryPoseAattachedNodes()
           }
+        } else if (lastPart && lastPart._end !== undefined) {
+          // new Node alias encounterd when last part is well pose
+          newMove = true
         }
       } else if (current instanceof TikzCoordinate) {
         // compute the absolute coordinate of node
@@ -97,9 +103,14 @@ export class TikzPathElement implements OptionableElementInterface, GeometryInte
           lastPart._end = newAbsC
           // if lastPart become will-posed
           // also pose the attached nodes on it
+          // set newMove to be false for next part
           if (lastPart.tryPoseSelf()) {
+            newMove = false
             lastPart.tryPoseAattachedNodes()
           }
+        } else if (lastPart && lastPart._end !== undefined) {
+          // last Part is well posed
+          newMove = true
         }
       } else if (current instanceof TikzLineOperation) {
         if (!subPath.ableToInsertNewPart())
@@ -122,6 +133,7 @@ export class TikzPathElement implements OptionableElementInterface, GeometryInte
           undefined,
           current._line_type,
         )
+        newLineToElement._newMove = newMove
         if (startNode) newLineToElement.setStartNode(startNode)
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
@@ -183,6 +195,7 @@ export class TikzPathElement implements OptionableElementInterface, GeometryInte
           current._c0,
           current._c1,
         )
+        newCurveElement._newMove = newMove
         if (startNode) newCurveElement.setStartNode(startNode)
         subPath.pushPart(newCurveElement)
       } else {
