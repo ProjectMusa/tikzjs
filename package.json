@@ -2,7 +2,8 @@
   "name": "tikzjs",
   "version": "0.1.0",
   "description": "",
-  "main": "main.js",
+  "main": "./dist/main.js",
+  "types": "./dist.main.js",
   "scripts": {
     "test": "jest --silent=false",
     "gen": "peggy -o src/parser/_tikzjs.js --cache src/parser/_tikzjs.pegjs",
@@ -37,6 +38,5 @@
   },
   "exports": {
     ".": "./dist/main.js"
-  },
-  "types": "./dist/main.js"
+  }
 }
