@@ -37,5 +37,6 @@
   },
   "exports": {
     ".": "./dist/main.js"
-  }
+  },
+  "types": "./dist/main.js"
 }

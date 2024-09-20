@@ -11,6 +11,12 @@ export function runWorker(s: string): Object {
   return parse(s, {}) as TikzRoot
 }
 
+export function Generate(s: string): string {
+  const ast = runWorker(s)
+  const result = generator_svg.generate(ast as TikzRoot)
+  return result[0].outerHTML
+}
+
 if (require.main === module) {
   // Uncomment to compile ./test/test.btx to ./test/test.html
   let strTikz = fs.readFileSync('./sample/test.tikz', 'utf8')
