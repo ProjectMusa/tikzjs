@@ -1,9 +1,11 @@
 import { AbsoluteCoordinate, assembleBoundingBox } from '../utils'
-import { ElementInterface } from '../Element'
+import { OptionableElementInterface } from '../Element'
 import { GeometryInterface } from '../utils'
 import { Context } from '../Context'
 import { TikzNodeElement } from './TikzNodeElement'
 import { BoundingBox } from '../utils'
+import { defaultArrowMarker, defaultReversedArrowMarker, TikzMarkerElement } from './TikzMarkerElement'
+import { TikzColorOption, TikzOption } from '../../parser/TikzOptions'
 
 export interface TikzSubPathPart extends GeometryInterface {
   _start?: AbsoluteCoordinate
@@ -18,16 +20,50 @@ export interface TikzSubPathPart extends GeometryInterface {
   setEndNode?(n: TikzNodeElement): void // influence geometry
 }
 
-export class TikzSubPathElement implements ElementInterface, GeometryInterface {
-  // sub path
+export class TikzSubPathElement implements OptionableElementInterface, GeometryInterface {
+  // sub path : means something you need to draw in svg with a single <path> elemnet
+  // While TizkPathElement means a group of TikzSubPathElement that are specified with a single
   // regard less wether it is streight lines or curves arcs
   // render with svg tag <path>
   _parts: TikzSubPathPart[] = []
   _coordinate_stack: (AbsoluteCoordinate | string)[] = []
   _ctx: Context
-
+  _subCtx: Context
+  _startMarker?: TikzMarkerElement
+  _endMarker?: TikzMarkerElement
+  _fill?: string
+  _stroke?: string
   constructor(ctx: Context) {
     this._ctx = ctx
+    this._subCtx = new Context(this._ctx)
+    for (let option of ctx._options) {
+      this.applyOption(option)
+    }
+  }
+
+  applyOption(option: TikzOption): void {
+    if (option instanceof TikzColorOption) {
+      if (option._fill) this._fill = option._fill
+      if (option._stroke) this._stroke = option._stroke
+      this._subCtx.pushOption(option)
+    } else {
+      switch (option._option_key) {
+        case '->':
+          this._endMarker = defaultArrowMarker
+          this._ctx.useMarker(defaultArrowMarker._uid)
+          return
+        case '<-':
+          this._startMarker = defaultReversedArrowMarker
+          this._ctx.useMarker(defaultReversedArrowMarker._uid)
+          return
+        case '<->':
+          this._startMarker = defaultReversedArrowMarker
+          this._endMarker = defaultArrowMarker
+          this._ctx.useMarker(defaultArrowMarker._uid)
+          this._ctx.useMarker(defaultReversedArrowMarker._uid)
+          return
+      }
+    }
   }
 
   valid(): boolean {
@@ -80,16 +116,26 @@ export class TikzSubPathElement implements ElementInterface, GeometryInterface {
     let subPath = document.createElement('path')
     let dlist: string[] = []
     let d: string = ''
-    let bFirst = true
     for (let part of this._parts) {
-      if (bFirst) {
-        dlist.push(`M ${part._start?.x} ${part._start?.y}`)
-        bFirst = false
-      }
       dlist.push(part.renderD())
     }
     d = dlist.join(' ')
     subPath.setAttribute('d', d)
+    if (this._startMarker) {
+      subPath.setAttribute('marker-start', `url(#${this._startMarker._uid})`)
+    }
+    if (this._endMarker) {
+      subPath.setAttribute('marker-end', `url(#${this._endMarker._uid})`)
+    }
+
+    if (this._fill) {
+      subPath.setAttribute('fill', this._fill)
+    }
+
+    if (this._stroke) {
+      subPath.setAttribute('stroke', this._stroke)
+    }
+
     return [subPath]
   }
 }

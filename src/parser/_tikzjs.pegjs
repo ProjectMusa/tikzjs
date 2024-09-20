@@ -33,11 +33,51 @@ option_list "option list"
   = x:(option|.., comma|) comma? { return x; }
 
 option "tikz option"
-  = b:bool_option { return ft.tikzOption(location(), b); }
-  // / ov:override_option { return ft.tikzOption(location(), ov); }
+  = ov:override_option { return ov; }
+  / b:bool_option { return b; }
 
 bool_option "bool option" //TODO add more options
-  = 'draw'
+  = d:'draw' { return new ft.tikzColorOption(location(), undefined, '#000000'); }
+  / a:'<->' { return new ft.tikzOption(location(), a); }
+  / a:'->' { return new ft.tikzOption(location(), a); }
+  / a:'<-' { return new ft.tikzOption(location(), a); }
+  / c:color_literal { return new ft.tikzColorOption(location(), c,c); }
+  / k:'above' { return new ft.tikzNodeOption(location(), k, undefined); }
+  / k:'below' { return new ft.tikzNodeOption(location(), k, undefined); }
+  / k:'sloped' { return new ft.tikzNodeOption(location(), k, undefined); }
+
+override_option "override option"
+  = k:'color' eq c:color_literal { return new ft.tikzColorOption(location(), c, c); }
+  / k:'draw' eq c:color_literal { return new ft.tikzColorOption(location(), undefined, c); }
+  / k:'fill' eq c:color_literal { return new ft.tikzColorOption(location(), c, undefined); }
+  / k:'above' eq s:offset_expr { return new ft.tikzNodeOption(location(), k, s); }
+  / k:'below' eq s:offset_expr { return new ft.tikzNodeOption(location(), k, s); }
+  / k:'pos' eq s:offset_expr   { return new ft.tikzNodeOption(location(), k, s); }
+
+color_literal "color literal"
+  = 'red' { return '#FF0000'; }
+  / 'green' { return '#00FF00'; }
+  / 'blue' { return '#0000FF'; }
+  / 'cyan' { return '#00FFFF'; }
+  / 'magenta' { return '#FF00FF'; }
+  / 'yellow' { return '#FFFF00'; }
+  / 'black' { return '#000000'; }
+  / 'gray' { return '#808080'; }
+  / 'white' { return '#FFFFFF'; }
+  / 'darkgray' { return '#A9A9A9'; }
+  / 'lightgray' { return '#D3D3D3'; }
+  / 'brown' { return '#964B00'; }
+  / 'lime' { return '#BFFF00';}
+  / 'olive' { return '#808000'; }
+  / 'orange' { return '#FFA500'; }
+  / 'pink' { return '#FFC0CB'; }
+  / 'purple' { return '#800080'; }
+  / 'teal' { return '#008080'; }
+  / 'violet' { return '#FF0000'; }
+  / c:hexcolor { return c; }
+
+hexcolor
+  = '#' hex_digit |6| 
 
 tikzcontent
   = ws list:statement_list ws { return list; }
@@ -267,7 +307,7 @@ rpar = ws ")" ws
 rbrace = ws '}' ws &{ return gc.checkValid('rbrace'); } {gc.endGroup('rbrace'); return text();}
 lbrace = ws '{' ws &{ return gc.checkValid('lbrace'); } {gc.beginGroup('lbrace'); return text(); }
 lbracket = ws '[' ws 
-rbracket =ws ']' ws
+rbracket = ws ']' ws
 comma = ws ',' ws
 colon = ws ':' ws
 semicolon = ws ';' ws
@@ -305,6 +345,11 @@ decimal_integer_literal
 
 decimal_digit
   = [0-9]
+
+hex_digit
+  = [0-9]
+  / [A-F]
+  / [a-f]
 
 nonzero_digit
   = [1-9]

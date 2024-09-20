@@ -1,7 +1,7 @@
 import { TikzInline, TikzPicture, TikzRoot } from './TikzRoot'
 import { TikzLiteral } from './TikzLiteral'
 import { TikzPath } from './TikzPath'
-import { TikzOption } from './TikzOptions'
+import { TikzColorOption, TikzNodeOption, TikzOption } from './TikzOptions'
 import {
   TikzCoordinate,
   TikzCoordinateOffset,
@@ -29,6 +29,8 @@ export const factory = {
   tikzToPathOperation: TikzToPathOperation,
   tikzNodeOperation: TikzNodeOperation,
   tikzOption: TikzOption,
+  tikzColorOption: TikzColorOption,
+  tikzNodeOption: TikzNodeOption,
 }
 
 export const g = group_checker

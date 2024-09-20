@@ -134,3 +134,15 @@ test('node_alias_anchor_test', () => {
   console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
   expect(result)
 })
+
+test('arrow_option_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw,<->] (0,0) -- (1,1);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})
+
+test('color_option_test', () => {
+  const result = runWorker('\\tikz[]{\\path[draw=blue,fill=red,<->] (0,0) -- node[green]{a} (1,1) -- (1,0);}')
+  console.log(JSON.stringify(result, beautifyReplacer(), tabsize))
+  expect(result)
+})

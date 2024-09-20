@@ -11,17 +11,18 @@ import {
 import { TikzPath } from '../../parser/TikzPath'
 import { Context } from '../Context'
 
-import { ElementInterface } from '../Element'
+import { ElementInterface, OptionableElementInterface } from '../Element'
 import { TikzNodeElement } from './TikzNodeElement'
 import { TikzSubPathElement } from './TikzSubPathElement'
 import { TikzSubPathLineToElement } from './TikzSubPathLineToElement'
 import { TikzSubPathCurveToElement } from './TikzSubPathCurveToElement'
 import { TikzSubPathGridElement } from './TikzSubPathGridElement'
 import { GeometryInterface, BoundingBox, assembleBoundingBox, toAbsoluteCoordinate, AbsoluteCoordinate } from '../utils'
-import { boolean, string } from 'yargs'
-export class TikzPathElement implements ElementInterface, GeometryInterface {
+import { TikzOption } from '../../parser/TikzOptions'
+export class TikzPathElement implements OptionableElementInterface, GeometryInterface {
   _ast: TikzPath
-  _ctx: Context
+  _ctx: Context // Defining Context for self
+  _subCtx: Context // Context for Child Elements
   _operations: TikzPathOperation[]
   _subpaths: TikzSubPathElement[]
   constructor(ctx: Context, path: TikzPath) {
@@ -32,22 +33,25 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
     // 4. build nodes and subpaths
     this._ast = path
     this._ctx = ctx
+    this._subCtx = new Context(ctx)
     this._operations = path._operation_list
     this._subpaths = []
-
-    let subPath = new TikzSubPathElement(this._ctx)
+    for (let option of path._option_list) {
+      this.applyOption(option)
+    }
+    let subPath = new TikzSubPathElement(this._subCtx)
 
     for (let current of this._operations) {
       let bSubPathFinish = false
       if (current instanceof TikzNodeAliasCoordinate) {
-        let absC = this._ctx.getNodeCoordinate(current._target_alias, current._anchor)
+        let absC = this._subCtx.getNodeCoordinate(current._target_alias, current._anchor)
         if (absC === undefined) {
           throw console.error(
             `Unknown node anchor alias ${current._target_alias}.${current._anchor} in current context`,
           )
         }
 
-        var nd = this._ctx.getNode(current._target_alias)
+        var nd = this._subCtx.getNode(current._target_alias)
         if (current._anchor === undefined) {
           subPath.pushNodeAlias(current._target_alias) // push alias to coordinate stack
         } else {
@@ -104,15 +108,20 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         var startCoordinate: AbsoluteCoordinate | undefined = undefined
         var startNode: TikzNodeElement | undefined = undefined
         if (typeof start === 'string') {
-          startCoordinate = this._ctx.getNodeCoordinate(start)
-          startNode = this._ctx.getNode(start)
+          startCoordinate = this._subCtx.getNodeCoordinate(start)
+          startNode = this._subCtx.getNode(start)
         } else {
           startCoordinate = start as AbsoluteCoordinate
         }
         if (!startCoordinate) {
           throw console.log(`Unknown start for TikzLineOperation ${JSON.stringify(current)}`)
         }
-        let newLineToElement = new TikzSubPathLineToElement(this._ctx, startCoordinate, undefined, current._line_type)
+        let newLineToElement = new TikzSubPathLineToElement(
+          this._subCtx,
+          startCoordinate,
+          undefined,
+          current._line_type,
+        )
         if (startNode) newLineToElement.setStartNode(startNode)
         subPath.pushPart(newLineToElement)
       } else if (current instanceof TikzNodeOperation) {
@@ -125,6 +134,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           }
           let newNode = new TikzNodeElement(
             ctx,
+            current,
             current._coordinate,
             move_type === ECoordinateMoveType.absolute ? { x: 0, y: 0 } : subPath.peekCoordinate(),
           )
@@ -133,7 +143,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           ctx.pushNode(newNode)
         } else {
           // with no explicit coordinate, only posible if this is attached to a subPath
-          let newNode = new TikzNodeElement(ctx)
+          let newNode = new TikzNodeElement(ctx, current)
           newNode.setLaTeX(current._contents)
           newNode.setAlias(current._alias)
           // try to attach it to SubPathPart
@@ -153,13 +163,13 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
         subPath.pushPart(newGridElement)
       } else if (current instanceof TikzCurveOperation) {
         if (!subPath.ableToInsertNewPart())
-          throw console.log('new subPath part encounterd when last path end undefined')
+          throw console.log('new subPath part encounterd when last subPath end undefined')
         const start = subPath.peekCoordinateOrNodeAlias()
         var startCoordinate: AbsoluteCoordinate | undefined = undefined
         var startNode: TikzNodeElement | undefined = undefined
         if (typeof start === 'string') {
-          startCoordinate = this._ctx.getNodeCoordinate(start)
-          startNode = this._ctx.getNode(start)
+          startCoordinate = this._subCtx.getNodeCoordinate(start)
+          startNode = this._subCtx.getNode(start)
         } else {
           startCoordinate = start as AbsoluteCoordinate
         }
@@ -167,7 +177,7 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
           throw console.log(`Unknown start for TikzLineOperation ${JSON.stringify(current)}`)
         }
         let newCurveElement = new TikzSubPathCurveToElement(
-          this._ctx,
+          this._subCtx,
           startCoordinate,
           undefined,
           current._c0,
@@ -186,6 +196,13 @@ export class TikzPathElement implements ElementInterface, GeometryInterface {
     }
 
     if (subPath.valid()) this._subpaths.push(subPath)
+  }
+
+  applyOption(option: TikzOption): void {
+    if (option._option_key) {
+      // TODO validate each option for (pathElement)
+      this._subCtx.pushOption(option)
+    }
   }
 
   computeBoundingBox(): BoundingBox | undefined {

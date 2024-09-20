@@ -57,3 +57,10 @@ test('svg_node_alias_anchor_test', () => {
   console.log(result[0].outerHTML)
   expect(result)
 })
+
+test('svg_arrow_test', () => {
+  const ast = runWorker('\\tikz[]{\\path[draw, <->] (0,0) -- (1,1);}')
+  const result = generator_svg.generate(ast as TikzRoot)
+  console.log(result[0].outerHTML)
+  expect(result)
+})

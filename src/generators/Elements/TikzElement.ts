@@ -4,6 +4,7 @@ import { Context } from '../Context'
 import { TikzPathElement } from './TikzPathElement'
 import { EGenerators } from '../Generator'
 import { GeometryInterface, BoundingBox, assembleBoundingBox } from '../utils'
+import { defaultArrowMarker, defaultReversedArrowMarker } from './TikzMarkerElement'
 
 export class TikzInlineElement implements ElementInterface, GeometryInterface {
   _ast: TikzInline
@@ -13,6 +14,8 @@ export class TikzInlineElement implements ElementInterface, GeometryInterface {
   constructor(ctx: Context, tikz: TikzInline) {
     this._ast = tikz
     this._ctx = ctx
+    this._ctx.registerMarker(defaultArrowMarker)
+    this._ctx.registerMarker(defaultReversedArrowMarker)
     this._contents = []
     for (let path of this._ast.contents()) {
       this._contents.push(new TikzPathElement(this._ctx, path))
@@ -34,6 +37,15 @@ export class TikzInlineElement implements ElementInterface, GeometryInterface {
       // svg.style.height = height + 'em'
       // svg.setAttribute('viewBox', `0 0 ${width} ${height}`)
       // svg.setAttribute('version', '1.1')
+      if (!this._ctx._uid_marker_map.empty) {
+        let defs = document.createElement('defs')
+        for (let uid in this._ctx._uid_marker_map) {
+          let markerElememt = this._ctx._uid_marker_map[uid]
+          defs.append(...markerElememt.render())
+        }
+        svg.append(defs)
+      }
+
       for (let pathElement of this._contents) {
         svg.append(...pathElement.render())
       }
