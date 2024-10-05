@@ -10,8 +10,7 @@
     "build": "./node_modules/.bin/tsc",
     "clean": "rm -rf ./dist",
     "start": "node ./dist/main.js",
-    "install": "npm install",
-    "postinstall": "npm i && npm build"
+    "postinstall": "npm i . && npm build"
   },
   "author": "Linax Dio",
   "license": "ISC",
