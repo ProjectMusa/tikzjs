@@ -1,4 +1,3 @@
-import { option } from 'yargs'
 import { AstNode, AstLocation } from './TikzAST'
 import { TikzCoordinateOffset } from './TikzPathOperations'
 export class TikzOption extends AstNode {

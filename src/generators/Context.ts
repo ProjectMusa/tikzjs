@@ -1,4 +1,3 @@
-import { string } from 'yargs'
 import { TikzNodeElement } from './Elements/TikzNodeElement'
 import { EGenerators } from './Generator'
 import { AbsoluteCoordinate } from './utils'
