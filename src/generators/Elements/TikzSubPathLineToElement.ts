@@ -68,11 +68,42 @@ export class TikzSubPathLineToElement implements TikzSubPathPart {
   setEndNode(n: TikzNodeElement): void {
     this._endNode = n
     this._end = n.getAnchor('center')
+    // Both endpoints are now known — clip each to its node's bounding box boundary
+    this._clipToNodeBoundaries()
   }
 
   setStartNode(n: TikzNodeElement): void {
     this._startNode = n
     this._start = n.getAnchor('center')
+  }
+
+  /**
+   * Given centers _start (from startNode) and _end (from endNode), find where the
+   * line exits each node's axis-aligned bounding box and update _start/_end to
+   * those boundary points so arrows begin/end at the node edge rather than its center.
+   */
+  private _clipToNodeBoundaries(): void {
+    if (!this._start || !this._end) return
+    const sx = this._start.x, sy = this._start.y
+    const ex = this._end.x,   ey = this._end.y
+    const dx = ex - sx, dy = ey - sy
+    if (dx === 0 && dy === 0) return
+
+    if (this._startNode?._width && this._startNode?._height) {
+      const hw = this._startNode._width  / 2 + this._startNode._padding
+      const hh = this._startNode._height / 2 + this._startNode._padding
+      const t  = Math.min(dx !== 0 ? hw / Math.abs(dx) : Infinity,
+                          dy !== 0 ? hh / Math.abs(dy) : Infinity)
+      this._start = { x: sx + t * dx, y: sy + t * dy }
+    }
+
+    if (this._endNode?._width && this._endNode?._height) {
+      const hw = this._endNode._width  / 2 + this._endNode._padding
+      const hh = this._endNode._height / 2 + this._endNode._padding
+      const t  = Math.min(dx !== 0 ? hw / Math.abs(dx) : Infinity,
+                          dy !== 0 ? hh / Math.abs(dy) : Infinity)
+      this._end = { x: ex - t * dx, y: ey - t * dy }
+    }
   }
 
   tryPoseSelf(): boolean {

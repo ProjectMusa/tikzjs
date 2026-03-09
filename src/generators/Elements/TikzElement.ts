@@ -1,4 +1,4 @@
-import { TikzInline, TikzPicture, TikzRoot } from '../../parser/TikzRoot'
+import { TikzInline, TikzPicture } from '../../parser/TikzRoot'
 import { ElementInterface } from '../Element'
 import { Context } from '../Context'
 import { TikzPathElement } from './TikzPathElement'
@@ -72,28 +72,55 @@ export class TikzInlineElement implements ElementInterface, GeometryInterface {
   }
 }
 
-export class TikzPictureElement implements ElementInterface {
+export class TikzPictureElement implements ElementInterface, GeometryInterface {
   _ast: TikzPicture
   _ctx: Context
   _contents: TikzPathElement[]
+  _padding: number = 20
   constructor(ctx: Context, tikz: TikzPicture) {
     this._ast = tikz
     this._ctx = ctx
+    this._ctx.registerMarker(defaultArrowMarker)
+    this._ctx.registerMarker(defaultReversedArrowMarker)
     this._contents = []
     for (let path of this._ast.contents()) {
       this._contents.push(new TikzPathElement(this._ctx, path))
     }
   }
+
+  computeBoundingBox(): BoundingBox | undefined {
+    return assembleBoundingBox([...this._contents, ...this._ctx._nodes])
+  }
+
   render(): HTMLElement[] {
     let result: HTMLElement[] = []
     if (this._ctx.generator === EGenerators.svg) {
       let svg = document.createElement('svg')
+      svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+      if (!this._ctx._uid_marker_map.empty) {
+        let defs = document.createElement('defs')
+        for (let uid in this._ctx._uid_marker_map) {
+          let markerElement = this._ctx._uid_marker_map[uid]
+          defs.append(...markerElement.render())
+        }
+        svg.append(defs)
+      }
+      for (let pathElement of this._contents) {
+        svg.append(...pathElement.render())
+      }
+      for (let nodeElement of this._ctx._nodes) {
+        svg.append(...nodeElement.render())
+      }
+      let box = this.computeBoundingBox()
+      if (box) {
+        svg.setAttribute(
+          'viewBox',
+          `${box.lowerLeft.x - this._padding} ${box.lowerLeft.y - this._padding} ${box.upperRight.x - box.lowerLeft.x + 2 * this._padding} ${box.upperRight.y - box.lowerLeft.y + 2 * this._padding}`,
+        )
+      } else {
+        svg.setAttribute('viewBox', '-100 -100 200 200')
+      }
       result.push(svg)
-    } else if (this._ctx.generator === EGenerators.html) {
-      // TODO for html add overlay path svg
-      // add node katex
-      // add css
-      // add katex
     }
     return result
   }

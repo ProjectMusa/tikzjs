@@ -44,7 +44,8 @@ export class Context {
   }
 
   getNode(alias: string): TikzNodeElement | undefined {
-    return this._alias_node_map[alias]
+    // Search shared _nodes array so child contexts can find nodes registered by parents
+    return this._nodes.find(nd => nd._alias === alias)
   }
 
   getNodeCoordinate(alias: string, anchor?: string): AbsoluteCoordinate | undefined {
