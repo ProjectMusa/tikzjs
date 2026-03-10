@@ -98,7 +98,10 @@ function pageShell(title, body, extraHead = '') {
 function header(current) {
   return `<header>
     <h1>tikzjs preview</h1>
-    <nav><a href="/">← all fixtures</a></nav>
+    <nav>
+      <a href="/">fixtures</a> &nbsp;
+      <a href="/diff">visual diff report</a>
+    </nav>
   </header>`
 }
 
@@ -204,12 +207,32 @@ function handleRawRef(name, res) {
   res.end(svg)
 }
 
+// ── Static file server for /tmp/tikzjs-diff/ ──────────────────────────────
+
+const DIFF_DIR = '/tmp/tikzjs-diff'
+const MIME = { '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css' }
+
+function handleDiff(url, res) {
+  const rel  = url === '/diff' || url === '/diff/' ? '/report.html' : url.slice('/diff'.length)
+  const file = path.join(DIFF_DIR, rel)
+  if (!fs.existsSync(file)) {
+    res.writeHead(404, { 'Content-Type': 'text/plain' })
+    res.end(`No diff report found at ${DIFF_DIR}. Run: npm run diff`)
+    return
+  }
+  const ext = path.extname(file)
+  res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' })
+  res.end(fs.readFileSync(file))
+}
+
 // ── Server ─────────────────────────────────────────────────────────────────
 
 const server = http.createServer((req, res) => {
   const url = req.url.split('?')[0]
 
   if (url === '/') return handleIndex(res)
+
+  if (url.startsWith('/diff')) return handleDiff(url, res)
 
   const compareMatch = url.match(/^\/compare\/(.+)$/)
   if (compareMatch) return handleCompare(compareMatch[1], res)
@@ -225,6 +248,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`tikzjs preview server running at http://localhost:${PORT}`)
-  console.log(`  Fixtures: ${fixtures().length} loaded from test/golden/fixtures/`)
+  console.log(`  Fixtures:    http://localhost:${PORT}/`)
+  console.log(`  Diff report: http://localhost:${PORT}/diff  (run npm run diff first)`)
   console.log(`  Press Ctrl+C to stop`)
 })

@@ -15,6 +15,7 @@
     "golden": "bash scripts/generateGolden.sh",
     "preview": "node scripts/preview.js",
     "serve": "node scripts/server.js",
+    "diff": "node scripts/visualdiff.js",
     "postinstall": "npm run gen && npm run build"
   },
   "author": "Linax Dio",
@@ -38,6 +39,9 @@
     "jest": "^29.7.0",
     "jest-environment-jsdom": "^29.7.0",
     "peggy": "^3.0.2",
+    "pixelmatch": "^5.3.0",
+    "playwright": "^1.58.2",
+    "pngjs": "^7.0.0",
     "prettier": "^3.0.0",
     "ts-jest": "^29.1.1",
     "typescript": "^5.3.3"

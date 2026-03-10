@@ -97,9 +97,9 @@
     for (const o of rawOpts) {
       if (o.key === 'start angle') startAngle = parseFloat(o.value);
       if (o.key === 'end angle')   endAngle   = parseFloat(o.value);
-      if (o.key === 'radius')      xRadius    = parseFloat(o.value);
-      if (o.key === 'x radius')    xRadius    = parseFloat(o.value);
-      if (o.key === 'y radius')    yRadius    = parseFloat(o.value);
+      if (o.key === 'radius')      xRadius    = op.parseDimensionPt(o.value);
+      if (o.key === 'x radius')    xRadius    = op.parseDimensionPt(o.value);
+      if (o.key === 'y radius')    yRadius    = op.parseDimensionPt(o.value);
     }
     if (startAngle !== undefined && endAngle !== undefined && xRadius !== undefined) {
       return ft.arcSegment(startAngle, endAngle, xRadius, yRadius);
@@ -331,12 +331,23 @@ path_coordinate "coordinate"
   / a:node_alias          { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
 raw_coordinate "raw coordinate"
-  = '(' ws x:number ws ',' ws y:number ws ')'
-    { return { mode: 'absolute', coord: { cs: 'xy', x, y } }; }
-  / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:number ws ',' ws 'y' ws '=' ws y:number ws ')'
-    { return { mode: 'absolute', coord: { cs: 'xy', x, y } }; }
-  / '(' ws angle:number ws ':' ws radius:number ws ')'
-    { return { mode: 'absolute', coord: { cs: 'polar', angle, radius } }; }
+  = '(' ws x:number u1:dim_unit ws ',' ws y:number u2:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
+  / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:number u1:dim_unit ws ',' ws 'y' ws '=' ws y:number u2:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
+  / '(' ws angle:number ws ':' ws radius:number u:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
+
+// Unit suffix → pt multiplier. No unit = TikZ default (1cm = 28.4528pt).
+dim_unit
+  = ws 'cm' { return 28.4528; }
+  / ws 'mm' { return 2.84528; }
+  / ws 'pt' { return 1.0; }
+  / ws 'bp' { return 1.00375; }
+  / ws 'in' { return 72.27; }
+  / ws 'ex' { return 4.5; }
+  / ws 'em' { return 10.0; }
+  / ws     { return 28.4528; }  // default TikZ unit = 1cm
 
 node_alias "node alias"
   = '(' ws name:identifier ws ')' { return name; }

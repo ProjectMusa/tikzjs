@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx jest --testPathPattern=\"test/golden\")",
       "Bash(curl -s http://localhost:3737/)",
-      "Bash(curl -s http://localhost:3737/render/18-arc-shapes)"
+      "Bash(curl -s http://localhost:3737/render/18-arc-shapes)",
+      "Bash(npx playwright --version)"
     ]
   }
 }

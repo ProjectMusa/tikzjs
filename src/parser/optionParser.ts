@@ -406,3 +406,17 @@ export function parseDimension(s: string): number {
   const unit = (m[2] ?? 'pt').toLowerCase()
   return value * (UNIT_TO_PT[unit] ?? 1)
 }
+
+/**
+ * Parse a TikZ dimension that lives in coordinate space (default unit = 1cm, not 1pt).
+ * Used for arc radii, node separation distances specified without explicit units.
+ */
+export function parseDimensionPt(s: string | undefined): number {
+  if (!s) return 0
+  const trimmed = s.trim()
+  const m = trimmed.match(/^([+-]?[\d.]+)\s*(pt|bp|mm|cm|in|em|ex|pc|dd|cc|sp)?$/)
+  if (!m) return 0
+  const value = parseFloat(m[1])
+  const unit = (m[2] ?? 'cm').toLowerCase() // default = cm in TikZ coordinate space
+  return value * (UNIT_TO_PT[unit] ?? 1)
+}
