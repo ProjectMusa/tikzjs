@@ -45,6 +45,9 @@ export function emitPath(
   // Build the SVG path d attribute
   let d = ''
   let lastPos: AbsoluteCoordinate = { x: 0, y: 0 }
+  let lastCoordRef: CoordRef | null = null  // track last coord to enable from-side node clipping
+  // Pending move: defer emitting M until first drawing segment so from-clipping can adjust it
+  let pendingMove: AbsoluteCoordinate | null = null
   let hasStroke = path.style.draw !== undefined && path.style.draw !== 'none'
   let hasFill = path.style.fill !== undefined && path.style.fill !== 'none'
 
@@ -57,8 +60,9 @@ export function emitPath(
     switch (seg.kind) {
       case 'move': {
         const pos = resolver.resolve(seg.to)
-        d += `M ${pos.x} ${pos.y} `
+        pendingMove = pos  // defer M emission
         lastPos = pos
+        lastCoordRef = seg.to
         subpathStart = pos
         bboxes.push(fromCorners(pos.x, pos.y, pos.x, pos.y))
         break
@@ -66,26 +70,33 @@ export function emitPath(
 
       case 'line': {
         let to = resolver.resolve(seg.to)
-        // Clip to node boundary if destination is a node
+        // Clip to-side if destination is a node
         const toGeo = getNodeGeoForCoord(seg.to, nodeRegistry)
         if (toGeo) {
           to = clipToNodeBoundary(lastPos, to, toGeo)
         }
-        const fromGeo = getNodeGeoForLastPos(lastPos, nodeRegistry)
+        // Clip from-side if last coord was a node (adjusts the pending move if applicable)
+        const fromGeo = lastCoordRef ? getNodeGeoForCoord(lastCoordRef, nodeRegistry) : null
         let from = lastPos
         if (fromGeo) {
           from = clipToNodeBoundary(to, lastPos, fromGeo)
         }
-        if (from !== lastPos) {
+        // Emit M for the (possibly clipped) start position
+        if (pendingMove) {
+          d += `M ${from.x} ${from.y} `
+          pendingMove = null
+        } else if (from.x !== lastPos.x || from.y !== lastPos.y) {
           d += `M ${from.x} ${from.y} `
         }
         d += `L ${to.x} ${to.y} `
         lastPos = resolver.resolve(seg.to)
+        lastCoordRef = seg.to
         bboxes.push(fromCorners(from.x, from.y, to.x, to.y))
         break
       }
 
       case 'hv-line': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve(seg.to)
         if (seg.hvFirst) {
           // horizontal then vertical: -|
@@ -101,6 +112,7 @@ export function emitPath(
       }
 
       case 'curve': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve(seg.to)
         if (seg.controls.length === 1) {
           // TikZ `.. controls (c) ..` is cubic Bezier with both control points at c
@@ -138,6 +150,7 @@ export function emitPath(
       }
 
       case 'arc': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         // SVG arc command: A rx ry x-rotation large-arc-flag sweep-flag x y
         const { startAngle, endAngle, xRadius, yRadius } = seg
         const rx = ptToPx(xRadius)
@@ -161,16 +174,19 @@ export function emitPath(
       }
 
       case 'to': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve(seg.to)
         // For 'to', handle bend/loop options to produce bezier approximation
         const bendPath = buildBendPath(lastPos, to, seg.rawOptions)
         d += bendPath.d
         bboxes.push(bendPath.bbox)
         lastPos = to
+        lastCoordRef = seg.to
         break
       }
 
       case 'rectangle': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve((seg as any).to)
         d += `L ${to.x} ${lastPos.y} L ${to.x} ${to.y} L ${lastPos.x} ${to.y} L ${lastPos.x} ${lastPos.y} Z `
         bboxes.push(fromCorners(
@@ -182,6 +198,7 @@ export function emitPath(
       }
 
       case 'grid': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         // Grid: render as a series of lines. The grid is from lastPos to 'to'.
         const gridSeg = seg as any
         const to = resolver.resolve(gridSeg.to)
@@ -316,7 +333,4 @@ function getNodeGeoForCoord(ref: CoordRef, registry: NodeGeometryRegistry) {
   return null
 }
 
-/** Get node geometry for the last rendered position (heuristic). */
-function getNodeGeoForLastPos(_pos: AbsoluteCoordinate, _registry: NodeGeometryRegistry) {
-  return null // Position-based lookup not feasible without reverse map
-}
+

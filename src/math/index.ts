@@ -103,9 +103,21 @@ export function parseMathJaxLength(s: string): number {
 export function renderMath(latex: string, display = false): MathResult {
   const { adaptor, doc } = getMathJax()
 
-  let source = latex
-  // If source doesn't contain math delimiters, wrap as inline math
-  if (source && !/[$\\]/.test(source) && !source.startsWith('\\text{')) {
+  let source = latex.trim()
+
+  // Strip math delimiters — doc.convert() takes a raw TeX expression, not delimited source.
+  if (source.startsWith('$$') && source.endsWith('$$') && source.length > 4) {
+    source = source.slice(2, -2).trim()
+    display = true
+  } else if (source.startsWith('$') && source.endsWith('$') && source.length > 2) {
+    source = source.slice(1, -1).trim()
+  } else if (source.startsWith('\\[') && source.endsWith('\\]')) {
+    source = source.slice(2, -2).trim()
+    display = true
+  } else if (source.startsWith('\\(') && source.endsWith('\\)')) {
+    source = source.slice(2, -2).trim()
+  } else if (source && !/[$\\]/.test(source) && !source.startsWith('\\text{')) {
+    // Plain text with no TeX — wrap so MathJax renders it as text
     source = `\\text{${source}}`
   }
 
@@ -167,7 +179,8 @@ export function wrapText(s: string): string {
 
 /**
  * The default MathRenderer: uses MathJax (server-side).
- * Plain text is wrapped in \text{...}; math delimiters are passed through.
+ * Strips math delimiters ($...$, \(...\), etc.) and passes the inner TeX to doc.convert().
+ * Plain text is wrapped in \text{...}.
  */
 export const defaultMathRenderer: MathRenderer = (latex: string) =>
-  renderMath(wrapText(latex))
+  renderMath(latex)
