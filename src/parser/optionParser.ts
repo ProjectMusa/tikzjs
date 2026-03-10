@@ -265,13 +265,21 @@ function applyOption(opt: RawOption, style: ResolvedStyle): void {
     case "'":      style.swap = true; break // tikzcd swap shorthand
 
     // ── Named colors as standalone options ────────────────────
-    default:
-      if (isNamedColor(key)) {
-        style.draw = resolveColor(key)
-        style.fill = resolveColor(key)
+    default: {
+      // Recognise bare color expressions: named ("red") or mixed ("green!30", "blue!50!white")
+      const isColorExpr = isNamedColor(key) || /^[a-zA-Z][a-zA-Z0-9]*!\d/.test(key)
+      if (isColorExpr) {
+        const color = resolveColor(key)
+        // Override whichever 'currentColor' slot was set by the implied option.
+        // e.g. \fill[green!30] → implied 'fill' sets fill=currentColor, then green!30 resolves it.
+        // e.g. \draw[red]     → implied 'draw' sets draw=currentColor, then red resolves it.
+        if      (style.fill === 'currentColor') style.fill = color
+        else if (style.draw === 'currentColor') style.draw = color
+        else style.draw = color  // fallback: treat as stroke color
       } else if (key) {
         setExtra(style, key, value as string ?? '')
       }
+    }
   }
 }
 

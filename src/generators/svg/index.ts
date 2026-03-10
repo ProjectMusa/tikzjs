@@ -54,20 +54,21 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   const markerRegistry: MarkerRegistry = new Map()
   const coordResolver = new CoordResolver(nodeRegistry)
 
-  const allElements: Element[] = []
+  // Paths go first (behind), node groups go last (on top)
+  const pathElements: Element[] = []
+  const nodeElements: Element[] = []
   const allBBoxes: BoundingBox[] = []
 
   // Two-pass rendering:
-  // Pass 1: render matrices and standalone nodes (populates nodeRegistry)
-  // Pass 2: render paths and edges (use nodeRegistry for anchor resolution)
+  // Pass 1: render matrices and standalone/inline nodes → populate nodeRegistry
+  // Pass 2: render paths and edges → use nodeRegistry for anchor resolution
 
   renderElements_pass1(
     diagram.elements,
     document,
     coordResolver,
     nodeRegistry,
-    markerRegistry,
-    allElements,
+    nodeElements,
     allBBoxes
   )
 
@@ -77,7 +78,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     coordResolver,
     nodeRegistry,
     markerRegistry,
-    allElements,
+    pathElements,
+    nodeElements,
     allBBoxes
   )
 
@@ -99,8 +101,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     svg.appendChild(defs)
   }
 
-  // Append all rendered elements in order
-  for (const el of allElements) {
+  // Paths first (behind), then node groups (on top)
+  for (const el of [...pathElements, ...nodeElements]) {
     svg.appendChild(el)
   }
 
@@ -114,42 +116,49 @@ function renderElements_pass1(
   document: Document,
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
-  markerRegistry: MarkerRegistry,
-  outElements: Element[],
+  outNodeElements: Element[],
   outBBoxes: BoundingBox[]
 ): void {
   for (const el of elements) {
     switch (el.kind) {
       case 'matrix': {
         const result = emitMatrix(el, document, resolver, nodeRegistry)
-        outElements.push(...result.elements)
+        outNodeElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
       }
 
       case 'node': {
         const result = emitNode(el, document, resolver, nodeRegistry)
-        outElements.push(result.element)
+        outNodeElements.push(result.element)
         outBBoxes.push(result.bbox)
         break
       }
 
+      case 'path': {
+        // Register inline nodes (e.g. from \node at ...) so their geometry is
+        // available when paths later reference their anchors.
+        for (const node of el.inlineNodes) {
+          const result = emitNode(node, document, resolver.clone(), nodeRegistry)
+          outNodeElements.push(result.element)
+          outBBoxes.push(result.bbox)
+        }
+        break
+      }
+
       case 'scope': {
-        // Recurse into scope children for pass 1
         renderElements_pass1(
           el.children,
           document,
           resolver.clone(),
           nodeRegistry,
-          markerRegistry,
-          outElements,
+          outNodeElements,
           outBBoxes
         )
         break
       }
 
       case 'coordinate': {
-        // Named coordinates: resolve and register but don't emit anything
         resolver.resolve(el.position)
         break
       }
@@ -165,23 +174,22 @@ function renderElements_pass2(
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
   markerRegistry: MarkerRegistry,
-  outElements: Element[],
+  outPathElements: Element[],
+  outNodeElements: Element[],
   outBBoxes: BoundingBox[]
 ): void {
   for (const el of elements) {
     switch (el.kind) {
       case 'path': {
         const result = emitPath(el, document, resolver.clone(), nodeRegistry, markerRegistry)
-        // Insert paths BEFORE nodes (so nodes appear on top)
-        // We'll manage ordering by inserting at start
-        outElements.unshift(...result.elements)
+        outPathElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
       }
 
       case 'edge': {
         const result = emitEdge(el, document, nodeRegistry, markerRegistry)
-        outElements.unshift(...result.elements)
+        outPathElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
       }
@@ -193,7 +201,8 @@ function renderElements_pass2(
           resolver.clone(),
           nodeRegistry,
           markerRegistry,
-          outElements,
+          outPathElements,
+          outNodeElements,
           outBBoxes
         )
         break
