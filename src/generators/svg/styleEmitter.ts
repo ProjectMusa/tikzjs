@@ -37,7 +37,7 @@ export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string,
   if (style.drawWidth !== undefined) {
     attrs['stroke-width'] = String(ptToPx(style.drawWidth))
   } else if (style.draw && style.draw !== 'none') {
-    attrs['stroke-width'] = '0.8' // thin default
+    attrs['stroke-width'] = String(ptToPx(0.4)) // TikZ default line width = 0.4pt
   }
 
   if (style.drawDash) {
@@ -69,15 +69,17 @@ export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string,
   return attrs
 }
 
-/** Convert style dash pattern to SVG stroke-dasharray. */
+/** Convert style dash pattern to SVG stroke-dasharray.
+ * Values from TikZ pgf source (pgfcorearrows.code.tex), converted to px. */
 function dashPattern(dash: string): string {
+  const p = (pt: number) => ptToPx(pt)
   switch (dash) {
-    case 'dashed':          return '6,3'
-    case 'dotted':          return '1.5,2'
-    case 'densely dashed':  return '4,2'
-    case 'loosely dashed':  return '10,5'
-    case 'densely dotted':  return '1.5,1'
-    case 'loosely dotted':  return '1.5,4'
+    case 'dashed':          return `${p(3)},${p(3)}`
+    case 'densely dashed':  return `${p(3)},${p(2)}`
+    case 'loosely dashed':  return `${p(5)},${p(5)}`
+    case 'dotted':          return `${p(0.4)},${p(3)}`
+    case 'densely dotted':  return `${p(0.4)},${p(1.5)}`
+    case 'loosely dotted':  return `${p(0.4)},${p(6)}`
     default:                return dash // pass-through for custom patterns
   }
 }

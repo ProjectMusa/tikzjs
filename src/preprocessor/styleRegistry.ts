@@ -12,8 +12,22 @@
 import { StyleDefinition, RawOption } from '../ir/types.js'
 import { splitCommaList, parseKeyValue, Scanner } from './scanner.js'
 
+// ── Built-in TikZ styles ──────────────────────────────────────────────────────
+
+/** Pre-defined TikZ styles that are always available (from the pgf library). */
+const BUILTIN_STYLES: Array<{ name: string; rawOptions: RawOption[] }> = [
+  // \tikzset{help lines/.style={color=black!25,very thin}}
+  { name: 'help lines', rawOptions: [{ key: 'color', value: 'black!25' }, { key: 'very thin' }] },
+]
+
 export class StyleRegistry {
   private _styles: Map<string, StyleDefinition> = new Map()
+
+  constructor() {
+    for (const s of BUILTIN_STYLES) {
+      this._styles.set(s.name, { name: s.name, rawOptions: s.rawOptions })
+    }
+  }
 
   /** Register a style definition. Overwrites any existing definition with the same name. */
   define(name: string, rawOptions: RawOption[], base?: string): void {

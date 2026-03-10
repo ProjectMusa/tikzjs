@@ -103,10 +103,11 @@ export function emitPath(
       case 'curve': {
         const to = resolver.resolve(seg.to)
         if (seg.controls.length === 1) {
+          // TikZ `.. controls (c) ..` is cubic Bezier with both control points at c
           const c = resolver.resolve(seg.controls[0])
-          d += `Q ${c.x} ${c.y} ${to.x} ${to.y} `
+          d += `C ${c.x} ${c.y} ${c.x} ${c.y} ${to.x} ${to.y} `
           if (Bezier) {
-            const curve = new Bezier.Bezier(lastPos.x, lastPos.y, c.x, c.y, to.x, to.y)
+            const curve = new Bezier.Bezier(lastPos.x, lastPos.y, c.x, c.y, c.x, c.y, to.x, to.y)
             const bb = curve.bbox()
             bboxes.push(fromCorners(bb.x.min, bb.y.min, bb.x.max, bb.y.max))
           } else {

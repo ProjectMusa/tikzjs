@@ -106,8 +106,11 @@ function applyOption(opt: RawOption, style: ResolvedStyle): void {
     // ── Combined ─────────────────────────────────────────────
     case 'color':
       if (value) {
-        style.draw = resolveColor(value as string)
-        style.fill = resolveColor(value as string)
+        const color = resolveColor(value as string)
+        // Only update slots that were already set to 'currentColor' by the implied
+        // draw/fill option. This prevents \draw[color=red] from getting fill="#FF0000".
+        if (style.draw === 'currentColor') style.draw = color
+        if (style.fill === 'currentColor') style.fill = color
       }
       break
 

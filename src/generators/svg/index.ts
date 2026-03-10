@@ -26,7 +26,7 @@ import {
   IRTikzcdArrow,
   IRNamedCoordinate,
 } from '../../ir/types.js'
-import { CoordResolver, NodeGeometryRegistry } from './coordResolver.js'
+import { CoordResolver, NodeGeometryRegistry, ptToPx } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { emitNode } from './nodeEmitter.js'
 import { emitPath } from './pathEmitter.js'
@@ -36,8 +36,8 @@ import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './bou
 
 const { JSDOM } = require('jsdom')
 
-/** Padding around the diagram content (px). */
-const PADDING_PX = 20
+/** Padding around the diagram content in px. ~2.4pt matches dvisvgm default margin. */
+const PADDING_PX = ptToPx(2.4)
 
 export interface SVGGeneratorOptions {
   padding?: number
