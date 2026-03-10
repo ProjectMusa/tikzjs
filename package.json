@@ -2,15 +2,18 @@
   "name": "tikzjs",
   "version": "0.1.0",
   "description": "",
-  "main": "./dist/main.js",
-  "types": "./dist.main.js",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "scripts": {
     "test": "jest --silent=false",
+    "test:unit": "jest --silent=false --testPathPattern='test/unit'",
+    "test:golden": "jest --silent=false --testPathPattern='test/golden'",
     "gen": "peggy -o src/parser/_tikzjs.js --cache src/parser/_tikzjs.pegjs",
     "build": "./node_modules/.bin/tsc",
     "clean": "rm -rf ./dist",
-    "start": "node ./dist/main.js",
-    "postinstall": "npm run build"
+    "start": "node ./dist/index.js",
+    "golden": "bash scripts/generateGolden.sh",
+    "postinstall": "npm run gen && npm run build"
   },
   "author": "Linax Dio",
   "license": "ISC",
@@ -38,6 +41,6 @@
     "typescript": "^5.3.3"
   },
   "exports": {
-    ".": "./dist/main.js"
+    ".": "./dist/index.js"
   }
 }

@@ -1,0 +1,126 @@
+/**
+ * Style emitter: converts ResolvedStyle to SVG attribute maps and CSS strings.
+ */
+
+import { ResolvedStyle, ArrowTipSpec } from '../../ir/types.js'
+
+export interface SVGPathAttrs {
+  stroke?: string
+  'stroke-width'?: string
+  'stroke-dasharray'?: string
+  fill?: string
+  opacity?: string
+  'fill-opacity'?: string
+  'stroke-opacity'?: string
+  'marker-start'?: string
+  'marker-end'?: string
+  transform?: string
+  [key: string]: string | undefined
+}
+
+/** Convert pt to SVG user units (px at the default scale). */
+import { ptToPx } from './coordResolver.js'
+
+/**
+ * Build SVG attributes for a path element from a ResolvedStyle.
+ */
+export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string, end?: string}): SVGPathAttrs {
+  const attrs: SVGPathAttrs = {}
+
+  // Stroke
+  if (style.draw !== undefined) {
+    attrs.stroke = style.draw === 'none' ? 'none' : (style.draw || '#000000')
+  } else {
+    attrs.stroke = 'none'
+  }
+
+  if (style.drawWidth !== undefined) {
+    attrs['stroke-width'] = String(ptToPx(style.drawWidth))
+  } else if (style.draw && style.draw !== 'none') {
+    attrs['stroke-width'] = '0.8' // thin default
+  }
+
+  if (style.drawDash) {
+    attrs['stroke-dasharray'] = dashPattern(style.drawDash)
+  }
+
+  // Fill
+  if (style.fill !== undefined) {
+    attrs.fill = style.fill === 'none' ? 'none' : style.fill
+  } else {
+    attrs.fill = 'none'
+  }
+
+  // Opacity
+  if (style.opacity !== undefined) {
+    attrs.opacity = String(style.opacity)
+  }
+  if (style.fillOpacity !== undefined) {
+    attrs['fill-opacity'] = String(style.fillOpacity)
+  }
+  if (style.drawOpacity !== undefined) {
+    attrs['stroke-opacity'] = String(style.drawOpacity)
+  }
+
+  // Arrow markers
+  if (markerId?.start) attrs['marker-start'] = `url(#${markerId.start})`
+  if (markerId?.end)   attrs['marker-end']   = `url(#${markerId.end})`
+
+  return attrs
+}
+
+/** Convert style dash pattern to SVG stroke-dasharray. */
+function dashPattern(dash: string): string {
+  switch (dash) {
+    case 'dashed':          return '6,3'
+    case 'dotted':          return '1.5,2'
+    case 'densely dashed':  return '4,2'
+    case 'loosely dashed':  return '10,5'
+    case 'densely dotted':  return '1.5,1'
+    case 'loosely dotted':  return '1.5,4'
+    default:                return dash // pass-through for custom patterns
+  }
+}
+
+/**
+ * Apply SVG attributes to a DOM element.
+ */
+export function applyAttrs(el: Element, attrs: Record<string, string | undefined>): void {
+  for (const [key, value] of Object.entries(attrs)) {
+    if (value !== undefined) {
+      el.setAttribute(key, value)
+    }
+  }
+}
+
+/**
+ * Build a transform attribute string from ResolvedStyle.
+ */
+export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0): string | undefined {
+  const parts: string[] = []
+
+  if (style.xshift || style.yshift) {
+    const tx = ptToPx(style.xshift ?? 0)
+    const ty = ptToPx(style.yshift ?? 0)
+    parts.push(`translate(${tx},${-ty})`)
+  }
+
+  if (style.rotate) {
+    parts.push(`rotate(${-style.rotate},${cx},${cy})`)
+  }
+
+  if (style.scale && style.scale !== 1) {
+    parts.push(`scale(${style.scale})`)
+  }
+
+  return parts.length > 0 ? parts.join(' ') : undefined
+}
+
+/**
+ * Return the marker ID suffix for an arrow tip spec.
+ * Used to look up or create the marker in markerDefs.ts.
+ */
+export function arrowMarkerId(spec: ArrowTipSpec): string {
+  const base = spec.kind.replace(/[^a-zA-Z0-9]/g, '_')
+  return spec.reversed ? `${base}_rev` : base
+}
