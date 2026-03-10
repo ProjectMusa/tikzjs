@@ -10,7 +10,7 @@ import { CoordResolver, NodeGeometryRegistry, getAnchorPosition, clipToNodeBound
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
-import { renderMath, wrapText } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 
 export interface EdgeRenderResult {
@@ -25,7 +25,8 @@ export function emitEdge(
   edge: IREdge,
   document: Document,
   nodeRegistry: NodeGeometryRegistry,
-  markerRegistry: MarkerRegistry
+  markerRegistry: MarkerRegistry,
+  mathRenderer: MathRenderer = defaultMathRenderer
 ): EdgeRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
@@ -82,7 +83,7 @@ export function emitEdge(
 
   // Render labels
   for (const label of edge.labels) {
-    const labelEl = emitEdgeLabel(label, midpoint, document)
+    const labelEl = emitEdgeLabel(label, midpoint, document, mathRenderer)
     if (labelEl) {
       elements.push(labelEl)
     }
@@ -225,12 +226,13 @@ function buildLoopPath(
 function emitEdgeLabel(
   label: EdgeLabel,
   midpoint: AbsoluteCoordinate,
-  document: Document
+  document: Document,
+  mathRenderer: MathRenderer
 ): Element | null {
   if (!label.text.trim()) return null
 
   try {
-    const { svgString, widthPx, heightPx } = renderMath(wrapText(label.text))
+    const { svgString, widthPx, heightPx } = mathRenderer(label.text)
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
 
     const offsetX = label.swap ? -widthPx / 2 - 4 : widthPx / 2 + 4

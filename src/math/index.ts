@@ -19,15 +19,23 @@ const { JSDOM } = require('jsdom')
 
 /** Rendered math result. */
 export interface MathResult {
-  /** Outer SVG string. */
+  /** SVG string to embed (an <svg> element). */
   svgString: string
-  /** Width in pixels (ex-based, converted). */
+  /** Width in pixels. */
   widthPx: number
   /** Height in pixels. */
   heightPx: number
   /** Vertical offset (baseline correction) in pixels. */
   verticalOffsetPx: number
 }
+
+/**
+ * A math renderer converts a LaTeX string to a MathResult.
+ * Implement this interface to swap in KaTeX, custom SVG, etc.
+ * The input `latex` is the raw label text from the TikZ node (may contain
+ * dollar-sign math delimiters or plain text).
+ */
+export type MathRenderer = (latex: string) => MathResult
 
 // ── Initialization ────────────────────────────────────────────────────────────
 
@@ -108,12 +116,18 @@ export function renderMath(latex: string, display = false): MathResult {
     containerWidth: CONTAINER_WIDTH,
   })
 
-  const svgString: string = adaptor.outerHTML(node)
+  const outerHTML: string = adaptor.outerHTML(node)
 
-  // Extract dimensions from SVG viewBox / width / height attributes
+  // MathJax wraps the SVG in <mjx-container> which is an HTML element.
+  // Extract just the <svg>...</svg> so it can be embedded in our SVG document.
+  const svgMatch = outerHTML.match(/<svg[\s\S]*<\/svg>/)
+  const svgString = svgMatch ? svgMatch[0] : ''
+
+  // Extract dimensions from the inner SVG element's width/height attributes
   const widthMatch = svgString.match(/width="([^"]+)"/)
   const heightMatch = svgString.match(/height="([^"]+)"/)
-  const styleMatch = svgString.match(/style="[^"]*vertical-align:\s*([^;'"]+)/)
+  // vertical-align is on the <mjx-container> style attribute
+  const styleMatch = outerHTML.match(/style="[^"]*vertical-align:\s*([^;'"]+)/)
 
   const widthPx = widthMatch ? parseMathJaxLength(widthMatch[1]) : 0
   const heightPx = heightMatch ? parseMathJaxLength(heightMatch[1]) : 0
@@ -150,3 +164,10 @@ export function wrapText(s: string): string {
   if (containsMath(s)) return s
   return `\\text{${s}}`
 }
+
+/**
+ * The default MathRenderer: uses MathJax (server-side).
+ * Plain text is wrapped in \text{...}; math delimiters are passed through.
+ */
+export const defaultMathRenderer: MathRenderer = (latex: string) =>
+  renderMath(wrapText(latex))

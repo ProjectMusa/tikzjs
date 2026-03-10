@@ -26,6 +26,8 @@ import { generateSVG, SVGGeneratorOptions } from './generators/svg/index.js'
 export type { IRDiagram, IRElement } from './ir/types.js'
 export type { ExpandedDoc } from './preprocessor/index.js'
 export type { SVGGeneratorOptions } from './generators/svg/index.js'
+export type { MathRenderer, MathResult } from './math/index.js'
+export { defaultMathRenderer } from './math/index.js'
 
 // ── Core pipeline ─────────────────────────────────────────────────────────────
 

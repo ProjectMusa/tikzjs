@@ -148,10 +148,26 @@
         const toCol  = cell.col + ar.colDelta;
         const toId   = cellNodeMap[toRow + ',' + toCol];
         if (!fromId || !toId) continue;
-        const labels  = ar.label ? [{ text: ar.label, position: 'midway' }] : [];
-        const rawOpts = ar.rawOptions || [];
-        const style   = resolveOptsFn(rawOpts);
-        arrows.push(ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, rawOpts, { labels }));
+
+        // Quoted string options like "f" or "g"' (swap) are labels, not style opts
+        const labels = [];
+        const styleRawOpts = [];
+        for (const opt of (ar.rawOptions || [])) {
+          const k = opt.key || '';
+          if (k.startsWith('"')) {
+            let text = k;
+            let swap = false;
+            if (text.endsWith("'")) { swap = true; text = text.slice(0, -1); }
+            if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1);
+            if (text) labels.push({ text, position: 'midway', swap });
+          } else {
+            styleRawOpts.push(opt);
+          }
+        }
+        if (ar.label) labels.push({ text: ar.label, position: 'midway', swap: false });
+
+        const style = resolveOptsFn(styleRawOpts);
+        arrows.push(ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, styleRawOpts, { labels }));
       }
     }
 

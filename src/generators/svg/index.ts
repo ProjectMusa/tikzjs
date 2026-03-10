@@ -26,13 +26,14 @@ import {
   IRTikzcdArrow,
   IRNamedCoordinate,
 } from '../../ir/types.js'
-import { CoordResolver, NodeGeometryRegistry, ptToPx } from './coordResolver.js'
+import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { emitNode } from './nodeEmitter.js'
 import { emitPath } from './pathEmitter.js'
 import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
+import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
 
 const { JSDOM } = require('jsdom')
 
@@ -41,6 +42,8 @@ const PADDING_PX = ptToPx(2.4)
 
 export interface SVGGeneratorOptions {
   padding?: number
+  /** Custom math renderer. Defaults to MathJax server-side rendering. */
+  mathRenderer?: MathRenderer
 }
 
 /**
@@ -53,6 +56,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   const nodeRegistry = new NodeGeometryRegistry()
   const markerRegistry: MarkerRegistry = new Map()
   const coordResolver = new CoordResolver(nodeRegistry)
+  const mathRenderer = opts.mathRenderer ?? defaultMathRenderer
 
   // Paths go first (behind), node groups go last (on top)
   const pathElements: Element[] = []
@@ -69,7 +73,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     coordResolver,
     nodeRegistry,
     nodeElements,
-    allBBoxes
+    allBBoxes,
+    mathRenderer
   )
 
   renderElements_pass2(
@@ -80,7 +85,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     markerRegistry,
     pathElements,
     nodeElements,
-    allBBoxes
+    allBBoxes,
+    mathRenderer
   )
 
   // Compute viewBox
@@ -90,9 +96,16 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     ? toViewBox(padBBox(rawBBox, padding))
     : `-${padding} -${padding} ${padding * 2 + 100} ${padding * 2 + 100}`
 
-  // Build SVG root
+  // Build SVG root — set width/height in pt so browsers render at the same physical
+  // size as dvisvgm output (which also uses pt), enabling fair side-by-side comparison.
+  const [, , vwStr, vhStr] = viewBox.split(' ')
+  const widthPt  = pxToPt(parseFloat(vwStr))
+  const heightPt = pxToPt(parseFloat(vhStr))
+
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
+  svg.setAttribute('width',   `${widthPt}pt`)
+  svg.setAttribute('height',  `${heightPt}pt`)
   svg.setAttribute('viewBox', viewBox)
 
   // Add <defs> with marker definitions if any
@@ -117,7 +130,8 @@ function renderElements_pass1(
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
   outNodeElements: Element[],
-  outBBoxes: BoundingBox[]
+  outBBoxes: BoundingBox[],
+  mathRenderer: MathRenderer
 ): void {
   for (const el of elements) {
     switch (el.kind) {
@@ -129,7 +143,7 @@ function renderElements_pass1(
       }
 
       case 'node': {
-        const result = emitNode(el, document, resolver, nodeRegistry)
+        const result = emitNode(el, document, resolver, nodeRegistry, mathRenderer)
         outNodeElements.push(result.element)
         outBBoxes.push(result.bbox)
         break
@@ -139,7 +153,7 @@ function renderElements_pass1(
         // Register inline nodes (e.g. from \node at ...) so their geometry is
         // available when paths later reference their anchors.
         for (const node of el.inlineNodes) {
-          const result = emitNode(node, document, resolver.clone(), nodeRegistry)
+          const result = emitNode(node, document, resolver.clone(), nodeRegistry, mathRenderer)
           outNodeElements.push(result.element)
           outBBoxes.push(result.bbox)
         }
@@ -153,7 +167,8 @@ function renderElements_pass1(
           resolver.clone(),
           nodeRegistry,
           outNodeElements,
-          outBBoxes
+          outBBoxes,
+          mathRenderer
         )
         break
       }
@@ -176,7 +191,8 @@ function renderElements_pass2(
   markerRegistry: MarkerRegistry,
   outPathElements: Element[],
   outNodeElements: Element[],
-  outBBoxes: BoundingBox[]
+  outBBoxes: BoundingBox[],
+  mathRenderer: MathRenderer
 ): void {
   for (const el of elements) {
     switch (el.kind) {
@@ -188,7 +204,7 @@ function renderElements_pass2(
       }
 
       case 'edge': {
-        const result = emitEdge(el, document, nodeRegistry, markerRegistry)
+        const result = emitEdge(el, document, nodeRegistry, markerRegistry, mathRenderer)
         outPathElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
@@ -203,7 +219,8 @@ function renderElements_pass2(
           markerRegistry,
           outPathElements,
           outNodeElements,
-          outBBoxes
+          outBBoxes,
+          mathRenderer
         )
         break
       }

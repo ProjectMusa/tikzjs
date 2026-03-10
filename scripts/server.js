@@ -71,7 +71,7 @@ const CSS = `
   .pane-header .label { font-weight: 600; }
   .pane-header .hint { color: #888; font-size: 11px; }
   .pane-body { flex: 1; overflow: auto; display: flex; align-items: center; justify-content: center; background: white; padding: 32px; }
-  .pane-body svg { max-width: 100%; max-height: 100%; }
+  .pane-body svg { width: auto; height: auto; max-width: calc(100% - 64px); max-height: calc(100% - 64px); display: block; }
   .error { background: #fff0f0; color: #cc0000; padding: 16px; font-size: 12px; font-family: monospace; border-radius: 4px; max-width: 500px; white-space: pre-wrap; }
   .no-ref { color: #999; font-size: 13px; text-align: center; }
   .source-pane { background: #1e1e1e; color: #d4d4d4; padding: 16px; font-size: 11px; font-family: monospace; overflow: auto; }
@@ -135,12 +135,11 @@ function handleCompare(name, res) {
 
   const src = fs.readFileSync(path.join(FIXTURES_DIR, name + '.tikz'), 'utf8')
 
-  // tikzjs pane — rendered server-side into an <img> via data URL so page load is simple
+  // tikzjs pane — embed SVG inline so CSS max-width/max-height scales it the same way as the ref
   let ourPane
   try {
     const svg = renderTikzjs(name)
-    const encoded = Buffer.from(svg).toString('base64')
-    ourPane = `<img src="data:image/svg+xml;base64,${encoded}" style="max-width:100%;max-height:100%;">`
+    ourPane = svg
   } catch (err) {
     ourPane = `<div class="error">Parse/render error:\n${esc(err.message)}</div>`
   }

@@ -11,7 +11,7 @@ import { IRNode, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, NodeGeometry, getAnchorPosition, ptToPx } from './coordResolver.js'
 import { BoundingBox, fromCorners } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
-import { renderMath, wrapText } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
 
 /** Default inner padding around node content (px). */
 const DEFAULT_INNER_SEP_PX = 4
@@ -28,14 +28,17 @@ export interface NodeRenderResult {
  * Render an IRNode to an SVG <g> element.
  * Also registers the node's geometry in the NodeGeometryRegistry so
  * that subsequent coordinate references to this node can resolve anchors.
+ *
+ * @param mathRenderer  Optional renderer for LaTeX labels. Defaults to MathJax.
  */
 export function emitNode(
   node: IRNode,
   document: Document,
   resolver: CoordResolver,
-  nodeRegistry: NodeGeometryRegistry
+  nodeRegistry: NodeGeometryRegistry,
+  mathRenderer: MathRenderer = defaultMathRenderer
 ): NodeRenderResult {
-  // Render the label with MathJax
+  // Render the label
   const labelSource = node.label || ''
   let svgContent = ''
   let labelWidth = 0
@@ -44,7 +47,7 @@ export function emitNode(
 
   if (labelSource.trim()) {
     try {
-      const result = renderMath(wrapText(labelSource))
+      const result = mathRenderer(labelSource)
       svgContent = result.svgString
       labelWidth = result.widthPx
       labelHeight = result.heightPx
