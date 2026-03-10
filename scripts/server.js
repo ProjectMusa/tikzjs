@@ -208,7 +208,7 @@ function handleRawRef(name, res) {
 
 // ── Static file server for /tmp/tikzjs-diff/ ──────────────────────────────
 
-const DIFF_DIR = '/tmp/tikzjs-diff'
+const DIFF_DIR = '/tmp/tikzjs-golden'
 const MIME = { '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css' }
 
 function handleDiff(url, res) {
@@ -216,7 +216,7 @@ function handleDiff(url, res) {
   const file = path.join(DIFF_DIR, rel)
   if (!fs.existsSync(file)) {
     res.writeHead(404, { 'Content-Type': 'text/plain' })
-    res.end(`No diff report found at ${DIFF_DIR}. Run: npm run diff`)
+    res.end(`No diff report found at ${DIFF_DIR}. Run: make cdiff`)
     return
   }
   const ext = path.extname(file)
@@ -245,9 +245,27 @@ const server = http.createServer((req, res) => {
   res.writeHead(404); res.end('Not found')
 })
 
-server.listen(PORT, () => {
-  console.log(`tikzjs preview server running at http://localhost:${PORT}`)
-  console.log(`  Fixtures:    http://localhost:${PORT}/`)
-  console.log(`  Diff report: http://localhost:${PORT}/diff  (run npm run diff first)`)
-  console.log(`  Press Ctrl+C to stop`)
+let currentPort = PORT
+
+function listen(port) {
+  currentPort = port
+  server.listen(port, () => {
+    console.log(`tikzjs preview server running at http://localhost:${port}`)
+    console.log(`  Fixtures:    http://localhost:${port}/`)
+    console.log(`  Diff report: http://localhost:${port}/diff  (run make cdiff first)`)
+    console.log(`  Press Ctrl+C to stop`)
+  })
+}
+
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    const next = currentPort + 1
+    console.warn(`Port ${currentPort} in use, trying ${next}...`)
+    server.close()
+    listen(next)
+  } else {
+    throw err
+  }
 })
+
+listen(PORT)

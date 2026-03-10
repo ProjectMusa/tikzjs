@@ -1,5 +1,5 @@
 """
-Per-fixture comparison logic: renders our SVG, loads the ref, and runs all checks.
+Per-fixture comparison logic.
 """
 
 from dataclasses import dataclass, field
@@ -8,23 +8,36 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-from .config import (
-    REFS_DIR, REPORT_DIR,
-    DIFF_THRESHOLD, AREA_TOLERANCE, VERBOSE,
-)
+from .config import REFS_DIR, REPORT_DIR, DIFF_THRESHOLD, AREA_TOLERANCE, VERBOSE
 from .svg import render_tikzjs, svg_to_png
 from .components import (
-    extract_components, structural_diff_pct, raw_pixel_diff_pct,
+    extract_components,
+    render_component_overlay,
+    structural_diff,
+    raw_pixel_diff_pct,
 )
+
+
+@dataclass
+class ComponentRow:
+    """Per-component comparison entry for the detail table."""
+    rank: int           # 1-based, sorted by area descending
+    our_area: float     # scaled to ref pixel density
+    ref_area: float
+    ratio: float        # our_area / ref_area
+    ok: bool            # within AREA_TOLERANCE
 
 
 @dataclass
 class CompareResult:
     name: str
     passed: bool = True
-    failures: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
-    stats: dict = field(default_factory=dict)
+    failures: list[str]      = field(default_factory=list)
+    warnings: list[str]      = field(default_factory=list)
+    stats: dict              = field(default_factory=dict)
+    component_rows: list[ComponentRow] = field(default_factory=list)
+    struct_diff: float = 0.0
+    raw_diff:    float = 0.0
 
     def fail(self, msg: str) -> None:
         self.passed = False
@@ -48,12 +61,17 @@ def compare_fixture(name: str) -> CompareResult:
     Compare tikzjs output for `name` against its golden reference SVG.
 
     Checks:
-    1. Component count — both images should have the same number of connected
-       foreground blobs (within a 10% tolerance for minor merge differences).
-    2. Area distribution — sorted component areas should match within
-       AREA_TOLERANCE, after scaling to a common canvas size.
-    3. Structural diff — content-cropped, dilated XOR comparison should be
-       below DIFF_THRESHOLD %.
+      1. Component count  — within 10% tolerance
+      2. Area distribution — sorted areas scaled to common density, within AREA_TOLERANCE
+      3. Structural diff   — content-cropped dilated XOR below DIFF_THRESHOLD %
+
+    Saves to REPORT_DIR:
+      {name}_ours.png      — rasterized our SVG
+      {name}_ref.png       — rasterized reference SVG
+      {name}_cc_ours.png   — component overlay (colored blobs)
+      {name}_cc_ref.png    — component overlay (colored blobs)
+      {name}_struct.png    — structural diff visualization
+      {name}_diff.png      — raw amplified pixel diff
     """
     result = CompareResult(name=name)
 
@@ -80,13 +98,11 @@ def compare_fixture(name: str) -> CompareResult:
         result.fail(f'rasterization error: {e}')
         return result
 
-    # ── Save debug PNGs ───────────────────────────────────────────────────────
-
     REPORT_DIR.mkdir(parents=True, exist_ok=True)
     cv2.imwrite(str(REPORT_DIR / f'{name}_ours.png'), our_img)
     cv2.imwrite(str(REPORT_DIR / f'{name}_ref.png'),  ref_img)
 
-    # ── Extract components ────────────────────────────────────────────────────
+    # ── Connected components ──────────────────────────────────────────────────
 
     our_cc = extract_components(our_img)
     ref_cc = extract_components(ref_img)
@@ -97,8 +113,15 @@ def compare_fixture(name: str) -> CompareResult:
     result.stats['n_cc']  = f'{n_ours}/{n_ref}'
     result.stats['fg_px'] = f"{our_cc['total_fg_pixels']}/{ref_cc['total_fg_pixels']}"
 
-    # Check 1: component count
-    count_diff = abs(n_ours - n_ref)
+    # Save component overlay images
+    cv2.imwrite(str(REPORT_DIR / f'{name}_cc_ours.png'),
+                render_component_overlay(our_img, our_cc))
+    cv2.imwrite(str(REPORT_DIR / f'{name}_cc_ref.png'),
+                render_component_overlay(ref_img, ref_cc))
+
+    # ── Check 1: component count ──────────────────────────────────────────────
+
+    count_diff  = abs(n_ours - n_ref)
     max_allowed = max(1, int(n_ref * 0.10))
     if count_diff > max_allowed:
         result.fail(
@@ -106,59 +129,61 @@ def compare_fixture(name: str) -> CompareResult:
             f'(diff={count_diff} > allowed={max_allowed})'
         )
 
-    # Check 2: area distribution (scale to a common pixel density)
+    # ── Check 2: area distribution ────────────────────────────────────────────
+
     h_ref, w_ref = ref_img.shape[:2]
     h_our, w_our = our_img.shape[:2]
     area_scale = (h_ref * w_ref) / (h_our * w_our) if (h_our * w_our) > 0 else 1.0
 
     n_compare = min(n_ours, n_ref)
-    if n_compare > 0:
-        our_areas_scaled = sorted(
-            [a * area_scale for a in our_cc['areas'][:n_compare]], reverse=True
-        )
-        ref_areas = ref_cc['areas'][:n_compare]
+    area_failures = []
 
-        area_failures = []
-        for i, (oa, ra) in enumerate(zip(our_areas_scaled, ref_areas)):
-            if ra == 0:
-                continue
-            ratio = oa / ra
-            if abs(ratio - 1.0) > AREA_TOLERANCE:
-                area_failures.append(
-                    f'  component {i + 1}: area ratio={ratio:.2f} '
-                    f'(ours={oa:.0f}, ref={ra:.0f})'
-                )
-
+    for i in range(n_compare):
+        oa = our_cc['areas'][i] * area_scale
+        ra = ref_cc['areas'][i]
+        ratio = oa / ra if ra > 0 else float('inf')
+        ok = abs(ratio - 1.0) <= AREA_TOLERANCE
+        result.component_rows.append(ComponentRow(
+            rank=i + 1, our_area=oa, ref_area=ra, ratio=ratio, ok=ok
+        ))
+        if not ok:
+            area_failures.append(
+                f'  cc[{i+1}]: ratio={ratio:.2f} (ours={oa:.0f}, ref={ra:.0f})'
+            )
         if VERBOSE:
-            for i, (oa, ra) in enumerate(zip(our_areas_scaled, ref_areas)):
-                ratio = oa / ra if ra > 0 else float('inf')
-                print(f'      cc[{i + 1}]: ours={oa:.0f} ref={ra:.0f} ratio={ratio:.2f}')
+            tag = '✓' if ok else '✗'
+            print(f'      {tag} cc[{i+1}]: ours={oa:.0f} ref={ra:.0f} ratio={ratio:.2f}')
 
-        if area_failures:
-            n_bad = len(area_failures)
-            if n_bad > max(1, int(n_compare * 0.20)):
-                result.fail(
-                    f'{n_bad}/{n_compare} components have area ratio outside '
-                    f'±{int(AREA_TOLERANCE * 100)}% tolerance:\n'
-                    + '\n'.join(area_failures[:5])
-                )
+    if area_failures:
+        n_bad = len(area_failures)
+        if n_bad > max(1, int(n_compare * 0.20)):
+            result.fail(
+                f'{n_bad}/{n_compare} components outside ±{int(AREA_TOLERANCE*100)}%:\n'
+                + '\n'.join(area_failures[:5])
+            )
 
-    # Check 3: structural diff
-    struct_diff = structural_diff_pct(our_img, ref_img)
-    raw_diff    = raw_pixel_diff_pct(our_img, ref_img)
-    result.stats['diff'] = f'{struct_diff:.2f}%'
-    result.stats['raw']  = f'{raw_diff:.1f}%'
+    # ── Check 3: structural diff ──────────────────────────────────────────────
 
-    # Save amplified diff image for visual inspection
+    struct_pct, struct_img = structural_diff(our_img, ref_img)
+    raw_pct = raw_pixel_diff_pct(our_img, ref_img)
+
+    result.struct_diff = struct_pct
+    result.raw_diff    = raw_pct
+    result.stats['diff'] = f'{struct_pct:.2f}%'
+    result.stats['raw']  = f'{raw_pct:.1f}%'
+
+    cv2.imwrite(str(REPORT_DIR / f'{name}_struct.png'), struct_img)
+
+    # Also save a raw amplified diff for reference
     h, w = ref_img.shape[:2]
     our_resized    = cv2.resize(our_img, (w, h), interpolation=cv2.INTER_AREA)
     diff_amplified = cv2.convertScaleAbs(cv2.absdiff(our_resized, ref_img), alpha=5.0)
     cv2.imwrite(str(REPORT_DIR / f'{name}_diff.png'), diff_amplified)
 
-    if struct_diff > DIFF_THRESHOLD:
+    if struct_pct > DIFF_THRESHOLD:
         result.fail(
-            f'structural diff {struct_diff:.2f}% exceeds threshold '
-            f'{DIFF_THRESHOLD:.1f}% (raw: {raw_diff:.1f}%)'
+            f'structural diff {struct_pct:.2f}% > threshold {DIFF_THRESHOLD:.1f}% '
+            f'(raw: {raw_pct:.1f}%)'
         )
 
     return result
