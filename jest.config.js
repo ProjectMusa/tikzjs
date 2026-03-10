@@ -10,7 +10,8 @@ module.exports = {
     '**/test/**/*.test.ts',
   ],
   moduleNameMapper: {
-    // Strip .js extension from imports for ts-jest compatibility
-    '^(.*)\\.js$': '$1',
+    // Only strip .js extension from relative imports (./foo.js, ../bar.js)
+    // NOT from node_modules paths
+    '^(\\.{1,2}/.*)\\.js$': '$1',
   },
 }

@@ -1,100 +1,237 @@
 {{
-  // Top-level preamble: imported once, shared across all parses
+  // Top-level preamble (one block only — runs once when parser module is loaded)
   const ft = require('./factory');
   const op = require('./optionParser');
   const sr = require('./styleResolver');
-}}
-{
-  // Per-parse preamble: options object available as 'options'
-  // options.styleRegistry  — StyleRegistry instance from the preprocessor
-  // options.tikzcdGrids    — Map<id, TikzcdGrid> from tikzcd preprocessor
-  // options.nodeRegistry   — Record<string, string> accumulated during parse
 
-  const registry = options && options.styleRegistry ? options.styleRegistry : { has: () => false, get: () => undefined };
-  const tikzcdGrids = options && options.tikzcdGrids ? options.tikzcdGrids : new Map();
+  // ── Helper: build segment list from raw grammar operation array ──────────────
+  function buildSegments(ops) {
+    const rawSegs = [];
+    const inlineNodes = [];
 
-  // Node registry: name → id, populated as nodes are parsed
-  const nodeRegistry = options && options.nodeRegistry ? options.nodeRegistry : {};
-
-  function registerNode(node) {
-    if (node && node.name) {
-      nodeRegistry[node.name] = node.id;
+    for (const item of ops) {
+      if (!item) continue;
+      switch (item.kind) {
+        case 'op-coord':
+          rawSegs.push(ft.moveSegment(item.coord));
+          break;
+        case 'op-line':
+          rawSegs.push({ _pendingLine: item.lineKind });
+          break;
+        case 'op-grid':
+          rawSegs.push({ _pendingGrid: item.rawOpts });
+          break;
+        case 'op-rectangle':
+          rawSegs.push({ _pendingRectangle: true });
+          break;
+        case 'op-curve':
+          rawSegs.push({ _pendingCurve: item.controls });
+          break;
+        case 'op-to':
+          rawSegs.push({ _pendingTo: item.rawOpts });
+          break;
+        case 'op-arc': {
+          const arcSeg = buildArcSegment(item.rawOpts);
+          if (arcSeg) rawSegs.push(arcSeg);
+          break;
+        }
+        case 'op-node':
+          inlineNodes.push(item.node);
+          rawSegs.push(ft.nodeOnPathSegment(item.node.id));
+          break;
+        case 'op-close':
+          rawSegs.push(ft.closeSegment());
+          break;
+      }
     }
-    return node;
+
+    return { segments: resolvePending(rawSegs), inlineNodes };
   }
 
-  function resolveOpts(rawOpts) {
-    return op.resolveOptions(rawOpts, registry);
+  function resolvePending(rawSegs) {
+    const segments = [];
+    for (let i = 0; i < rawSegs.length; i++) {
+      const seg = rawSegs[i];
+      if (seg && seg._pendingLine !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          const to = next.to;
+          if (seg._pendingLine === '--') segments.push(ft.lineSegment(to));
+          else if (seg._pendingLine === '-|') segments.push(ft.hvLineSegment(to, true));
+          else segments.push(ft.hvLineSegment(to, false));
+          i++;
+        }
+      } else if (seg && seg._pendingCurve !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.curveSegment(seg._pendingCurve, next.to));
+          i++;
+        }
+      } else if (seg && seg._pendingRectangle) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push({ kind: 'rectangle', to: next.to });
+          i++;
+        }
+      } else if (seg && seg._pendingGrid !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push({ kind: 'grid', to: next.to, rawOptions: seg._pendingGrid });
+          i++;
+        }
+      } else if (seg && seg._pendingTo !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.toSegment(next.to, seg._pendingTo));
+          i++;
+        }
+      } else if (seg) {
+        segments.push(seg);
+      }
+    }
+    return segments;
   }
 
-  function parseRaw(optStr) {
-    return op.parseRawOptions(optStr || '');
+  function buildArcSegment(rawOpts) {
+    let startAngle, endAngle, xRadius, yRadius;
+    for (const o of rawOpts) {
+      if (o.key === 'start angle') startAngle = parseFloat(o.value);
+      if (o.key === 'end angle')   endAngle   = parseFloat(o.value);
+      if (o.key === 'radius')      xRadius    = parseFloat(o.value);
+      if (o.key === 'x radius')    xRadius    = parseFloat(o.value);
+      if (o.key === 'y radius')    yRadius    = parseFloat(o.value);
+    }
+    if (startAngle !== undefined && endAngle !== undefined && xRadius !== undefined) {
+      return ft.arcSegment(startAngle, endAngle, xRadius, yRadius);
+    }
+    return null;
   }
 
-  function anchorFor(rawOpts) {
-    return sr.anchorFromPlacement(rawOpts);
+  function buildMatrixFromGrid(grid, id, nodeReg, resolveOptsFn) {
+    const position  = ft.coordRef(0, 0);
+    const rowSepPt  = 28.45; // 1cm
+    const colSepPt  = 56.9;  // 2cm
+
+    const rows        = [];
+    const cellNodeMap = {};
+
+    for (let r = 0; r < grid.rowCount; r++) {
+      const row = [];
+      for (let c = 0; c < grid.colCount; c++) {
+        const cell = grid.cells.find(cell => cell.row === r && cell.col === c);
+        if (cell) {
+          const node = ft.makeNode(
+            ft.coordRef(0, 0), cell.label, {}, [],
+            { name: id + '_' + r + '_' + c }
+          );
+          if (node.name) nodeReg[node.name] = node.id;
+          cellNodeMap[r + ',' + c] = node.id;
+          row.push(node);
+        } else {
+          row.push(null);
+        }
+      }
+      rows.push(row);
+    }
+
+    const arrows = [];
+    for (const cell of grid.cells) {
+      for (const ar of cell.arrows) {
+        const fromId = cellNodeMap[cell.row + ',' + cell.col];
+        const toRow  = cell.row + ar.rowDelta;
+        const toCol  = cell.col + ar.colDelta;
+        const toId   = cellNodeMap[toRow + ',' + toCol];
+        if (!fromId || !toId) continue;
+        const labels  = ar.label ? [{ text: ar.label, position: 'midway' }] : [];
+        const rawOpts = ar.rawOptions || [];
+        const style   = resolveOptsFn(rawOpts);
+        arrows.push(ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, rawOpts, { labels }));
+      }
+    }
+
+    const rawOpts = grid.rawOptions || [];
+    const style   = resolveOptsFn(rawOpts);
+    const matrix  = ft.makeMatrix(position, rows, style, rawOpts, {
+      name: id, columnSep: colSepPt, rowSep: rowSepPt,
+    });
+    return ft.makeScope([matrix, ...arrows], {}, []);
   }
+}}
+
+{
+  // Per-parse initializer
+  const registry     = (options && options.styleRegistry) ? options.styleRegistry : { has: () => false, get: () => undefined, toRecord: () => ({}) };
+  const tikzcdGrids  = (options && options.tikzcdGrids)   ? options.tikzcdGrids   : new Map();
+  const nodeRegistry = (options && options.nodeRegistry)  ? options.nodeRegistry  : {};
+
+  function resolveOpts(rawOpts) { return op.resolveOptions(rawOpts, registry); }
+  function parseRaw(optStr)     { return op.parseRawOptions(optStr || ''); }
+  function anchorFor(rawOpts)   { return sr.anchorFromPlacement(rawOpts); }
+  function registerNode(node)   { if (node && node.name) nodeRegistry[node.name] = node.id; return node; }
 }
 
 /////////////////////// Entry Point //////////////////////////
 
 start
-  = ws t:tikz ws        { return t; }
+  = ws t:tikz        ws { return t; }
   / ws p:tikzpicture ws { return p; }
+  / ws cd:tikzcd_root ws { return cd; }
+
+tikzcd_root
+  = scope:tikzcd_statement
+    {
+      return ft.makeDiagram('tikzpicture', [scope], {}, [],
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+    }
 
 tikz
-  = tikzhead opt:option_block cnt:tikzcontent
+  = tikzhead_open opt:option_block cnt:tikzcontent '}'
     {
       const rawOpts = parseRaw(opt);
-      const style = resolveOpts(rawOpts);
-      return ft.makeDiagram('tikz-inline', cnt, style, rawOpts, registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+      return ft.makeDiagram('tikz-inline', cnt, resolveOpts(rawOpts), rawOpts,
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
     }
 
 tikzpicture
   = tikzpicturehead opt:option_block cnt:tikzcontent tikzpicturetail
     {
       const rawOpts = parseRaw(opt);
-      const style = resolveOpts(rawOpts);
-      return ft.makeDiagram('tikzpicture', cnt, style, rawOpts, registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+      return ft.makeDiagram('tikzpicture', cnt, resolveOpts(rawOpts), rawOpts,
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
     }
 
-tikzhead
-  = ws ('\\tikz' / '\\tikzjs') ws '{' ws
+tikzhead_open
+  = ws '\\tikzjs' ws
+  / ws '\\tikz'   ws
 
 tikzpicturehead
   = ws '\\begin' ws '{' ws ('tikzpicture' / 'tikzjspicture') ws '}' ws
 
 tikzpicturetail
-  = ws '}' ws
-  / ws '\\end' ws '{' ws ('tikzpicture' / 'tikzjspicture') ws '}' ws
+  = ws '\\end' ws '{' ws ('tikzpicture' / 'tikzjspicture') ws '}' ws
 
 /////////////////////// Option Blocks //////////////////////////
 
-// Returns the raw option string (content inside [...])
 option_block "option block"
   = ws '[' content:option_content ']' ws { return content; }
-  / ws                                   { return ''; }
+  / ws                                    { return ''; }
 
-// Consume option content respecting nested brackets and braces
-option_content
-  = chars:option_char* { return chars.join(''); }
+option_content = chars:option_char* { return chars.join(''); }
 
 option_char
   = '{' inner:brace_content '}' { return '{' + inner + '}'; }
   / '[' inner:option_content ']' { return '[' + inner + ']'; }
   / c:[^\[\]{};] { return c; }
 
-brace_content
-  = chars:brace_char* { return chars.join(''); }
+brace_content = chars:brace_char* { return chars.join(''); }
 
 brace_char
   = '{' inner:brace_content '}' { return '{' + inner + '}'; }
   / c:[^{}] { return c; }
 
-/////////////////////// Content (statement list) //////////////////////////
+/////////////////////// Content //////////////////////////
 
-tikzcontent
-  = ws list:statement_list ws { return list; }
+tikzcontent = ws list:statement_list ws { return list; }
 
 statement_list
   = items:(ws s:statement ws { return s; })* { return items.filter(Boolean); }
@@ -112,8 +249,7 @@ scope_statement
   = '\\begin' ws '{' ws 'scope' ws '}' opt:option_block cnt:tikzcontent '\\end' ws '{' ws 'scope' ws '}'
     {
       const rawOpts = parseRaw(opt);
-      const style = resolveOpts(rawOpts);
-      return ft.makeScope(cnt, style, rawOpts, location());
+      return ft.makeScope(cnt, resolveOpts(rawOpts), rawOpts);
     }
 
 /////////////////////// tikzcd placeholder //////////////////////////
@@ -123,7 +259,7 @@ tikzcd_statement
     {
       const grid = tikzcdGrids.get(id);
       if (!grid) return null;
-      return buildMatrixFromGrid(grid, id);
+      return buildMatrixFromGrid(grid, id, nodeRegistry, resolveOpts);
     }
 
 /////////////////////// Path Statements //////////////////////////
@@ -131,12 +267,12 @@ tikzcd_statement
 path_statement
   = head:path_head opt:option_block ops:operation_list ';'
     {
-      const impliedOpts = head.impliedOpts || '';
-      const combinedOptStr = impliedOpts ? impliedOpts + (opt ? ',' + opt : '') : opt;
-      const rawOpts = parseRaw(combinedOptStr);
-      const style = resolveOpts(rawOpts);
+      const impliedOpts  = head.impliedOpts || '';
+      const combinedStr  = impliedOpts ? (opt ? impliedOpts + ',' + opt : impliedOpts) : opt;
+      const rawOpts      = parseRaw(combinedStr);
+      const style        = resolveOpts(rawOpts);
       const { segments, inlineNodes } = buildSegments(ops);
-      return ft.makePath(segments, style, rawOpts, inlineNodes, location());
+      return ft.makePath(segments, style, rawOpts, inlineNodes);
     }
 
 path_head "path command"
@@ -144,32 +280,25 @@ path_head "path command"
   / '\\draw'     { return { cmd: '\\draw',     impliedOpts: 'draw' }; }
   / '\\fill'     { return { cmd: '\\fill',     impliedOpts: 'fill' }; }
   / '\\filldraw' { return { cmd: '\\filldraw', impliedOpts: 'draw,fill' }; }
-  / '\\clip'     { return { cmd: '\\clip',     impliedOpts: 'clip' }; }
-  / '\\shade'    { return { cmd: '\\shade',    impliedOpts: 'shade' }; }
+  / '\\clip'     { return { cmd: '\\clip',     impliedOpts: '' }; }
+  / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
-// Standalone \node command (shorthand)
 standalone_node_statement
   = '\\node' opt:option_block al:node_alias? at_coord:node_at cnt:node_content ';'
     {
       const rawOpts = parseRaw(opt);
-      const anchor = anchorFor(rawOpts);
-      const style = resolveOpts(rawOpts);
-      const position = at_coord || ft.coordRef(0, 0);
-      const node = ft.makeNode(position, cnt || '', style, rawOpts, { name: al || undefined, anchor });
+      const pos     = at_coord || ft.coordRef(0, 0);
+      const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
+        { name: al || undefined, anchor: anchorFor(rawOpts) });
       registerNode(node);
-      // Wrap in a single-node path for consistency
-      return ft.makePath(
-        [ft.moveSegment(position), ft.nodeOnPathSegment(node.id)],
-        {}, [], [node], location()
-      );
+      return ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
     }
 
-// Standalone \coordinate command
 standalone_coordinate_statement
   = '\\coordinate' opt:option_block al:node_alias? at_coord:node_at ';'
     {
-      const position = at_coord || ft.coordRef(0, 0);
-      const coord = ft.makeCoordinate(position, { name: al || undefined });
+      const pos   = at_coord || ft.coordRef(0, 0);
+      const coord = ft.makeCoordinate(pos, { name: al || undefined });
       if (al) nodeRegistry[al] = coord.id;
       return coord;
     }
@@ -177,11 +306,12 @@ standalone_coordinate_statement
 /////////////////////// Operation List //////////////////////////
 
 operation_list
-  = ops:(ws op:path_operation ws { return op; })* { return ops; }
+  = ops:(ws o:path_operation ws { return o; })* { return ops; }
 
 path_operation
-  = c:path_coordinate { return { kind: 'op-coord', coord: c }; }
+  = c:path_coordinate { return c; }
   / l:line_op         { return l; }
+  / r:rectangle_op    { return r; }
   / g:grid_op         { return g; }
   / b:curve_op        { return b; }
   / t:to_op           { return t; }
@@ -191,80 +321,70 @@ path_operation
 
 cycle_op = ws 'cycle' ws
 
-/////////////////////// Coordinate Spec //////////////////////////
+/////////////////////// Coordinates //////////////////////////
 
 path_coordinate "coordinate"
-  = '++' c:raw_coordinate { return { kind: 'op-coord', coord: { ...c, mode: 'relative' } }; }
-  / '+'  c:raw_coordinate { return { kind: 'op-coord', coord: { ...c, mode: 'relative-pass' } }; }
-  / c:raw_coordinate      { return { kind: 'op-coord', coord: { ...c, mode: 'absolute' } }; }
+  = '++' c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
+  / '+'  c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
+  / c:raw_coordinate      { return { kind: 'op-coord', coord: c }; }
   / a:node_alias_anchor   { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
   / a:node_alias          { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
 raw_coordinate "raw coordinate"
   = '(' ws x:number ws ',' ws y:number ws ')'
-    { return ft.coordRef(x, y); }
+    { return { mode: 'absolute', coord: { cs: 'xy', x, y } }; }
   / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:number ws ',' ws 'y' ws '=' ws y:number ws ')'
-    { return ft.coordRef(x, y); }
+    { return { mode: 'absolute', coord: { cs: 'xy', x, y } }; }
   / '(' ws angle:number ws ':' ws radius:number ws ')'
-    { return ft.polarRef(angle, radius); }
-  / '(' ws 'canvas' ws 'polar' ws 'cs' ws ':' ws 'angle' ws '=' ws a:number ws ',' ws 'radius' ws '=' ws r:number ws ')'
-    { return ft.polarRef(a, r); }
+    { return { mode: 'absolute', coord: { cs: 'polar', angle, radius } }; }
 
 node_alias "node alias"
-  = '(' ws name:identifier ws ')'  { return name; }
+  = '(' ws name:identifier ws ')' { return name; }
 
 node_alias_anchor "node alias with anchor"
   = '(' ws name:identifier ws '.' ws anchor:anchor_name ws ')' { return [name, anchor]; }
 
 anchor_name
-  = 'north east' / 'north west' / 'south east' / 'south west'
-  / 'north' / 'south' / 'east' / 'west'
-  / 'center' / 'mid' / 'base'
-  / 'mid east' / 'mid west' / 'base east' / 'base west'
+  = $('north east' / 'north west' / 'south east' / 'south west'
+     / 'north' / 'south' / 'east' / 'west'
+     / 'center' / 'mid east' / 'mid west' / 'base east' / 'base west'
+     / 'mid' / 'base')
   / identifier
 
-/////////////////////// Line Operations //////////////////////////
+/////////////////////// Path Operations //////////////////////////
 
-line_op "line operation"
+line_op "line"
   = ws '--' ws { return { kind: 'op-line', lineKind: '--' }; }
   / ws '-|' ws { return { kind: 'op-line', lineKind: '-|' }; }
   / ws '|-' ws { return { kind: 'op-line', lineKind: '|-' }; }
 
-/////////////////////// Grid Operation //////////////////////////
+rectangle_op "rectangle"
+  = ws 'rectangle' ws { return { kind: 'op-rectangle' }; }
 
-grid_op "grid operation"
+grid_op "grid"
   = ws 'grid' opt:option_block
     { return { kind: 'op-grid', rawOpts: parseRaw(opt) }; }
 
-/////////////////////// Curve Operations //////////////////////////
-
-curve_op "curve operation"
+curve_op "curve"
   = ws '..' ws 'controls' ws c0:path_coordinate ws 'and' ws c1:path_coordinate ws '..' ws
     { return { kind: 'op-curve', controls: [c0.coord, c1.coord] }; }
   / ws '..' ws 'controls' ws c0:path_coordinate ws '..' ws
     { return { kind: 'op-curve', controls: [c0.coord] }; }
 
-/////////////////////// To-path Operation //////////////////////////
-
-to_op "to operation"
+to_op "to"
   = ws 'to' opt:option_block
     { return { kind: 'op-to', rawOpts: parseRaw(opt) }; }
 
-/////////////////////// Arc Operation //////////////////////////
-
-arc_op "arc operation"
+arc_op "arc"
   = ws 'arc' opt:option_block
     { return { kind: 'op-arc', rawOpts: parseRaw(opt) }; }
 
-/////////////////////// Node Operation //////////////////////////
-
-node_op "node operation"
+node_op "node"
   = ws 'node' opt:option_block al:node_alias? cnt:node_content ws
     {
       const rawOpts = parseRaw(opt);
-      const anchor = anchorFor(rawOpts);
-      const style = resolveOpts(rawOpts);
-      const node = ft.makeNode(ft.coordRef(0, 0), cnt || '', style, rawOpts, { name: al || undefined, anchor });
+      const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
+        { name: al || undefined, anchor: anchorFor(rawOpts) });
       registerNode(node);
       return { kind: 'op-node', node };
     }
@@ -277,216 +397,22 @@ node_content "node content"
   = ws '{' content:node_body '}' ws { return content; }
   / ws                               { return ''; }
 
-node_body
-  = chars:node_body_char* { return chars.join(''); }
+node_body = chars:node_body_char* { return chars.join(''); }
 
 node_body_char
   = '{' inner:node_body '}' { return '{' + inner + '}'; }
   / c:[^{}] { return c; }
 
-/////////////////////// Identifier //////////////////////////
+/////////////////////// Primitives //////////////////////////
 
-identifier
-  = $[a-zA-Z_][a-zA-Z0-9_\-]*
-  / $[a-zA-Z]+
-
-/////////////////////// Numbers //////////////////////////
+identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
 
 number "number"
-  = s:[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*
+  = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*
     { return parseFloat((s||'') + i + '.' + (f||'0')); }
-  / s:[+\-]? ws '.' f:$[0-9]+
+  / s:$[+\-]? ws '.' f:$[0-9]+
     { return parseFloat((s||'') + '0.' + f); }
-  / s:[+\-]? ws i:$[0-9]+
+  / s:$[+\-]? ws i:$[0-9]+
     { return parseFloat((s||'') + i); }
 
-ws "whitespace"
-  = [ \t\n\r]*
-
-/////////////////////// Helper functions (in action preamble) //////////////////////////
-
-{{
-  // Build segments and inline-node list from the raw operation list
-  function buildSegments(ops) {
-    const segments = [];
-    const inlineNodes = [];
-    let lastCoord = null;
-
-    for (const op of ops) {
-      if (!op) continue;
-
-      switch (op.kind) {
-        case 'op-coord': {
-          const coord = op.coord;
-          if (lastCoord === null) {
-            segments.push(ft.moveSegment(coord));
-          } else {
-            // A coordinate after another coordinate is an implicit move
-            segments.push(ft.moveSegment(coord));
-          }
-          lastCoord = coord;
-          break;
-        }
-        case 'op-line': {
-          // The line op is followed by a coordinate (next op-coord)
-          // We record the line type; the next coord will complete it
-          segments.push({ _pendingLine: op.lineKind });
-          break;
-        }
-        case 'op-grid': {
-          segments.push({ _pendingGrid: op.rawOpts });
-          break;
-        }
-        case 'op-curve': {
-          segments.push({ _pendingCurve: op.controls });
-          break;
-        }
-        case 'op-to': {
-          segments.push({ _pendingTo: op.rawOpts });
-          break;
-        }
-        case 'op-arc': {
-          const arcSeg = buildArcSegment(op.rawOpts);
-          if (arcSeg) segments.push(arcSeg);
-          break;
-        }
-        case 'op-node': {
-          inlineNodes.push(op.node);
-          segments.push(ft.nodeOnPathSegment(op.node.id));
-          break;
-        }
-        case 'op-close': {
-          segments.push(ft.closeSegment());
-          break;
-        }
-      }
-    }
-
-    // Second pass: resolve pending operations by looking ahead for their target coord
-    return resolvePending(segments, inlineNodes);
-  }
-
-  function resolvePending(rawSegments, inlineNodes) {
-    const segments = [];
-    for (let i = 0; i < rawSegments.length; i++) {
-      const seg = rawSegments[i];
-      if (seg && seg._pendingLine !== undefined) {
-        // Find next move segment
-        const nextMove = rawSegments[i + 1];
-        if (nextMove && nextMove.kind === 'move') {
-          const to = nextMove.to;
-          segments.push(
-            seg._pendingLine === '--' ? ft.lineSegment(to) :
-            seg._pendingLine === '-|' ? ft.hvLineSegment(to, true) :
-            ft.hvLineSegment(to, false)
-          );
-          i++; // consume the move
-        }
-      } else if (seg && seg._pendingCurve !== undefined) {
-        const nextMove = rawSegments[i + 1];
-        if (nextMove && nextMove.kind === 'move') {
-          segments.push(ft.curveSegment(seg._pendingCurve, nextMove.to));
-          i++;
-        }
-      } else if (seg && seg._pendingGrid !== undefined) {
-        const nextMove = rawSegments[i + 1];
-        if (nextMove && nextMove.kind === 'move') {
-          // Grid: encode as a special 'arc' kind re-purposing the structure,
-          // or use a dedicated segment type. We encode as a 'line' with
-          // rawOptions containing 'grid' marker for the generator to handle.
-          segments.push({ kind: 'grid', to: nextMove.to, rawOptions: seg._pendingGrid });
-          i++;
-        }
-      } else if (seg && seg._pendingTo !== undefined) {
-        const nextMove = rawSegments[i + 1];
-        if (nextMove && nextMove.kind === 'move') {
-          segments.push(ft.toSegment(nextMove.to, seg._pendingTo));
-          i++;
-        }
-      } else if (seg) {
-        segments.push(seg);
-      }
-    }
-    return { segments, inlineNodes };
-  }
-
-  function buildArcSegment(rawOpts) {
-    let startAngle, endAngle, xRadius, yRadius;
-    for (const opt of rawOpts) {
-      if (opt.key === 'start angle') startAngle = parseFloat(opt.value);
-      if (opt.key === 'end angle') endAngle = parseFloat(opt.value);
-      if (opt.key === 'radius') xRadius = ft.parseDimension ? ft.parseDimension(opt.value) : parseFloat(opt.value);
-      if (opt.key === 'x radius') xRadius = ft.parseDimension ? ft.parseDimension(opt.value) : parseFloat(opt.value);
-      if (opt.key === 'y radius') yRadius = ft.parseDimension ? ft.parseDimension(opt.value) : parseFloat(opt.value);
-    }
-    if (startAngle !== undefined && endAngle !== undefined && xRadius !== undefined) {
-      return ft.arcSegment(startAngle, endAngle, xRadius, yRadius);
-    }
-    return null;
-  }
-
-  function buildMatrixFromGrid(grid, id) {
-    // Convert TikzcdGrid → IRMatrix + IRTikzcdArrow[]
-    // Returns an IRMatrix element with arrows embedded
-    // The arrows will be resolved by the SVG generator using nodeRegistry
-    const position = ft.coordRef(0, 0);
-    const rowSep = 28.45; // 1cm in pt ≈ default tikzcd row sep
-    const colSep = 56.9;  // 2cm in pt ≈ default tikzcd col sep
-
-    // Build rows of IRNode
-    const rows = [];
-    const cellNodeMap = {}; // "r,c" → node id
-
-    for (let r = 0; r < grid.rowCount; r++) {
-      const row = [];
-      for (let c = 0; c < grid.colCount; c++) {
-        const cell = grid.cells.find(cell => cell.row === r && cell.col === c);
-        if (cell && cell.label) {
-          const node = ft.makeNode(
-            ft.coordRef(0, 0), // position set by matrixEmitter
-            cell.label,
-            {},
-            [],
-            { name: `${id}_${r}_${c}` }
-          );
-          registerNode(node);
-          cellNodeMap[`${r},${c}`] = node.id;
-          row.push(node);
-        } else {
-          row.push(null);
-        }
-      }
-      rows.push(row);
-    }
-
-    // Build IRTikzcdArrow for each \ar command
-    const arrows = [];
-    for (const cell of grid.cells) {
-      for (const ar of cell.arrows) {
-        const fromId = cellNodeMap[`${cell.row},${cell.col}`];
-        const toRow = cell.row + ar.rowDelta;
-        const toCol = cell.col + ar.colDelta;
-        const toId = cellNodeMap[`${toRow},${toCol}`];
-        if (!fromId || !toId) continue;
-
-        const labels = ar.label ? [{ text: ar.label, position: 'midway' }] : [];
-        const rawOpts = ar.rawOptions || [];
-        const style = resolveOpts(rawOpts);
-
-        const arrow = ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, rawOpts, { labels });
-        arrows.push(arrow);
-      }
-    }
-
-    const rawOpts = grid.rawOptions || [];
-    const style = resolveOpts(rawOpts);
-    const matrix = ft.makeMatrix(position, rows, style, rawOpts, {
-      name: id,
-      columnSep: colSep,
-      rowSep: rowSep,
-    });
-
-    // Return a scope containing matrix + arrows
-    return ft.makeScope([matrix, ...arrows], {}, [], location());
-  }
-}}
+ws "whitespace" = [ \t\n\r]*

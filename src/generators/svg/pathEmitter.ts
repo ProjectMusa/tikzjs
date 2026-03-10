@@ -169,6 +169,17 @@ export function emitPath(
         break
       }
 
+      case 'rectangle': {
+        const to = resolver.resolve((seg as any).to)
+        d += `L ${to.x} ${lastPos.y} L ${to.x} ${to.y} L ${lastPos.x} ${to.y} L ${lastPos.x} ${lastPos.y} Z `
+        bboxes.push(fromCorners(
+          Math.min(lastPos.x, to.x), Math.min(lastPos.y, to.y),
+          Math.max(lastPos.x, to.x), Math.max(lastPos.y, to.y)
+        ))
+        lastPos = to
+        break
+      }
+
       case 'grid': {
         // Grid: render as a series of lines. The grid is from lastPos to 'to'.
         const gridSeg = seg as any
