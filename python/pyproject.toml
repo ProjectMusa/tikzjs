@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "tikzjs-compare"
+version = "0.1.0"
+description = "Golden SVG comparison tool for tikzjs using OpenCV connected-component analysis"
+requires-python = ">=3.10"
+dependencies = [
+    "opencv-python-headless>=4.8",
+    "cairosvg>=2.7",
+    "numpy>=1.26",
+]
+
+[project.scripts]
+tikzjs-compare = "tikzjs_compare.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tikzjs_compare*"]

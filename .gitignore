@@ -1,4 +1,19 @@
+# Node
 node_modules/
 dist/
+
+# Editor
 .vscode/
+.idea/
+
+# Misc
 sample/
+
+# Python virtual environment
+.venv/
+
+# Python bytecode / build artifacts
+__pycache__/
+*.pyc
+*.pyo
+python/*.egg-info/

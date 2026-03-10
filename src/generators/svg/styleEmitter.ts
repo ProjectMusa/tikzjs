@@ -22,6 +22,24 @@ export interface SVGPathAttrs {
 import { ptToPx } from './coordResolver.js'
 
 /**
+ * Merge two ResolvedStyle objects.
+ * `override` takes precedence over `base`. Properties that are undefined or
+ * 'currentColor' in override fall back to base.
+ *
+ * Used for scope style inheritance: the scope's style is the base, the
+ * element's own style is the override.
+ */
+export function mergeStyles(base: ResolvedStyle, override: ResolvedStyle): ResolvedStyle {
+  const result: ResolvedStyle = { ...base }
+  for (const [k, v] of Object.entries(override) as [keyof ResolvedStyle, any][]) {
+    if (v === undefined) continue
+    if (v === 'currentColor' && (result as any)[k] !== undefined) continue  // keep inherited color
+    ;(result as any)[k] = v
+  }
+  return result
+}
+
+/**
  * Build SVG attributes for a path element from a ResolvedStyle.
  */
 export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string, end?: string}): SVGPathAttrs {

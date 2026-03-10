@@ -15,17 +15,7 @@
  * 9. Wrap in <svg> with viewBox
  */
 
-import {
-  IRDiagram,
-  IRElement,
-  IRNode,
-  IRPath,
-  IRScope,
-  IRMatrix,
-  IREdge,
-  IRTikzcdArrow,
-  IRNamedCoordinate,
-} from '../../ir/types.js'
+import { IRDiagram, IRElement, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { emitNode } from './nodeEmitter.js'
@@ -34,6 +24,7 @@ import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
 import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
+import { mergeStyles } from './styleEmitter.js'
 
 const { JSDOM } = require('jsdom')
 
@@ -67,6 +58,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   // Pass 1: render matrices and standalone/inline nodes → populate nodeRegistry
   // Pass 2: render paths and edges → use nodeRegistry for anchor resolution
 
+  const globalStyle: ResolvedStyle = diagram.globalStyle ?? {}
+
   renderElements_pass1(
     diagram.elements,
     document,
@@ -74,7 +67,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     nodeRegistry,
     nodeElements,
     allBBoxes,
-    mathRenderer
+    mathRenderer,
+    globalStyle
   )
 
   renderElements_pass2(
@@ -86,7 +80,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     pathElements,
     nodeElements,
     allBBoxes,
-    mathRenderer
+    mathRenderer,
+    globalStyle
   )
 
   // Compute viewBox
@@ -131,7 +126,8 @@ function renderElements_pass1(
   nodeRegistry: NodeGeometryRegistry,
   outNodeElements: Element[],
   outBBoxes: BoundingBox[],
-  mathRenderer: MathRenderer
+  mathRenderer: MathRenderer,
+  inherited: ResolvedStyle = {}
 ): void {
   for (const el of elements) {
     switch (el.kind) {
@@ -143,17 +139,18 @@ function renderElements_pass1(
       }
 
       case 'node': {
-        const result = emitNode(el, document, resolver, nodeRegistry, mathRenderer)
+        const merged = { ...el, style: mergeStyles(inherited, el.style) }
+        const result = emitNode(merged, document, resolver, nodeRegistry, mathRenderer)
         outNodeElements.push(result.element)
         outBBoxes.push(result.bbox)
         break
       }
 
       case 'path': {
-        // Register inline nodes (e.g. from \node at ...) so their geometry is
-        // available when paths later reference their anchors.
+        // Register inline nodes so their geometry is available when paths reference their anchors.
         for (const node of el.inlineNodes) {
-          const result = emitNode(node, document, resolver.clone(), nodeRegistry, mathRenderer)
+          const merged = { ...node, style: mergeStyles(inherited, node.style) }
+          const result = emitNode(merged, document, resolver.clone(), nodeRegistry, mathRenderer)
           outNodeElements.push(result.element)
           outBBoxes.push(result.bbox)
         }
@@ -168,7 +165,8 @@ function renderElements_pass1(
           nodeRegistry,
           outNodeElements,
           outBBoxes,
-          mathRenderer
+          mathRenderer,
+          mergeStyles(inherited, el.style)
         )
         break
       }
@@ -192,19 +190,22 @@ function renderElements_pass2(
   outPathElements: Element[],
   outNodeElements: Element[],
   outBBoxes: BoundingBox[],
-  mathRenderer: MathRenderer
+  mathRenderer: MathRenderer,
+  inherited: ResolvedStyle = {}
 ): void {
   for (const el of elements) {
     switch (el.kind) {
       case 'path': {
-        const result = emitPath(el, document, resolver.clone(), nodeRegistry, markerRegistry)
+        const merged = { ...el, style: mergeStyles(inherited, el.style) }
+        const result = emitPath(merged, document, resolver.clone(), nodeRegistry, markerRegistry)
         outPathElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
       }
 
       case 'edge': {
-        const result = emitEdge(el, document, nodeRegistry, markerRegistry, mathRenderer)
+        const merged = { ...el, style: mergeStyles(inherited, el.style) }
+        const result = emitEdge(merged, document, nodeRegistry, markerRegistry, mathRenderer)
         outPathElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
@@ -220,7 +221,8 @@ function renderElements_pass2(
           outPathElements,
           outNodeElements,
           outBBoxes,
-          mathRenderer
+          mathRenderer,
+          mergeStyles(inherited, el.style)
         )
         break
       }
