@@ -98,6 +98,8 @@ export interface ResolvedStyle {
   draw?: string // CSS color string or 'none'
   drawWidth?: number // pt
   drawDash?: 'solid' | 'dashed' | 'dotted' | 'densely dashed' | 'loosely dashed' | string
+  lineCap?: 'butt' | 'round' | 'rect'
+  lineJoin?: 'miter' | 'round' | 'bevel'
 
   // Fill
   fill?: string // CSS color string or 'none'

@@ -89,7 +89,7 @@ export function emitPath(
           d += `M ${from.x} ${from.y} `
         }
         d += `L ${to.x} ${to.y} `
-        lastPos = resolver.resolve(seg.to)
+        lastPos = to
         lastCoordRef = seg.to
         bboxes.push(fromCorners(from.x, from.y, to.x, to.y))
         break

@@ -8,6 +8,8 @@ export interface SVGPathAttrs {
   stroke?: string
   'stroke-width'?: string
   'stroke-dasharray'?: string
+  'stroke-linecap'?: string
+  'stroke-linejoin'?: string
   fill?: string
   opacity?: string
   'fill-opacity'?: string
@@ -60,6 +62,15 @@ export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string,
 
   if (style.drawDash) {
     attrs['stroke-dasharray'] = dashPattern(style.drawDash)
+  }
+
+  if (style.lineCap) {
+    // TikZ 'rect' maps to SVG 'square'
+    attrs['stroke-linecap'] = style.lineCap === 'rect' ? 'square' : style.lineCap
+  }
+
+  if (style.lineJoin) {
+    attrs['stroke-linejoin'] = style.lineJoin
   }
 
   // Fill

@@ -127,6 +127,14 @@ function applyOption(opt: RawOption, style: ResolvedStyle): void {
     case 'very thick': style.drawWidth = 1.2; break
     case 'ultra thick': style.drawWidth = 1.6; break
 
+    // ── Line cap / join ──────────────────────────────────────
+    case 'line cap':
+      if (value) style.lineCap = value as ResolvedStyle['lineCap']
+      break
+    case 'line join':
+      if (value) style.lineJoin = value as ResolvedStyle['lineJoin']
+      break
+
     // ── Dash patterns ─────────────────────────────────────────
     case 'solid':          style.drawDash = 'solid'; break
     case 'dashed':         style.drawDash = 'dashed'; break
