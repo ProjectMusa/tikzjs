@@ -12,7 +12,7 @@ import { IRMatrix, IRNode } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, ptToPx } from './coordResolver.js'
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { emitNode } from './nodeEmitter.js'
-import { renderMath, wrapText } from '../../math/index.js'
+import { MathRenderer, mathModeRenderer } from '../../math/index.js'
 
 /** Default tikzcd separations (matching TikZ defaults). */
 const DEFAULT_COL_SEP_PX = ptToPx(56.9)  // 2cm
@@ -32,7 +32,8 @@ export function emitMatrix(
   matrix: IRMatrix,
   document: Document,
   resolver: CoordResolver,
-  nodeRegistry: NodeGeometryRegistry
+  nodeRegistry: NodeGeometryRegistry,
+  mathRenderer: MathRenderer = mathModeRenderer
 ): MatrixRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
@@ -52,7 +53,7 @@ export function emitMatrix(
     for (let c = 0; c < colCount; c++) {
       const node = rows[r]?.[c]
       if (!node) continue
-      const { hw, hh } = measureNode(node)
+      const { hw, hh } = measureNode(node, mathRenderer)
       colWidths[c]  = Math.max(colWidths[c],  hw * 2)
       rowHeights[r] = Math.max(rowHeights[r], hh * 2)
     }
@@ -119,7 +120,7 @@ export function emitMatrix(
         },
       }
 
-      const result = emitNode(patchedNode, document, resolver, nodeRegistry)
+      const result = emitNode(patchedNode, document, resolver, nodeRegistry, mathRenderer)
       elements.push(result.element)
       bboxes.push(result.bbox)
     }
@@ -132,16 +133,16 @@ export function emitMatrix(
 }
 
 /** Measure a node's natural half-width and half-height. */
-function measureNode(node: IRNode): { hw: number; hh: number } {
-  const DEFAULT_INNER_SEP = 4
-  const DEFAULT_HALF = 8
+function measureNode(node: IRNode, mathRenderer: MathRenderer = mathModeRenderer): { hw: number; hh: number } {
+  const DEFAULT_INNER_SEP = ptToPx(3.333)
+  const DEFAULT_HALF = 1
 
   let labelWidth = 0
   let labelHeight = 0
 
   if (node.label?.trim()) {
     try {
-      const r = renderMath(wrapText(node.label))
+      const r = mathRenderer(node.label)
       labelWidth  = r.widthPx
       labelHeight = r.heightPx
     } catch {

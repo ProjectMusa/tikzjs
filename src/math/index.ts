@@ -93,14 +93,15 @@ export function parseMathJaxLength(s: string): number {
 /**
  * Render a LaTeX string to an SVG string and measure its dimensions.
  *
- * @param latex  LaTeX source. May be:
+ * @param latex     LaTeX source. May be:
  *   - Inline math:   "$...$" or "\(...\)"
  *   - Plain text:    "\text{...}"
  *   - Display math:  "$$...$$" or "\[...\]"
- *
- * @param display  If true, render in display math mode.
+ * @param display   If true, render in display math mode.
+ * @param mathMode  If true, treat undelimited plain strings as math (italic),
+ *                  not as \text{}. Use for tikzcd labels where "f" means $f$.
  */
-export function renderMath(latex: string, display = false): MathResult {
+export function renderMath(latex: string, display = false, mathMode = false): MathResult {
   const { adaptor, doc } = getMathJax()
 
   let source = latex.trim()
@@ -116,8 +117,9 @@ export function renderMath(latex: string, display = false): MathResult {
     display = true
   } else if (source.startsWith('\\(') && source.endsWith('\\)')) {
     source = source.slice(2, -2).trim()
-  } else if (source && !/[$\\]/.test(source) && !source.startsWith('\\text{')) {
-    // Plain text with no TeX — wrap so MathJax renders it as text
+  } else if (!mathMode && source && !/[$\\]/.test(source) && !source.startsWith('\\text{')) {
+    // Plain text with no TeX — wrap so MathJax renders it upright.
+    // In mathMode (tikzcd), undelimited strings are already math expressions.
     source = `\\text{${source}}`
   }
 
@@ -184,3 +186,10 @@ export function wrapText(s: string): string {
  */
 export const defaultMathRenderer: MathRenderer = (latex: string) =>
   renderMath(latex)
+
+/**
+ * Math-mode renderer: like defaultMathRenderer but treats undelimited strings as
+ * math expressions (italic). Use for tikzcd labels where "f" means $f$.
+ */
+export const mathModeRenderer: MathRenderer = (latex: string) =>
+  renderMath(latex, false, true)

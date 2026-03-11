@@ -10,7 +10,7 @@ import { CoordResolver, NodeGeometryRegistry, getAnchorPosition, clipToNodeBound
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
-import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, mathModeRenderer } from '../../math/index.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 
 export interface EdgeRenderResult {
@@ -81,9 +81,12 @@ export function emitEdge(
     elements.push(pathEl)
   }
 
+  // tikzcd labels are always math (italic); plain edges use the passed renderer
+  const labelRenderer = (edge as IRTikzcdArrow).tikzcdKind ? mathModeRenderer : mathRenderer
+
   // Render labels
   for (const label of edge.labels) {
-    const labelEl = emitEdgeLabel(label, midpoint, document, mathRenderer)
+    const labelEl = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer)
     if (labelEl) {
       elements.push(labelEl)
     }
@@ -222,10 +225,22 @@ function buildLoopPath(
   }
 }
 
-/** Render an edge label as a <g> element. */
+/** Render an edge label as a <g> element.
+ *
+ * Placement rule (tikzcd / TikZ `auto`):
+ *   No swap (no prime): label on the LEFT of the arrow direction (in TikZ y-up) =
+ *     CW-rotated perpendicular in SVG y-down: perp = (dy, -dx).
+ *   Swap (prime): label on the RIGHT = opposite perp: (-dy, dx).
+ *
+ * The label center is placed at midpoint + perpendicular_offset,
+ * where the offset magnitude is half the label's bounding box extent in the
+ * perpendicular direction plus a small gap.
+ */
 function emitEdgeLabel(
   label: EdgeLabel,
   midpoint: AbsoluteCoordinate,
+  from: AbsoluteCoordinate,
+  to: AbsoluteCoordinate,
   document: Document,
   mathRenderer: MathRenderer
 ): Element | null {
@@ -235,11 +250,29 @@ function emitEdgeLabel(
     const { svgString, widthPx, heightPx } = mathRenderer(label.text)
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
 
-    const offsetX = label.swap ? -widthPx / 2 - 4 : widthPx / 2 + 4
-    const x = midpoint.x - widthPx / 2 + (label.swap ? -offsetX : 0)
-    const y = midpoint.y - heightPx / 2
+    // Compute unit arrow direction vector in SVG coords (y-down)
+    const adx = to.x - from.x
+    const ady = to.y - from.y
+    const len = Math.sqrt(adx * adx + ady * ady)
+    const ux = len > 1e-9 ? adx / len : 1
+    const uy = len > 1e-9 ? ady / len : 0
 
-    g.setAttribute('transform', `translate(${x - widthPx / 2},${y})`)
+    // Perpendicular: CW rotation in SVG y-down = "auto/above" for rightward arrow
+    // auto (no swap) = (uy, -ux);  swap (prime) = (-uy, ux)
+    const sign = label.swap ? -1 : 1
+    const px = sign * uy
+    const py = sign * (-ux)
+
+    // Offset magnitude: half the label extent in the perp direction + gap
+    const GAP_PX = 4
+    const halfExtent = (Math.abs(px) * widthPx + Math.abs(py) * heightPx) / 2
+    const offset = halfExtent + GAP_PX
+
+    // Label center
+    const cx = midpoint.x + px * offset
+    const cy = midpoint.y + py * offset
+
+    g.setAttribute('transform', `translate(${cx - widthPx / 2},${cy - heightPx / 2})`)
     g.innerHTML = svgString
     return g
   } catch {

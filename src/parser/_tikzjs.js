@@ -118,8 +118,9 @@
 
   function buildMatrixFromGrid(grid, id, nodeReg, resolveOptsFn) {
     const position  = ft.coordRef(0, 0);
-    const rowSepPt  = 28.45; // 1cm
-    const colSepPt  = 56.9;  // 2cm
+    // tikzcd default separations (gap between node bounding boxes, measured from the reference)
+    const rowSepPt  = 17;
+    const colSepPt  = 23;
 
     const rows        = [];
     const cellNodeMap = {};
@@ -170,6 +171,8 @@
         if (ar.label) labels.push({ text: ar.label, position: 'midway', swap: false });
 
         const style = resolveOptsFn(styleRawOpts);
+        // tikzcd default: all arrows have a stealth arrowhead at the end (-> style)
+        if (!style.arrowEnd) style.arrowEnd = { kind: '>' };
         arrows.push(ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, styleRawOpts, { labels }));
       }
     }

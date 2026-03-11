@@ -23,7 +23,7 @@ import { emitPath } from './pathEmitter.js'
 import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
-import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, mathModeRenderer } from '../../math/index.js'
 import { mergeStyles } from './styleEmitter.js'
 
 const { JSDOM } = require('jsdom')
@@ -132,7 +132,7 @@ function renderElements_pass1(
   for (const el of elements) {
     switch (el.kind) {
       case 'matrix': {
-        const result = emitMatrix(el, document, resolver, nodeRegistry)
+        const result = emitMatrix(el, document, resolver, nodeRegistry, mathModeRenderer)
         outNodeElements.push(...result.elements)
         outBBoxes.push(result.bbox)
         break
