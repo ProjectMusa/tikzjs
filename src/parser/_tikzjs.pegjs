@@ -104,6 +104,24 @@
           if (arcSeg) rawSegs.push(arcSeg);
           break;
         }
+        case 'op-arc-short':
+          rawSegs.push(ft.arcSegment(item.startAngle, item.endAngle, item.xRadius, item.yRadius));
+          break;
+        case 'op-circle':
+          rawSegs.push(ft.circleSegment(item.radius));
+          break;
+        case 'op-ellipse':
+          rawSegs.push(ft.ellipseSegment(item.xRadius, item.yRadius));
+          break;
+        case 'op-parabola':
+          rawSegs.push({ _pendingParabola: { rawOpts: item.rawOpts, bend: item.bend || null } });
+          break;
+        case 'op-sin':
+          rawSegs.push({ _pendingSin: true });
+          break;
+        case 'op-cos':
+          rawSegs.push({ _pendingCos: true });
+          break;
         case 'op-node':
           item.node.position = lastCoord;  // inline node sits at current path position
           inlineNodes.push(item.node);
@@ -153,6 +171,26 @@
         const next = rawSegs[i + 1];
         if (next && next.kind === 'move') {
           segments.push(ft.toSegment(next.to, seg._pendingTo));
+          i++;
+        }
+      } else if (seg && seg._pendingParabola !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          const { rawOpts, bend } = seg._pendingParabola;
+          const bendAtEnd = rawOpts && rawOpts.some(o => o.key === 'bend at end');
+          segments.push(ft.parabolaSegment(next.to, bendAtEnd, bend || undefined));
+          i++;
+        }
+      } else if (seg && seg._pendingSin) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.sinSegment(next.to));
+          i++;
+        }
+      } else if (seg && seg._pendingCos) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.cosSegment(next.to));
           i++;
         }
       } else if (seg) {
@@ -383,8 +421,8 @@ path_statement
 path_head "path command"
   = '\\path'     { return { cmd: '\\path',     impliedOpts: '' }; }
   / '\\draw'     { return { cmd: '\\draw',     impliedOpts: 'draw' }; }
-  / '\\fill'     { return { cmd: '\\fill',     impliedOpts: 'fill' }; }
   / '\\filldraw' { return { cmd: '\\filldraw', impliedOpts: 'draw,fill' }; }
+  / '\\fill'     { return { cmd: '\\fill',     impliedOpts: 'fill' }; }
   / '\\clip'     { return { cmd: '\\clip',     impliedOpts: '' }; }
   / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
@@ -422,6 +460,11 @@ path_operation
   / t:to_op           { return t; }
   / n:node_op         { return n; }
   / a:arc_op          { return a; }
+  / ci:circle_op      { return ci; }
+  / el:ellipse_op     { return el; }
+  / pa:parabola_op    { return pa; }
+  / s:sin_op          { return s; }
+  / co:cos_op         { return co; }
   / cycle_op          { return { kind: 'op-close' }; }
 
 cycle_op = ws 'cycle' ws
@@ -492,8 +535,32 @@ to_op "to"
     { return { kind: 'op-to', rawOpts: parseRaw(opt) }; }
 
 arc_op "arc"
-  = ws 'arc' opt:option_block
+  = ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
+    { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: xr * u1, yRadius: yr * u2 }; }
+  / ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws r:number u:dim_unit ws ')'
+    { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: r * u }; }
+  / ws 'arc' opt:option_block
     { return { kind: 'op-arc', rawOpts: parseRaw(opt) }; }
+
+circle_op "circle"
+  = ws 'circle' ws '(' ws r:number u:dim_unit ws ')'
+    { return { kind: 'op-circle', radius: r * u }; }
+
+ellipse_op "ellipse"
+  = ws 'ellipse' ws '(' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
+    { return { kind: 'op-ellipse', xRadius: xr * u1, yRadius: yr * u2 }; }
+
+parabola_op "parabola"
+  = ws 'parabola' opt:option_block ws 'bend' ws b:path_coordinate
+    { return { kind: 'op-parabola', rawOpts: parseRaw(opt), bend: b.coord }; }
+  / ws 'parabola' opt:option_block
+    { return { kind: 'op-parabola', rawOpts: parseRaw(opt) }; }
+
+sin_op "sin"
+  = ws 'sin' ws { return { kind: 'op-sin' }; }
+
+cos_op "cos"
+  = ws 'cos' ws { return { kind: 'op-cos' }; }
 
 node_op "node"
   = ws 'node' opt:option_block al:node_alias? cnt:node_content ws

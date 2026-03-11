@@ -38,6 +38,8 @@ export function emitPath(
 ): PathRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
+  // Bboxes already in world space (circle/ellipse) — not passed through transformBBox
+  const worldBboxes: BoundingBox[] = []
 
   // Track start-of-subpath position for close-path
   let subpathStart: AbsoluteCoordinate = { x: 0, y: 0 }
@@ -219,6 +221,88 @@ export function emitPath(
         lastPos = subpathStart
         break
 
+      case 'circle': {
+        const cx = pendingMove ? pendingMove.x : lastPos.x
+        const cy = pendingMove ? pendingMove.y : lastPos.y
+        pendingMove = null
+        const r = ptToPx((seg as any).radius)
+        d += `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z `
+        worldBboxes.push(rotatedEllipseBBox(cx, cy, r, r, path.style.rotate ?? 0))
+        lastPos = { x: cx, y: cy }
+        break
+      }
+
+      case 'ellipse': {
+        const cx = pendingMove ? pendingMove.x : lastPos.x
+        const cy = pendingMove ? pendingMove.y : lastPos.y
+        pendingMove = null
+        const rx = ptToPx((seg as any).xRadius)
+        const ry = ptToPx((seg as any).yRadius)
+        d += `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z `
+        worldBboxes.push(rotatedEllipseBBox(cx, cy, rx, ry, path.style.rotate ?? 0))
+        lastPos = { x: cx, y: cy }
+        break
+      }
+
+      case 'parabola': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
+        const to = resolver.resolve((seg as any).to)
+        let cx: number, cy: number
+        if ((seg as any).bend) {
+          const b = resolver.resolve((seg as any).bend)
+          cx = b.x; cy = b.y
+        } else if ((seg as any).bendAtEnd) {
+          cx = to.x; cy = lastPos.y
+        } else {
+          cx = lastPos.x; cy = to.y
+        }
+        d += `Q ${cx} ${cy} ${to.x} ${to.y} `
+        bboxes.push(fromCorners(
+          Math.min(lastPos.x, cx, to.x), Math.min(lastPos.y, cy, to.y),
+          Math.max(lastPos.x, cx, to.x), Math.max(lastPos.y, cy, to.y)
+        ))
+        lastPos = to
+        break
+      }
+
+      case 'sin': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
+        const to = resolver.resolve((seg as any).to)
+        const dx = to.x - lastPos.x
+        const dy = to.y - lastPos.y
+        // Cubic bezier: horizontal departure, vertical arrival
+        const c1x = lastPos.x + dx / 3
+        const c1y = lastPos.y
+        const c2x = to.x
+        const c2y = to.y - dy / 3
+        d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
+        bboxes.push(fromCorners(
+          Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),
+          Math.max(lastPos.x, c1x, c2x, to.x), Math.max(lastPos.y, c1y, c2y, to.y)
+        ))
+        lastPos = to
+        break
+      }
+
+      case 'cos': {
+        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
+        const to = resolver.resolve((seg as any).to)
+        const dx = to.x - lastPos.x
+        const dy = to.y - lastPos.y
+        // Cubic bezier: vertical departure, horizontal arrival
+        const c1x = lastPos.x
+        const c1y = lastPos.y + dy / 3
+        const c2x = to.x - dx / 3
+        const c2y = to.y
+        d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
+        bboxes.push(fromCorners(
+          Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),
+          Math.max(lastPos.x, c1x, c2x, to.x), Math.max(lastPos.y, c1y, c2y, to.y)
+        ))
+        lastPos = to
+        break
+      }
+
       case 'node-on-path':
         // Handled by nodeEmitter — no path contribution
         break
@@ -250,8 +334,26 @@ export function emitPath(
   const transform = buildTransform(path.style)
   return {
     elements,
-    bbox: transformBBox(rawBBox, transform),
+    bbox: mergeBBoxes([transformBBox(rawBBox, transform), ...worldBboxes]),
   }
+}
+
+/**
+ * Analytically compute the axis-aligned bounding box of an ellipse with semi-axes (rx, ry)
+ * centered at (cx, cy) after a rotation of `rotateDeg` degrees around the SVG origin (0,0).
+ * SVG uses negative rotation (TikZ CCW = SVG CW), so we negate here to match buildTransform.
+ */
+function rotatedEllipseBBox(cx: number, cy: number, rx: number, ry: number, rotateDeg: number): BoundingBox {
+  const θ = (-rotateDeg * Math.PI) / 180
+  const cosθ = Math.cos(θ)
+  const sinθ = Math.sin(θ)
+  // Rotate center around origin
+  const rcx = cx * cosθ - cy * sinθ
+  const rcy = cx * sinθ + cy * cosθ
+  // Half-extents of rotated ellipse AABB
+  const hw = Math.sqrt((rx * cosθ) ** 2 + (ry * sinθ) ** 2)
+  const hh = Math.sqrt((rx * sinθ) ** 2 + (ry * cosθ) ** 2)
+  return fromCorners(rcx - hw, rcy - hh, rcx + hw, rcy + hh)
 }
 
 /** Build a bend/arc path for 'to' operations with bend options. */

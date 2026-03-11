@@ -303,3 +303,23 @@ export function arcSegment(
 export function nodeOnPathSegment(nodeId: string, pos?: number): PathSegment {
   return { kind: 'node-on-path', nodeId, pos }
 }
+
+export function circleSegment(radius: number): PathSegment {
+  return { kind: 'circle', radius }
+}
+
+export function ellipseSegment(xRadius: number, yRadius: number): PathSegment {
+  return { kind: 'ellipse', xRadius, yRadius }
+}
+
+export function parabolaSegment(to: CoordRef, bendAtEnd: boolean, bend?: CoordRef): PathSegment {
+  return { kind: 'parabola', to, bendAtEnd, bend }
+}
+
+export function sinSegment(to: CoordRef): PathSegment {
+  return { kind: 'sin', to }
+}
+
+export function cosSegment(to: CoordRef): PathSegment {
+  return { kind: 'cos', to }
+}

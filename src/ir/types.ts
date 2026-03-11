@@ -209,6 +209,34 @@ export interface ClosePathSegment {
   kind: 'close'
 }
 
+export interface CircleSegment {
+  kind: 'circle'
+  radius: number // pt
+}
+
+export interface EllipseSegment {
+  kind: 'ellipse'
+  xRadius: number // pt
+  yRadius: number // pt
+}
+
+export interface ParabolaSegment {
+  kind: 'parabola'
+  to: CoordRef
+  bend?: CoordRef // explicit bend point
+  bendAtEnd: boolean
+}
+
+export interface SinSegment {
+  kind: 'sin'
+  to: CoordRef
+}
+
+export interface CosSegment {
+  kind: 'cos'
+  to: CoordRef
+}
+
 export type PathSegment =
   | MoveSegment
   | LineSegment
@@ -218,6 +246,11 @@ export type PathSegment =
   | ToSegment
   | NodeOnPathSegment
   | ClosePathSegment
+  | CircleSegment
+  | EllipseSegment
+  | ParabolaSegment
+  | SinSegment
+  | CosSegment
 
 // ── IR Elements ───────────────────────────────────────────────────────────────
 
