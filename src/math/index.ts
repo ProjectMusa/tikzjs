@@ -69,10 +69,18 @@ function getMathJax(): { adaptor: any; doc: any } {
 
 /** Pixels per ex (approximate, based on MathJax default font). */
 const EX_TO_PX = 8
+/** Pixels per em (MathJax default, = 16px). */
+const EM_TO_PX = 16
 /** MathJax base vertical shift in px. */
 const BASE_SHIFT_PX = 4
 /** MathJax container width (affects line breaking). */
 const CONTAINER_WIDTH = 600
+
+/**
+ * tikzcd `every label` uses \scriptstyle (7pt at 10pt base = 0.7×).
+ * Source: tikzlibrarycd.code.tex line 533.
+ */
+export const TIKZCD_LABEL_SCALE = 7 / 10
 
 /**
  * Parse a MathJax length string (e.g. "1.5ex", "20px") to pixels.
@@ -101,7 +109,7 @@ export function parseMathJaxLength(s: string): number {
  * @param mathMode  If true, treat undelimited plain strings as math (italic),
  *                  not as \text{}. Use for tikzcd labels where "f" means $f$.
  */
-export function renderMath(latex: string, display = false, mathMode = false): MathResult {
+export function renderMath(latex: string, display = false, mathMode = false, scale = 1): MathResult {
   const { adaptor, doc } = getMathJax()
 
   let source = latex.trim()
@@ -125,7 +133,7 @@ export function renderMath(latex: string, display = false, mathMode = false): Ma
 
   const node = doc.convert(source, {
     display,
-    em: 16,
+    em: EM_TO_PX,
     ex: EX_TO_PX,
     containerWidth: CONTAINER_WIDTH,
   })
@@ -135,7 +143,7 @@ export function renderMath(latex: string, display = false, mathMode = false): Ma
   // MathJax wraps the SVG in <mjx-container> which is an HTML element.
   // Extract just the <svg>...</svg> so it can be embedded in our SVG document.
   const svgMatch = outerHTML.match(/<svg[\s\S]*<\/svg>/)
-  const svgString = svgMatch ? svgMatch[0] : ''
+  let svgString = svgMatch ? svgMatch[0] : ''
 
   // Extract dimensions from the inner SVG element's width/height attributes
   const widthMatch = svgString.match(/width="([^"]+)"/)
@@ -143,9 +151,17 @@ export function renderMath(latex: string, display = false, mathMode = false): Ma
   // vertical-align is on the <mjx-container> style attribute
   const styleMatch = outerHTML.match(/style="[^"]*vertical-align:\s*([^;'"]+)/)
 
-  const widthPx = widthMatch ? parseMathJaxLength(widthMatch[1]) : 0
-  const heightPx = heightMatch ? parseMathJaxLength(heightMatch[1]) : 0
-  const verticalOffsetPx = styleMatch ? -parseMathJaxLength(styleMatch[1].trim()) + BASE_SHIFT_PX : BASE_SHIFT_PX
+  const widthPx = (widthMatch ? parseMathJaxLength(widthMatch[1]) : 0) * scale
+  const heightPx = (heightMatch ? parseMathJaxLength(heightMatch[1]) : 0) * scale
+  const verticalOffsetPx = (styleMatch ? -parseMathJaxLength(styleMatch[1].trim()) + BASE_SHIFT_PX : BASE_SHIFT_PX) * scale
+
+  // Apply scale: replace ex-based dimensions with explicit px values so the SVG
+  // renders at the target size regardless of the surrounding font context.
+  if (scale !== 1 && svgString) {
+    svgString = svgString
+      .replace(/width="[^"]*ex"/, `width="${widthPx}px"`)
+      .replace(/height="[^"]*ex"/, `height="${heightPx}px"`)
+  }
 
   return { svgString, widthPx, heightPx, verticalOffsetPx }
 }
@@ -193,3 +209,11 @@ export const defaultMathRenderer: MathRenderer = (latex: string) =>
  */
 export const mathModeRenderer: MathRenderer = (latex: string) =>
   renderMath(latex, false, true)
+
+/**
+ * Scriptstyle math-mode renderer for tikzcd arrow labels.
+ * tikzcd `every label` uses \scriptstyle (7pt at 10pt base = 0.7×).
+ * Source: tikzlibrarycd.code.tex — `every label/.style={font=\scriptstyle}`.
+ */
+export const scriptMathModeRenderer: MathRenderer = (latex: string) =>
+  renderMath(latex, false, true, TIKZCD_LABEL_SCALE)

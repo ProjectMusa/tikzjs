@@ -10,7 +10,7 @@ import { CoordResolver, NodeGeometryRegistry, getAnchorPosition, clipToNodeBound
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
-import { MathRenderer, defaultMathRenderer, mathModeRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, scriptMathModeRenderer } from '../../math/index.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 
 export interface EdgeRenderResult {
@@ -81,14 +81,15 @@ export function emitEdge(
     elements.push(pathEl)
   }
 
-  // tikzcd labels are always math (italic); plain edges use the passed renderer
-  const labelRenderer = (edge as IRTikzcdArrow).tikzcdKind ? mathModeRenderer : mathRenderer
+  // tikzcd arrow labels use \scriptstyle (0.7× scale); plain edges use the passed renderer
+  const labelRenderer = (edge as IRTikzcdArrow).tikzcdKind ? scriptMathModeRenderer : mathRenderer
 
   // Render labels
   for (const label of edge.labels) {
-    const labelEl = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer)
-    if (labelEl) {
-      elements.push(labelEl)
+    const result = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer)
+    if (result) {
+      elements.push(result.el)
+      bboxes.push(result.bbox)
     }
   }
 
@@ -124,15 +125,20 @@ function buildEdgePath(
     case 'bend': {
       const angle = routing.angle
       const dir = routing.direction === 'left' ? 1 : -1
-      const { cx, cy } = computeBendControl(fromClipped, toClipped, angle, dir)
-      const midX = 0.5 * (fromClipped.x + 2 * cx + toClipped.x) / 2
-      const midY = 0.5 * (fromClipped.y + 2 * cy + toClipped.y) / 2
+      // Compute control point from unclipped centers to get the correct tangent directions.
+      // Then re-clip using those tangents so the arrow exits/enters the node at the bend angle.
+      const { cx: cxApprox, cy: cyApprox } = computeBendControl(from, to, angle, dir)
+      const fromClippedBend = clipToNodeBoundary({ x: cxApprox, y: cyApprox }, from, fromGeo)
+      const toClippedBend   = clipToNodeBoundary({ x: cxApprox, y: cyApprox }, to, toGeo)
+      const { cx, cy } = computeBendControl(fromClippedBend, toClippedBend, angle, dir)
+      const midX = (fromClippedBend.x + 2 * cx + toClippedBend.x) / 4
+      const midY = (fromClippedBend.y + 2 * cy + toClippedBend.y) / 4
       return {
-        d: `M ${fromClipped.x} ${fromClipped.y} Q ${cx} ${cy} ${toClipped.x} ${toClipped.y}`,
+        d: `M ${fromClippedBend.x} ${fromClippedBend.y} Q ${cx} ${cy} ${toClippedBend.x} ${toClippedBend.y}`,
         midpoint: { x: midX, y: midY },
         bbox: fromCorners(
-          Math.min(fromClipped.x, cx, toClipped.x), Math.min(fromClipped.y, cy, toClipped.y),
-          Math.max(fromClipped.x, cx, toClipped.x), Math.max(fromClipped.y, cy, toClipped.y)
+          Math.min(fromClippedBend.x, cx, toClippedBend.x), Math.min(fromClippedBend.y, cy, toClippedBend.y),
+          Math.max(fromClippedBend.x, cx, toClippedBend.x), Math.max(fromClippedBend.y, cy, toClippedBend.y)
         ),
       }
     }
@@ -183,8 +189,10 @@ function computeBendControl(
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
   if (len < 1e-9) return { cx: mx, cy: my }
-  const perpX = -dy / len
-  const perpY = dx / len
+  // CW rotation in SVG (y-down) = CCW in TikZ (y-up) = "left" side of travel direction.
+  // For a rightward arrow (dx>0, dy=0): perpX=0, perpY=-1 = UP in SVG = above = left ✓
+  const perpX = dy / len
+  const perpY = -dx / len
   const d = (len / 2) * Math.tan((angle * Math.PI) / 180)
   return { cx: mx + dir * perpX * d, cy: my + dir * perpY * d }
 }
@@ -243,7 +251,7 @@ function emitEdgeLabel(
   to: AbsoluteCoordinate,
   document: Document,
   mathRenderer: MathRenderer
-): Element | null {
+): { el: Element; bbox: BoundingBox } | null {
   if (!label.text.trim()) return null
 
   try {
@@ -272,9 +280,11 @@ function emitEdgeLabel(
     const cx = midpoint.x + px * offset
     const cy = midpoint.y + py * offset
 
-    g.setAttribute('transform', `translate(${cx - widthPx / 2},${cy - heightPx / 2})`)
+    const tlx = cx - widthPx / 2
+    const tly = cy - heightPx / 2
+    g.setAttribute('transform', `translate(${tlx},${tly})`)
     g.innerHTML = svgString
-    return g
+    return { el: g, bbox: fromCorners(tlx, tly, tlx + widthPx, tly + heightPx) }
   } catch {
     return null
   }
