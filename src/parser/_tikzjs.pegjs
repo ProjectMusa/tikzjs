@@ -8,12 +8,14 @@
   function buildSegments(ops) {
     const rawSegs = [];
     const inlineNodes = [];
+    let lastCoord = ft.coordRef(0, 0);  // current path position for inline node placement
 
     for (const item of ops) {
       if (!item) continue;
       switch (item.kind) {
         case 'op-coord':
           rawSegs.push(ft.moveSegment(item.coord));
+          lastCoord = item.coord;
           break;
         case 'op-line':
           rawSegs.push({ _pendingLine: item.lineKind });
@@ -36,6 +38,7 @@
           break;
         }
         case 'op-node':
+          item.node.position = lastCoord;  // inline node sits at current path position
           inlineNodes.push(item.node);
           rawSegs.push(ft.nodeOnPathSegment(item.node.id));
           break;

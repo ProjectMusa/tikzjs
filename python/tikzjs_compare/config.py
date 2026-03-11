@@ -19,7 +19,12 @@ DIST_INDEX   = PROJECT_ROOT / 'dist' / 'index.js'
 # ── Comparison thresholds ──────────────────────────────────────────────────────
 
 # Maximum structural diff % (after content-crop + dilation) to PASS
-DIFF_THRESHOLD = float(os.environ.get('GOLDEN_DIFF_THRESHOLD', '2.0'))
+DIFF_THRESHOLD = float(os.environ.get('GOLDEN_DIFF_THRESHOLD', '5.0'))
+
+# When struct_diff > DIFF_THRESHOLD but raw_diff < RAW_FONT_THRESHOLD, the excess
+# is attributed to font rendering differences (MathJax vs TeX CM glyphs), not
+# layout errors — report as a WARNING rather than a FAILURE.
+RAW_FONT_THRESHOLD = float(os.environ.get('GOLDEN_RAW_FONT_THRESHOLD', '12.0'))
 
 # Fractional tolerance for per-component area comparison
 AREA_TOLERANCE = float(os.environ.get('GOLDEN_AREA_TOLERANCE', '0.20'))

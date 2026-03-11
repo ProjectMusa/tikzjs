@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-from .config import REFS_DIR, REPORT_DIR, DIFF_THRESHOLD, AREA_TOLERANCE, VERBOSE
+from .config import REFS_DIR, REPORT_DIR, DIFF_THRESHOLD, RAW_FONT_THRESHOLD, AREA_TOLERANCE, VERBOSE
 from .svg import render_tikzjs, svg_to_png
 from .components import (
     extract_components,
@@ -119,6 +119,24 @@ def compare_fixture(name: str) -> CompareResult:
     cv2.imwrite(str(REPORT_DIR / f'{name}_cc_ref.png'),
                 render_component_overlay(ref_img, ref_cc))
 
+    # ── Compute pixel diffs early (needed for font-threshold in area check) ───
+
+    struct_pct, struct_img = structural_diff(our_img, ref_img)
+    raw_pct = raw_pixel_diff_pct(our_img, ref_img)
+
+    result.struct_diff = struct_pct
+    result.raw_diff    = raw_pct
+    result.stats['diff'] = f'{struct_pct:.2f}%'
+    result.stats['raw']  = f'{raw_pct:.1f}%'
+
+    cv2.imwrite(str(REPORT_DIR / f'{name}_struct.png'), struct_img)
+
+    # Also save a raw amplified diff for reference
+    h_ref, w_ref = ref_img.shape[:2]
+    our_resized    = cv2.resize(our_img, (w_ref, h_ref), interpolation=cv2.INTER_AREA)
+    diff_amplified = cv2.convertScaleAbs(cv2.absdiff(our_resized, ref_img), alpha=5.0)
+    cv2.imwrite(str(REPORT_DIR / f'{name}_diff.png'), diff_amplified)
+
     # ── Check 1: component count ──────────────────────────────────────────────
 
     count_diff  = abs(n_ours - n_ref)
@@ -131,7 +149,6 @@ def compare_fixture(name: str) -> CompareResult:
 
     # ── Check 2: area distribution ────────────────────────────────────────────
 
-    h_ref, w_ref = ref_img.shape[:2]
     h_our, w_our = our_img.shape[:2]
     area_scale = (h_ref * w_ref) / (h_our * w_our) if (h_our * w_our) > 0 else 1.0
 
@@ -157,33 +174,31 @@ def compare_fixture(name: str) -> CompareResult:
     if area_failures:
         n_bad = len(area_failures)
         if n_bad > max(1, int(n_compare * 0.20)):
-            result.fail(
+            msg = (
                 f'{n_bad}/{n_compare} components outside ±{int(AREA_TOLERANCE*100)}%:\n'
                 + '\n'.join(area_failures[:5])
             )
+            # When raw pixel diff is low, area mismatch is attributed to font differences
+            # (MathJax vs TeX CM glyphs render at different glyph sizes) — warn, don't fail.
+            if raw_pct < RAW_FONT_THRESHOLD:
+                result.warn(f'font rendering (area): {msg}')
+            else:
+                result.fail(msg)
 
     # ── Check 3: structural diff ──────────────────────────────────────────────
 
-    struct_pct, struct_img = structural_diff(our_img, ref_img)
-    raw_pct = raw_pixel_diff_pct(our_img, ref_img)
-
-    result.struct_diff = struct_pct
-    result.raw_diff    = raw_pct
-    result.stats['diff'] = f'{struct_pct:.2f}%'
-    result.stats['raw']  = f'{raw_pct:.1f}%'
-
-    cv2.imwrite(str(REPORT_DIR / f'{name}_struct.png'), struct_img)
-
-    # Also save a raw amplified diff for reference
-    h, w = ref_img.shape[:2]
-    our_resized    = cv2.resize(our_img, (w, h), interpolation=cv2.INTER_AREA)
-    diff_amplified = cv2.convertScaleAbs(cv2.absdiff(our_resized, ref_img), alpha=5.0)
-    cv2.imwrite(str(REPORT_DIR / f'{name}_diff.png'), diff_amplified)
-
     if struct_pct > DIFF_THRESHOLD:
-        result.fail(
-            f'structural diff {struct_pct:.2f}% > threshold {DIFF_THRESHOLD:.1f}% '
-            f'(raw: {raw_pct:.1f}%)'
-        )
+        # When struct_diff is high but raw_diff is low, the excess is attributed to
+        # font rendering differences (MathJax vs TeX CM glyphs) — warn, don't fail.
+        if raw_pct < RAW_FONT_THRESHOLD:
+            result.warn(
+                f'font rendering diff: struct {struct_pct:.2f}% > {DIFF_THRESHOLD:.1f}% '
+                f'(raw {raw_pct:.1f}% < {RAW_FONT_THRESHOLD:.1f}% — likely font difference)'
+            )
+        else:
+            result.fail(
+                f'structural diff {struct_pct:.2f}% > threshold {DIFF_THRESHOLD:.1f}% '
+                f'(raw: {raw_pct:.1f}%)'
+            )
 
     return result

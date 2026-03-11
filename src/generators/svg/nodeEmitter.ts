@@ -43,7 +43,6 @@ export function emitNode(
   let svgContent = ''
   let labelWidth = 0
   let labelHeight = 0
-  let verticalOffset = 0
 
   if (labelSource.trim()) {
     try {
@@ -51,7 +50,6 @@ export function emitNode(
       svgContent = result.svgString
       labelWidth = result.widthPx
       labelHeight = result.heightPx
-      verticalOffset = result.verticalOffsetPx
     } catch {
       // Fallback: render as plain text
       svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
@@ -114,7 +112,7 @@ export function emitNode(
     const foreignG = document.createElementNS('http://www.w3.org/2000/svg', 'g')
     // Position the label so its center aligns with the node center
     const tx = centerX - labelWidth / 2
-    const ty = centerY - labelHeight / 2 - verticalOffset
+    const ty = centerY - labelHeight / 2
     foreignG.setAttribute('transform', `translate(${tx},${ty})`)
     foreignG.innerHTML = svgContent
     g.appendChild(foreignG)
