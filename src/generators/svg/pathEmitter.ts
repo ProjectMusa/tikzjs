@@ -280,14 +280,15 @@ function buildBendPath(
     }
   }
 
-  // Compute control point for bend
+  // Compute control point for bend.
+  // CW rotation in SVG (y-down) = CCW in TikZ (y-up) = "left" side of travel.
   const mx = (from.x + to.x) / 2
   const my = (from.y + to.y) / 2
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
-  const perpX = -dy / len
-  const perpY = dx / len
+  const perpX = dy / len
+  const perpY = -dx / len
   const bendDist = (len / 2) * Math.tan((bendAngle * Math.PI) / 180)
   const cx = mx + bendDir * perpX * bendDist
   const cy = my + bendDir * perpY * bendDist
