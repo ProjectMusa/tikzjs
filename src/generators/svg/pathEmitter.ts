@@ -160,7 +160,9 @@ export function emitPath(
         // In SVG coords, y is inverted
         const endX = lastPos.x + rx * (Math.cos(endRad) - Math.cos(startRad))
         const endY = lastPos.y - ry * (Math.sin(endRad) - Math.sin(startRad))
-        const sweep = endAngle > startAngle ? 1 : 0
+        // TikZ angles increase CCW (y-up). The y-flip to SVG reverses rotation direction,
+        // so TikZ CCW (endAngle > startAngle) maps to SVG sweep=0 (CCW in y-down).
+        const sweep = endAngle > startAngle ? 0 : 1
         const largeArc = Math.abs(endAngle - startAngle) > 180 ? 1 : 0
         d += `A ${rx} ${ry} 0 ${largeArc} ${sweep} ${endX} ${endY} `
         lastPos = { x: endX, y: endY }
