@@ -1,4 +1,4 @@
 \begin{tikzpicture}
- \node [node font=\tiny, minimum height=3em, draw] {tiny};
- \node [node font=\small, minimum height=3em, draw] {small};
+  \node [node font=\tiny, minimum height=3em, draw] at (0,0) {tiny};
+  \node [node font=\small, minimum height=3em, draw] at (0,2) {small};
 \end{tikzpicture}
