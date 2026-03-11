@@ -1,0 +1,4 @@
+\begin{tikzcd}
+  A \arrow[r, "f"] \arrow[dr, "h"'] & B \arrow[d, "g"] \\
+                                    & C
+\end{tikzcd}

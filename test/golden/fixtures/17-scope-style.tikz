@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+  \begin{scope}[thick,blue]
+    \draw (0,0) -- (1,1);
+    \draw (1,0) -- (0,1);
+  \end{scope}
+  \begin{scope}[red,dashed]
+    \draw (2,0) rectangle (3,1);
+    \draw (2.5,0) -- (2.5,1);
+  \end{scope}
+\end{tikzpicture}

@@ -1,0 +1,6 @@
+\begin{tikzpicture}
+  \fill[blue!20] (0,0) -- (1,0) -- (0.5,1) -- cycle;
+  \draw (0,0) -- (1,0) -- (0.5,1) -- cycle;
+  \fill[red!20] (1.5,0) rectangle (2.5,1);
+  \draw (1.5,0) rectangle (2.5,1);
+\end{tikzpicture}

@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw (0,0) arc[start angle=0, end angle=180, radius=1];
+  \draw[fill=yellow!50] (3,0) arc[start angle=0, end angle=270, radius=0.8] -- cycle;
+  \draw[thick,red] (6,0) arc[start angle=-90, end angle=90, radius=0.5];
+\end{tikzpicture}

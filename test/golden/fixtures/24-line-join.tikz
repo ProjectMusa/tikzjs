@@ -1,0 +1,5 @@
+\begin{tikzpicture}[line width=10pt]
+  \draw[line join=round] (0,0) -- ++(.5,1) -- ++(.5,-1);
+  \draw[line join=bevel] (1.25,0) -- ++(.5,1) -- ++(.5,-1);
+  \draw[line join=miter] (2.5,0) -- ++(.5,1) -- ++(.5,-1);
+\end{tikzpicture}

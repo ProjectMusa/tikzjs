@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw[->] (0,0) to[bend left=30] (3,0);
+  \draw[->] (0,-1) to[bend right=30] (3,-1);
+  \draw[->] (0,-2) to[bend left=60] (3,-2);
+\end{tikzpicture}

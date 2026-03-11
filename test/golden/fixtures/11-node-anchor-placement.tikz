@@ -1,0 +1,4 @@
+\begin{tikzpicture}
+  \draw[->] (0,0) node[anchor=north east] {first node}
+        rectangle (1,1) node[anchor=west] {second node};
+\end{tikzpicture}

@@ -1,0 +1,4 @@
+\begin{tikzcd}[column sep=small]
+& A \arrow[dl] \arrow[dr] & \\
+B \arrow[rr] & & C
+\end{tikzcd}

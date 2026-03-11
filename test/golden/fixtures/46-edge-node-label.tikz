@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+  \node (A) at (0,0) {$A$};
+  \node (B) at (4,0) {$B$};
+  \node (C) at (2,2) {$C$};
+  \draw[->] (A) -- (B) node[midway,below] {$f$};
+  \draw[->] (A) -- (C) node[midway,left] {$g$};
+  \draw[->] (C) -- (B) node[midway,right] {$h$};
+\end{tikzpicture}

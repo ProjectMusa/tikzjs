@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw (0,0) .. controls (1,2) .. (2,0);
+  \draw[blue] (0,-2) .. controls (0.5,-1) and (1.5,-1) .. (2,-2);
+  \draw[red,->] (0,-4) .. controls (1,-2) and (2,-5) .. (3,-3);
+\end{tikzpicture}

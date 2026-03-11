@@ -1,358 +1,601 @@
-{
-  const ft = require('./factory').factory
-  const gc = require('./factory').g
-  function err_not_impl(s) {
-    return `${s} is not implemented`
+{{
+  // Top-level preamble (one block only — runs once when parser module is loaded)
+  const ft = require('./factory');
+  const op = require('./optionParser');
+  const sr = require('./styleResolver');
+
+  // ── Helper: detect (nodeA) --/to (nodeB) node[midway/pos, above/below/left/right]{text} ──────
+  // Returns an IREdge if the pattern matches, else null.
+  const POSITION_KEYS = new Set(['midway', 'near start', 'near end', 'at start', 'at end', 'very near start', 'very near end']);
+  const PLACEMENT_KEYS = new Set(['above', 'below', 'left', 'right']);
+
+  function tryBuildEdgeFromOps(ops, style, rawOpts, nodeReg) {
+    // Filter nulls
+    const items = ops.filter(Boolean);
+    // Pattern: coord(nodeRef A) [line|to] coord(nodeRef B) node(midway/pos)
+    // Optional: any number of trailing node ops
+    // Minimal: exactly 4 items: coord, line/to, coord, node
+    if (items.length < 4) return null;
+
+    const [first, conn, second, ...rest] = items;
+
+    // First must be a named-node coord reference
+    if (first.kind !== 'op-coord') return null;
+    if (first.coord.coord.cs !== 'node-anchor') return null;
+
+    // Connector must be line (--) or to
+    if (conn.kind !== 'op-line' && conn.kind !== 'op-to') return null;
+
+    // Second must also be a named-node coord
+    if (second.kind !== 'op-coord') return null;
+    if (second.coord.coord.cs !== 'node-anchor') return null;
+
+    // Rest: all must be op-node with position/placement options
+    if (rest.length === 0) return null;
+    if (!rest.every(item => item.kind === 'op-node')) return null;
+
+    // Check at least one node has a position key (midway etc.)
+    const labels = [];
+    for (const nodeItem of rest) {
+      const nodeRawOpts = nodeItem.node.rawOptions || [];
+      const keys = nodeRawOpts.map(o => o.key);
+      const hasPosition = keys.some(k => POSITION_KEYS.has(k));
+      if (!hasPosition) return null;  // not a midway label — don't convert
+
+      const position = keys.find(k => POSITION_KEYS.has(k)) || 'midway';
+      const placement = keys.find(k => PLACEMENT_KEYS.has(k)) || undefined;
+      const swap = keys.includes('swap');
+      const text = nodeItem.node.label || '';
+      labels.push({ text, position, placement, swap });
+    }
+
+    // Determine routing
+    let routing = { kind: 'straight' };
+    if (conn.kind === 'op-to') {
+      // Check for bend left/right in to options
+      const toOpts = conn.rawOpts || [];
+      const bendLeft  = toOpts.find(o => o.key === 'bend left');
+      const bendRight = toOpts.find(o => o.key === 'bend right');
+      if (bendLeft)  routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
+      else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
+    }
+
+    const fromNode = nodeReg[first.coord.coord.nodeName];
+    const toNode   = nodeReg[second.coord.coord.nodeName];
+    if (!fromNode || !toNode) return null;
+
+    return ft.makeEdge(fromNode, toNode, routing, style, rawOpts, {
+      fromAnchor: first.coord.coord.anchor !== 'center' ? first.coord.coord.anchor : undefined,
+      toAnchor:   second.coord.coord.anchor !== 'center' ? second.coord.coord.anchor : undefined,
+      labels,
+    });
   }
+
+  // ── Helper: build segment list from raw grammar operation array ──────────────
+  function buildSegments(ops) {
+    const rawSegs = [];
+    const inlineNodes = [];
+    let lastCoord = ft.coordRef(0, 0);  // current path position for inline node placement
+
+    for (const item of ops) {
+      if (!item) continue;
+      switch (item.kind) {
+        case 'op-coord':
+          rawSegs.push(ft.moveSegment(item.coord));
+          lastCoord = item.coord;
+          break;
+        case 'op-line':
+          rawSegs.push({ _pendingLine: item.lineKind });
+          break;
+        case 'op-grid':
+          rawSegs.push({ _pendingGrid: item.rawOpts });
+          break;
+        case 'op-rectangle':
+          rawSegs.push({ _pendingRectangle: true });
+          break;
+        case 'op-curve':
+          rawSegs.push({ _pendingCurve: item.controls });
+          break;
+        case 'op-to':
+          rawSegs.push({ _pendingTo: item.rawOpts });
+          break;
+        case 'op-arc': {
+          const arcSeg = buildArcSegment(item.rawOpts);
+          if (arcSeg) rawSegs.push(arcSeg);
+          break;
+        }
+        case 'op-arc-short':
+          rawSegs.push(ft.arcSegment(item.startAngle, item.endAngle, item.xRadius, item.yRadius));
+          break;
+        case 'op-circle':
+          rawSegs.push(ft.circleSegment(item.radius));
+          break;
+        case 'op-ellipse':
+          rawSegs.push(ft.ellipseSegment(item.xRadius, item.yRadius));
+          break;
+        case 'op-parabola':
+          rawSegs.push({ _pendingParabola: { rawOpts: item.rawOpts, bend: item.bend || null } });
+          break;
+        case 'op-sin':
+          rawSegs.push({ _pendingSin: true });
+          break;
+        case 'op-cos':
+          rawSegs.push({ _pendingCos: true });
+          break;
+        case 'op-node':
+          item.node.position = lastCoord;  // inline node sits at current path position
+          inlineNodes.push(item.node);
+          rawSegs.push(ft.nodeOnPathSegment(item.node.id));
+          break;
+        case 'op-close':
+          rawSegs.push(ft.closeSegment());
+          break;
+      }
+    }
+
+    return { segments: resolvePending(rawSegs), inlineNodes };
+  }
+
+  function resolvePending(rawSegs) {
+    const segments = [];
+    for (let i = 0; i < rawSegs.length; i++) {
+      const seg = rawSegs[i];
+      if (seg && seg._pendingLine !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          const to = next.to;
+          if (seg._pendingLine === '--') segments.push(ft.lineSegment(to));
+          else if (seg._pendingLine === '-|') segments.push(ft.hvLineSegment(to, true));
+          else segments.push(ft.hvLineSegment(to, false));
+          i++;
+        }
+      } else if (seg && seg._pendingCurve !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.curveSegment(seg._pendingCurve, next.to));
+          i++;
+        }
+      } else if (seg && seg._pendingRectangle) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push({ kind: 'rectangle', to: next.to });
+          i++;
+        }
+      } else if (seg && seg._pendingGrid !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push({ kind: 'grid', to: next.to, rawOptions: seg._pendingGrid });
+          i++;
+        }
+      } else if (seg && seg._pendingTo !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.toSegment(next.to, seg._pendingTo));
+          i++;
+        }
+      } else if (seg && seg._pendingParabola !== undefined) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          const { rawOpts, bend } = seg._pendingParabola;
+          const bendAtEnd = rawOpts && rawOpts.some(o => o.key === 'bend at end');
+          segments.push(ft.parabolaSegment(next.to, bendAtEnd, bend || undefined));
+          i++;
+        }
+      } else if (seg && seg._pendingSin) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.sinSegment(next.to));
+          i++;
+        }
+      } else if (seg && seg._pendingCos) {
+        const next = rawSegs[i + 1];
+        if (next && next.kind === 'move') {
+          segments.push(ft.cosSegment(next.to));
+          i++;
+        }
+      } else if (seg) {
+        segments.push(seg);
+      }
+    }
+    return segments;
+  }
+
+  function buildArcSegment(rawOpts) {
+    let startAngle, endAngle, xRadius, yRadius;
+    for (const o of rawOpts) {
+      if (o.key === 'start angle') startAngle = parseFloat(o.value);
+      if (o.key === 'end angle')   endAngle   = parseFloat(o.value);
+      if (o.key === 'radius')      xRadius    = op.parseDimensionPt(o.value);
+      if (o.key === 'x radius')    xRadius    = op.parseDimensionPt(o.value);
+      if (o.key === 'y radius')    yRadius    = op.parseDimensionPt(o.value);
+    }
+    if (startAngle !== undefined && endAngle !== undefined && xRadius !== undefined) {
+      return ft.arcSegment(startAngle, endAngle, xRadius, yRadius);
+    }
+    return null;
+  }
+
+  // ── tikzcd named sep presets (from tikzlibrarycd.code.tex, converted: 1em = 10pt) ──────────
+  const TIKZCD_COL_SEP = { huge: 48, large: 36, normal: 24, scriptsize: 18, small: 12, tiny: 6 };
+  const TIKZCD_ROW_SEP = { huge: 36, large: 27, normal: 18, scriptsize: 13.5, small: 9, tiny: 4.5 };
+
+  function resolveTikzcdSep(rawOpts, key, presets, defaultPt) {
+    const opt = rawOpts.find(o => o.key === key);
+    if (!opt) return defaultPt;
+    const v = (opt.value || '').trim();
+    if (presets[v] !== undefined) return presets[v];
+    const parsed = op.parseDimensionPt(v);
+    return parsed > 0 ? parsed : defaultPt;
+  }
+
+  function buildMatrixFromGrid(grid, id, nodeReg, resolveOptsFn) {
+    const position  = ft.coordRef(0, 0);
+    const rawOpts   = grid.rawOptions || [];
+    // Resolve column/row sep from diagram options; fall back to tikzcd `normal` defaults
+    const sepFallback = resolveTikzcdSep(rawOpts, 'sep', TIKZCD_COL_SEP, null);
+    const colSepPt  = resolveTikzcdSep(rawOpts, 'column sep', TIKZCD_COL_SEP, sepFallback ?? 24);
+    const rowSepPt  = resolveTikzcdSep(rawOpts, 'row sep',    TIKZCD_ROW_SEP, sepFallback ?? 18);
+
+    const rows        = [];
+    const cellNodeMap = {};
+
+    for (let r = 0; r < grid.rowCount; r++) {
+      const row = [];
+      for (let c = 0; c < grid.colCount; c++) {
+        const cell = grid.cells.find(cell => cell.row === r && cell.col === c);
+        if (cell) {
+          const node = ft.makeNode(
+            ft.coordRef(0, 0), cell.label, {}, [],
+            { name: id + '_' + r + '_' + c }
+          );
+          if (node.name) nodeReg[node.name] = node.id;
+          cellNodeMap[r + ',' + c] = node.id;
+          row.push(node);
+        } else {
+          row.push(null);
+        }
+      }
+      rows.push(row);
+    }
+
+    const arrows = [];
+    for (const cell of grid.cells) {
+      for (const ar of cell.arrows) {
+        const fromId = cellNodeMap[cell.row + ',' + cell.col];
+        const toRow  = cell.row + ar.rowDelta;
+        const toCol  = cell.col + ar.colDelta;
+        const toId   = cellNodeMap[toRow + ',' + toCol];
+        if (!fromId || !toId) continue;
+
+        // Quoted string options like "f" or "g"' (swap) are labels, not style opts
+        const labels = [];
+        const styleRawOpts = [];
+        for (const opt of (ar.rawOptions || [])) {
+          const k = opt.key || '';
+          if (k.startsWith('"')) {
+            let text = k;
+            let swap = false;
+            if (text.endsWith("'")) { swap = true; text = text.slice(0, -1); }
+            if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1);
+            if (text) labels.push({ text, position: 'midway', swap });
+          } else {
+            styleRawOpts.push(opt);
+          }
+        }
+        if (ar.label) labels.push({ text: ar.label, position: 'midway', swap: false });
+
+        const style = resolveOptsFn(styleRawOpts);
+        // tikzcd default: all arrows have a stealth arrowhead at the end (-> style)
+        if (!style.arrowEnd) style.arrowEnd = { kind: '>' };
+        arrows.push(ft.makeTikzcdArrow(fromId, toId, ar.rowDelta, ar.colDelta, style, styleRawOpts, { labels }));
+      }
+    }
+
+    const style   = resolveOptsFn(rawOpts);
+    const matrix  = ft.makeMatrix(position, rows, style, rawOpts, {
+      name: id, columnSep: colSepPt, rowSep: rowSepPt,
+    });
+    return ft.makeScope([matrix, ...arrows], {}, []);
+  }
+}}
+
+{
+  // Per-parse initializer
+  const registry     = (options && options.styleRegistry) ? options.styleRegistry : { has: () => false, get: () => undefined, toRecord: () => ({}) };
+  const tikzcdGrids  = (options && options.tikzcdGrids)   ? options.tikzcdGrids   : new Map();
+  const nodeRegistry = (options && options.nodeRegistry)  ? options.nodeRegistry  : {};
+
+  function resolveOpts(rawOpts) { return op.resolveOptions(rawOpts, registry); }
+  function parseRaw(optStr)     { return op.parseRawOptions(optStr || ''); }
+  function anchorFor(rawOpts)   { return sr.anchorFromPlacement(rawOpts); }
+  function registerNode(node)   { if (node && node.name) nodeRegistry[node.name] = node.id; return node; }
 }
-/////////////////////// Global //////////////////////////
-start 
-  = t:tikz { return new ft.tikzRoot(location(), [t]) } 
-  / p:tikzpicture { return new ft.tikzRoot(location(), [p]) }
 
-tikz  
-  = tikzhead opt:tikzoption l:lbrace cnt:tikzcontent r:rbrace { return new ft.tikzInline(location(), opt, cnt); }
+/////////////////////// Entry Point //////////////////////////
 
-tikzpicture 
-  = tikzpicturehead opt:tikzoption cnt:tikzcontent tikzpicturetail { return new ft.tikzPicture(location(), opt, cnt); }
+start
+  = ws t:tikz        ws { return t; }
+  / ws p:tikzpicture ws { return p; }
+  / ws cd:tikzcd_root ws { return cd; }
 
-tikzhead 
-  = ws ('\\tikz'/'\\tikzjs') ws
+tikzcd_root
+  = scope:tikzcd_statement
+    {
+      return ft.makeDiagram('tikzpicture', [scope], {}, [],
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+    }
 
-tikzpicturehead 
-  = begin l:lbrace ('tikzpicture'/'tikzjspicture') r:rbrace { gc.beginGroup('@env_tikzpicture'); }
+tikz
+  = tikzhead_open opt:option_block cnt:tikzcontent '}'
+    {
+      const rawOpts = parseRaw(opt);
+      return ft.makeDiagram('tikz-inline', cnt, resolveOpts(rawOpts), rawOpts,
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+    }
+
+tikzpicture
+  = tikzpicturehead opt:option_block cnt:tikzcontent tikzpicturetail
+    {
+      const rawOpts = parseRaw(opt);
+      return ft.makeDiagram('tikzpicture', cnt, resolveOpts(rawOpts), rawOpts,
+        registry.toRecord ? registry.toRecord() : {}, nodeRegistry);
+    }
+
+tikzhead_open
+  = ws '\\tikzjs' ws
+  / ws '\\tikz'   ws
+
+tikzpicturehead
+  = ws '\\begin' ws '{' ws ('tikzpicture' / 'tikzjspicture') ws '}' ws
 
 tikzpicturetail
-  = end lbrace ('tikzpicture'/'tikzjspicture') rbrace { gc.endGroup('@env_tikzpicture'); }
+  = ws '\\end' ws '{' ws ('tikzpicture' / 'tikzjspicture') ws '}' ws
 
-tikzoption 
-  = lbracket list:option_list rbracket { return list; }
-  / ws { return []; }
+/////////////////////// Option Blocks //////////////////////////
 
-option_list "option list" 
-  = x:(option|.., comma|) comma? { return x; }
+option_block "option block"
+  = ws '[' content:option_content ']' ws { return content; }
+  / ws                                    { return ''; }
 
-option "tikz option"
-  = ov:override_option { return ov; }
-  / b:bool_option { return b; }
+option_content = chars:option_char* { return chars.join(''); }
 
-bool_option "bool option" //TODO add more options
-  = d:'draw' { return new ft.tikzColorOption(location(), undefined, '#000000'); }
-  / a:'<->' { return new ft.tikzOption(location(), a); }
-  / a:'->' { return new ft.tikzOption(location(), a); }
-  / a:'<-' { return new ft.tikzOption(location(), a); }
-  / c:color_literal { return new ft.tikzColorOption(location(), c,c); }
-  / k:'above' { return new ft.tikzNodeOption(location(), k, undefined); }
-  / k:'below' { return new ft.tikzNodeOption(location(), k, undefined); }
-  / k:'sloped' { return new ft.tikzNodeOption(location(), k, undefined); }
+option_char
+  = '{' inner:brace_content '}' { return '{' + inner + '}'; }
+  / '[' inner:option_content ']' { return '[' + inner + ']'; }
+  / c:[^\[\]{};] { return c; }
 
-override_option "override option"
-  = k:'color' eq c:color_literal { return new ft.tikzColorOption(location(), c, c); }
-  / k:'draw' eq c:color_literal { return new ft.tikzColorOption(location(), undefined, c); }
-  / k:'fill' eq c:color_literal { return new ft.tikzColorOption(location(), c, undefined); }
-  / k:'above' eq s:offset_expr { return new ft.tikzNodeOption(location(), k, s); }
-  / k:'below' eq s:offset_expr { return new ft.tikzNodeOption(location(), k, s); }
-  / k:'pos' eq s:offset_expr   { return new ft.tikzNodeOption(location(), k, s); }
+brace_content = chars:brace_char* { return chars.join(''); }
 
-color_literal "color literal"
-  = 'red' { return '#FF0000'; }
-  / 'green' { return '#00FF00'; }
-  / 'blue' { return '#0000FF'; }
-  / 'cyan' { return '#00FFFF'; }
-  / 'magenta' { return '#FF00FF'; }
-  / 'yellow' { return '#FFFF00'; }
-  / 'black' { return '#000000'; }
-  / 'gray' { return '#808080'; }
-  / 'white' { return '#FFFFFF'; }
-  / 'darkgray' { return '#A9A9A9'; }
-  / 'lightgray' { return '#D3D3D3'; }
-  / 'brown' { return '#964B00'; }
-  / 'lime' { return '#BFFF00';}
-  / 'olive' { return '#808000'; }
-  / 'orange' { return '#FFA500'; }
-  / 'pink' { return '#FFC0CB'; }
-  / 'purple' { return '#800080'; }
-  / 'teal' { return '#008080'; }
-  / 'violet' { return '#FF0000'; }
-  / c:hexcolor { return c; }
+brace_char
+  = '{' inner:brace_content '}' { return '{' + inner + '}'; }
+  / c:[^{}] { return c; }
 
-hexcolor
-  = '#' hex_digit |6| 
+/////////////////////// Content //////////////////////////
 
-tikzcontent
-  = ws list:statement_list ws { return list; }
+tikzcontent = ws list:statement_list ws { return list; }
 
-begin_env
-  = begin lbrace env_name rbrace
-
-end_env
-  = end lbrace env_name rbrace
-
-env_name // envs other than tikzjspicture tikzpicture
-  = "env_test"
-
-begin
-  = "\\begin"
-
-end 
-  = "\\end"
-
-
-////////////////// COORDINATE SPEC ///////////////////////////
-
-path_coordinate
-  = c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'' ,c.cs_type); }
-  / plus c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'+' ,c.cs_type); }
-  / plusplus c:coordinate { return new ft.tikzCoordinate(location(), c.offset_list,'++' ,c.cs_type); }
-  / a:node_alias { return new ft.tikzNodeAliasCoordinate(location(), a, undefined); }
-  / ac: node_alias_anchor { return new ft.tikzNodeAliasCoordinate(location(), ac[0], ac[1]); }
-
-
-coordinate
-  = coordinate_canvas 
-  / coordinate_canvas_polar
-  // TODO add coordinate_xyz etc
-
-coordinate_canvas
-  = lpar x:offset_expr comma y:offset_expr rpar  { return {'offset_list': [x, y], "cs_type": 'canvas'}; }
-  / lpar 'canvas cs' colon 'x' eq x_:offset_expr comma 'y' eq y_:offset_expr rpar { return {'offset_list': [x_, y_], "cs_type": 'canvas'}; }
-
-coordinate_canvas_polar
-  = lpar angle:offset_expr colon radius:offset_expr rpar { return {'offset_list': [angle, radius], "cs_type": 'ploar'}; }
-  / lpar 'canvas polar cs' colon 'angle' eq angle_:offset_expr comma 'radius' eq radius_:offset_expr rpar { return {'offset_list': [angle_, radius_], "cs_type": 'ploar'}; }
-
-offset_expr
-  = n:number ws u:unit ws { return new ft.tikzCoordinateOffset(location(), n, u); }
-  / n:number { return new ft.tikzCoordinateOffset(location(), n); }
-
-
-unit 
-  = "cm"
-  / "mm" 
-  / "pt" 
-  / "ex"
-  / "rm"
-  / "deg"
-
-//////////////////// PATH SPEC ////////////////////////
 statement_list
-  = list:(statement|.., ws|) { return list; }
+  = items:(ws s:statement ws { return s; })* { return items.filter(Boolean); }
 
 statement
-  = path_statement
-  // / foreach_statement
+  = scope_statement
+  / path_statement
+  / standalone_node_statement
+  / standalone_coordinate_statement
+  / tikzcd_statement
+
+/////////////////////// Scope //////////////////////////
+
+scope_statement
+  = '\\begin' ws '{' ws 'scope' ws '}' opt:option_block cnt:tikzcontent '\\end' ws '{' ws 'scope' ws '}'
+    {
+      const rawOpts = parseRaw(opt);
+      return ft.makeScope(cnt, resolveOpts(rawOpts), rawOpts);
+    }
+
+/////////////////////// tikzcd placeholder //////////////////////////
+
+tikzcd_statement
+  = '\\tikzjsTikzcd' ws '{' id:identifier '}'
+    {
+      const grid = tikzcdGrids.get(id);
+      if (!grid) return null;
+      return buildMatrixFromGrid(grid, id, nodeRegistry, resolveOpts);
+    }
+
+/////////////////////// Path Statements //////////////////////////
 
 path_statement
-  = h:path_head opt:tikzoption opr:operation_list semicolon { return new ft.tikzPath(location(), h, opt, opr); }
-  / node_path_statement
+  = head:path_head opt:option_block ops:operation_list ';'
+    {
+      const impliedOpts  = head.impliedOpts || '';
+      const combinedStr  = impliedOpts ? (opt ? impliedOpts + ',' + opt : impliedOpts) : opt;
+      const rawOpts      = parseRaw(combinedStr);
+      const style        = resolveOpts(rawOpts);
+      const edge = tryBuildEdgeFromOps(ops, style, rawOpts, nodeRegistry);
+      if (edge) return edge;
+      const { segments, inlineNodes } = buildSegments(ops);
+      return ft.makePath(segments, style, rawOpts, inlineNodes);
+    }
 
+path_head "path command"
+  = '\\path'     { return { cmd: '\\path',     impliedOpts: '' }; }
+  / '\\draw'     { return { cmd: '\\draw',     impliedOpts: 'draw' }; }
+  / '\\filldraw' { return { cmd: '\\filldraw', impliedOpts: 'draw,fill' }; }
+  / '\\fill'     { return { cmd: '\\fill',     impliedOpts: 'fill' }; }
+  / '\\clip'     { return { cmd: '\\clip',     impliedOpts: '' }; }
+  / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
-path_head 
-  = '\\path'
-  // / '\\draw'
-  // / '\\fill'
-  // / '\\filldraw'
-  // / '\\pattern'
-  // / '\\shade'
-  // / '\\shadedraw'
-  // / '\\clip'
-  // //short hand for node shapes
-  // / '\\node'
-  // / '\\matrix'
+standalone_node_statement
+  = '\\node' opt:option_block al:node_alias? at_coord:node_at cnt:node_content ';'
+    {
+      const rawOpts = parseRaw(opt);
+      const pos     = at_coord || ft.coordRef(0, 0);
+      const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
+        { name: al || undefined, anchor: anchorFor(rawOpts) });
+      registerNode(node);
+      return ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
+    }
 
-node_path_statement
-  = escape n:node_operation opr:operation_list semicolon { return new ft.tikzPath(location(), '\\node', [], [n, ...opr]) }
+standalone_coordinate_statement
+  = '\\coordinate' opt:option_block al:node_alias? at_coord:node_at ';'
+    {
+      const pos   = at_coord || ft.coordRef(0, 0);
+      const coord = ft.makeCoordinate(pos, { name: al || undefined });
+      if (al) nodeRegistry[al] = coord.id;
+      return coord;
+    }
+
+/////////////////////// Operation List //////////////////////////
 
 operation_list
-  = list:(path_operation|.., ws|) { return list; }
+  = ops:(ws o:path_operation ws { return o; })* { return ops; }
 
 path_operation
   = c:path_coordinate { return c; }
-  / l:line_operation { return l; }
-  / g:grid_operation { return g; }
-  / b:curve_operation { return b; }
-  / t:topath_operation { return t; }
-  / n:node_operation { return n; }
-  // / e:edge_operation { return e; }
-  // / rectangle_operation
-  // / circle_operation
-  // / ellipse_operation
-  // / arc_operation
-  // / foreach_operation
-  // / let_operation
+  / l:line_op         { return l; }
+  / r:rectangle_op    { return r; }
+  / g:grid_op         { return g; }
+  / b:curve_op        { return b; }
+  / t:to_op           { return t; }
+  / n:node_op         { return n; }
+  / a:arc_op          { return a; }
+  / ci:circle_op      { return ci; }
+  / el:ellipse_op     { return el; }
+  / pa:parabola_op    { return pa; }
+  / s:sin_op          { return s; }
+  / co:cos_op         { return co; }
+  / cycle_op          { return { kind: 'op-close' }; }
 
+cycle_op = ws 'cycle' ws
 
-////////// line operations /////////////
-line_operation
-  = streight_line_operation { return new ft.tikzLineOperation(location(), '--'); }
-  / hv_corner_operation { return new ft.tikzLineOperation(location(), '-|'); }
-  / vh_corner_operation { return new ft.tikzLineOperation(location(), '|-'); }
+/////////////////////// Coordinates //////////////////////////
 
-streight_line_operation
-  = ws '--' ws
+path_coordinate "coordinate"
+  = '++' c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
+  / '+'  c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
+  / c:raw_coordinate      { return { kind: 'op-coord', coord: c }; }
+  / a:node_alias_anchor   { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
+  / a:node_alias          { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
-hv_corner_operation
-  = ws '-|' ws
+raw_coordinate "raw coordinate"
+  = '(' ws x:number u1:dim_unit ws ',' ws y:number u2:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
+  / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:number u1:dim_unit ws ',' ws 'y' ws '=' ws y:number u2:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
+  / '(' ws angle:number ws ':' ws radius:number u:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
 
-vh_corner_operation 
-  = ws '|-' ws
+// Unit suffix → pt multiplier. No unit = TikZ default (1cm = 28.4528pt).
+dim_unit
+  = ws 'cm' { return 28.4528; }
+  / ws 'mm' { return 2.84528; }
+  / ws 'pt' { return 1.0; }
+  / ws 'bp' { return 1.00375; }
+  / ws 'in' { return 72.27; }
+  / ws 'ex' { return 4.5; }
+  / ws 'em' { return 10.0; }
+  / ws     { return 28.4528; }  // default TikZ unit = 1cm
 
-////////// grid operations /////////////
-grid_operation
-  = grid_operation_head opt:tikzoption {return new ft.tikzGridOperation(location(), opt); }
+node_alias "node alias"
+  = '(' ws name:identifier ws ')' { return name; }
 
-grid_operation_head
-  = ws 'grid' ws
+node_alias_anchor "node alias with anchor"
+  = '(' ws name:identifier ws '.' ws anchor:anchor_name ws ')' { return [name, anchor]; }
 
+anchor_name
+  = $('north east' / 'north west' / 'south east' / 'south west'
+     / 'north' / 'south' / 'east' / 'west'
+     / 'center' / 'mid east' / 'mid west' / 'base east' / 'base west'
+     / 'mid' / 'base')
+  / identifier
 
-//////// curve operations /////////////
-curve_operation
-  = dotdot curve_control c:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c); }
-  / dotdot curve_control c0:path_coordinate and c1:path_coordinate dotdot { return new ft.tikzCurveOperation(location(), c0, c1); }
+/////////////////////// Path Operations //////////////////////////
 
-curve_control = ws 'controls' ws
+line_op "line"
+  = ws '--' ws { return { kind: 'op-line', lineKind: '--' }; }
+  / ws '-|' ws { return { kind: 'op-line', lineKind: '-|' }; }
+  / ws '|-' ws { return { kind: 'op-line', lineKind: '|-' }; }
 
-////////// to-path operations /////////////
-topath_operation
-  = to opt:tikzoption { return new ft.tikzToPathOperation(location(), opt); }
+rectangle_op "rectangle"
+  = ws 'rectangle' ws { return { kind: 'op-rectangle' }; }
 
-// ///////// node operations //////////////
-node_operation
-  = node_head opt:tikzoption al:node_alias at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, al, at, cnt)}
-  / node_head opt:tikzoption at:node_at cnt:node_content {return new ft.tikzNodeOperation(location(), opt, undefined, at, cnt)}
+grid_op "grid"
+  = ws 'grid' opt:option_block
+    { return { kind: 'op-grid', rawOpts: parseRaw(opt) }; }
 
-node_head = ws 'node' ws
+curve_op "curve"
+  = ws '..' ws 'controls' ws c0:path_coordinate ws 'and' ws c1:path_coordinate ws '..' ws
+    { return { kind: 'op-curve', controls: [c0.coord, c1.coord] }; }
+  / ws '..' ws 'controls' ws c0:path_coordinate ws '..' ws
+    { return { kind: 'op-curve', controls: [c0.coord] }; }
 
-node_alias 
-  = lpar name:identifier rpar { return name; }
+to_op "to"
+  = ws 'to' opt:option_block
+    { return { kind: 'op-to', rawOpts: parseRaw(opt) }; }
 
-node_alias_anchor 
-  = lpar name:identifier tight_dot anchor: identifier rpar { return [name, anchor]; }
+arc_op "arc"
+  = ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
+    { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: xr * u1, yRadius: yr * u2 }; }
+  / ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws r:number u:dim_unit ws ')'
+    { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: r * u }; }
+  / ws 'arc' opt:option_block
+    { return { kind: 'op-arc', rawOpts: parseRaw(opt) }; }
 
-node_at
-  = at c:path_coordinate { return c; }
-  / ws { return undefined; }
+circle_op "circle"
+  = ws 'circle' ws '(' ws r:number u:dim_unit ws ')'
+    { return { kind: 'op-circle', radius: r * u }; }
 
-//
-node_content
-  = lbrace li:latex_inline rbrace { return li; }
-  / ws { return undefined; }
+ellipse_op "ellipse"
+  = ws 'ellipse' ws '(' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
+    { return { kind: 'op-ellipse', xRadius: xr * u1, yRadius: yr * u2 }; }
 
-latex_inline
-  = x:(latex_plain / latex_math)+ { return x.join(''); }
+parabola_op "parabola"
+  = ws 'parabola' opt:option_block ws 'bend' ws b:path_coordinate
+    { return { kind: 'op-parabola', rawOpts: parseRaw(opt), bend: b.coord }; }
+  / ws 'parabola' opt:option_block
+    { return { kind: 'op-parabola', rawOpts: parseRaw(opt) }; }
 
-latex_plain
-  = p:(latex_plain_primitive)+ { return `\\text{${text()}}`; }
+sin_op "sin"
+  = ws 'sin' ws { return { kind: 'op-sin' }; }
 
-// this rule must always return a string
-latex_plain_primitive "primitive" =
-      char
-    / utf8_char
-    / hyphen
-    / decimal_digit   {return text();}
-    / punctuation
-    / quotes
-    / escape identifier { return text();}
-    / lbrace  rbrace
-    / lbrace (latex_plain_primitive)+ rbrace { return text(); }
-    / line_break
-    / sp
-    / ctrl_space
-    / ctrl_sym
-    
+cos_op "cos"
+  = ws 'cos' ws { return { kind: 'op-cos' }; }
 
-latex_math 
-  = math_shift m:(latex_math_primitive)+ math_shift { return text().slice(1,-1); }
-  / inline_math_begin m:(latex_math_primitive)+ inline_math_end { return text().slice(2,-2); }
+node_op "node"
+  = ws 'node' opt:option_block al:node_alias? cnt:node_content ws
+    {
+      const rawOpts = parseRaw(opt);
+      const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
+        { name: al || undefined, anchor: anchorFor(rawOpts) });
+      registerNode(node);
+      return { kind: 'op-node', node };
+    }
 
-latex_math_primitive =
-    latex_plain_primitive
-    / alignment_tab
-    / superscript
-    / subscript
-    / escape identifier { return text();}
-    / lbrace  rbrace
-    / lbrace (latex_math_primitive)+ rbrace { return text(); }
+node_at "at clause"
+  = ws 'at' ws c:path_coordinate { return c.coord; }
+  / ws                            { return null; }
 
-identifier =
-    $char+
+node_content "node content"
+  = ws '{' content:node_body '}' ws { return content; }
+  / ws                               { return ''; }
 
+node_body = chars:node_body_char* { return chars.join(''); }
 
-/////////////////// Primitives ////////////////////////
-punctuation "punctuation"   = p:[.,;:\*/()!?=+<>]                
-macro_parameter "parameter" = "#"                                
-quotes      "quotes"        = q:[`']                            
-utf8_char   "utf8 char"     = !(sp/ ctrl_sym/ char/ hyphen / escape / lbrace / rbrace / math_shift / alignment_tab /
-                                superscript / subscript )
-                               u:.                              
-hyphen      "hyphen"        = "-"                               
-ctrl_sym    "control symbol"= escape c:[$%#&{}_\-,/@]    
-char        "letter"        = c:[a-zA-Z]i                          
-line_break   "line_break"   = ws '\\\\' ws
-escape       "escape"       = '\\' { return '\\'; }
-ctrl_space "latex space"    = ws'\\ 'ws
+node_body_char
+  = '{' inner:node_body '}' { return '{' + inner + '}'; }
+  / c:[^{}] { return c; }
 
+/////////////////////// Primitives //////////////////////////
 
+identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
 
+number "number"
+  = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*
+    { return parseFloat((s||'') + i + '.' + (f||'0')); }
+  / s:$[+\-]? ws '.' f:$[0-9]+
+    { return parseFloat((s||'') + '0.' + f); }
+  / s:$[+\-]? ws i:$[0-9]+
+    { return parseFloat((s||'') + i); }
 
-/* text tokens - symbols that generate output */
-alignment_tab "alignment"   = ws '&'ws
-superscript "supperscript"  = ws '^' ws
-subscript   "subscript"     = ws '_' ws
-math_shift  "latex inline"  = ws '$' ws &{ return gc.checkValid('$'); } { gc.toggleMathScope('$'); return text(); }
-inline_math_begin = ws '\\(' ws &{ return gc.checkValid('\\('); } { gc.toggleMathScope('\\('); return text(); }
-inline_math_end = ws '\\)' ws &{ return gc.checkValid('\\)'); } { gc.toggleMathScope('\\)'); return text(); }
-lpar = ws "(" ws 
-rpar = ws ")" ws 
-rbrace = ws '}' ws &{ return gc.checkValid('rbrace'); } {gc.endGroup('rbrace'); return text();}
-lbrace = ws '{' ws &{ return gc.checkValid('lbrace'); } {gc.beginGroup('lbrace'); return text(); }
-lbracket = ws '[' ws 
-rbracket = ws ']' ws
-comma = ws ',' ws
-colon = ws ':' ws
-semicolon = ws ';' ws
-eq = ws '=' ws
-double_dots = ws '..' ws 
-dot = ws '.' ws
-tight_dot = '.'
-dotdot = ws '..' ws
-plus = ws '+' ws
-plusplus = ws '++' ws
-in = ws 'in' ws 
-at = ws 'at' ws
-to = ws 'to' ws
-and = ws 'and' ws
 ws "whitespace" = [ \t\n\r]*
-sp = [ \t]+ {return ' ';}
-
-number
-  = signed_integer_literal tight_dot decimal_digit* {
-      return parseFloat(text());
-    }
-  / tight_dot decimal_digit+ {
-      return parseFloat(text());
-    }
-  / signed_integer_literal {
-      return  parseFloat(text());
-    }
-
-signed_integer_literal
-  = [+-]? decimal_integer_literal
-
-decimal_integer_literal
-  = "0"
-  / nonzero_digit decimal_digit*
-
-decimal_digit
-  = [0-9]
-
-hex_digit
-  = [0-9]
-  / [A-F]
-  / [a-f]
-
-nonzero_digit
-  = [1-9]
-
-
-

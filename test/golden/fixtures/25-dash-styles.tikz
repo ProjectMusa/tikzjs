@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw[dashed]  (0,6pt) -- (3.5cm,6pt);
+  \draw[dotted]  (0,3pt) -- (3.5cm,3pt);
+  \draw[dash pattern=on 2pt off 3pt on 4pt off 4pt] (0,0pt) -- (3.5cm,0pt);
+\end{tikzpicture}
