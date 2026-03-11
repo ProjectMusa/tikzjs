@@ -13,10 +13,10 @@ import { BoundingBox, fromCorners } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
 import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
 
-/** Default inner padding around node content (px). */
-const DEFAULT_INNER_SEP_PX = 4
-/** Minimum node half-size (px). */
-const MIN_HALF_SIZE = 8
+/** Default inner padding around node content (px). TikZ default: inner sep = 3.333pt. */
+const DEFAULT_INNER_SEP_PX = ptToPx(3.333)
+/** Minimum node half-size (px). Keep small — TikZ has no enforced minimum unless minimum width/height is set. */
+const MIN_HALF_SIZE = 1
 
 export interface NodeRenderResult {
   element: Element
