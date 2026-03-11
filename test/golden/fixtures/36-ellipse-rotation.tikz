@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw (2,1) ellipse (2 and 1);
+  \draw[rotate=30] (2,1) ellipse (2 and 0.5);
+  \draw[red] (0,0) ellipse (1 and 0.5);
+\end{tikzpicture}

@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+  \node (A) at (0,0) {$A$};
+  \node (B) at (3,0) {$B$};
+  \node (C) at (1.5,2) {$C$};
+  \draw[->] (A) -- (B);
+  \draw[->] (A) -- (C);
+  \draw[->] (B) -- (C);
+\end{tikzpicture}

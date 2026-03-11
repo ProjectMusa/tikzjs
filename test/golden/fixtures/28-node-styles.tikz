@@ -1,0 +1,7 @@
+\begin{tikzpicture}
+  \draw[->] (0,2) node[left] {start} -- (3,2) node[right] {end};
+  \draw[<->] (0,1) node[left] {A} -- (3,1) node[right] {B};
+  \node[draw,circle] at (0,0) {X};
+  \node[draw,rectangle] at (3,0) {Y};
+  \draw[->] (0.5,0) -- (2.5,0);
+\end{tikzpicture}

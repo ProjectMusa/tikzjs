@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw (0,0) parabola (2,2);
+  \draw (3,0) parabola[bend at end] (5,2);
+  \draw (0,-3) parabola bend (1,-1) (2,-3);
+\end{tikzpicture}

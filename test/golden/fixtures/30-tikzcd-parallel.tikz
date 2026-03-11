@@ -1,0 +1,3 @@
+\begin{tikzcd}
+  A \arrow[r, bend left=20, "f"] \arrow[r, bend right=20, "g"'] & B
+\end{tikzcd}

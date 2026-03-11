@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw (0,0) arc (0:90:2);
+  \draw (3,0) arc (0:180:1);
+  \draw (6,0) arc (0:270:1.5);
+\end{tikzpicture}

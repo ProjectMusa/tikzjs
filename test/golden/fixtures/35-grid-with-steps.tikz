@@ -1,0 +1,4 @@
+\begin{tikzpicture}
+  \draw[step=0.5,gray,very thin] (0,0) grid (3,2);
+  \draw[step=1,black] (0,0) grid (3,2);
+\end{tikzpicture}

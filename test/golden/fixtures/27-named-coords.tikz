@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+  \coordinate (A) at (0,0);
+  \coordinate (B) at (3,0);
+  \coordinate (C) at (1.5,2);
+  \draw (A) -- (B) -- (C) -- cycle;
+  \draw[blue,->] (A) -- (B);
+  \node[fill=red,inner sep=2pt] at (A) {};
+  \node[fill=red,inner sep=2pt] at (B) {};
+  \node[fill=red,inner sep=2pt] at (C) {};
+\end{tikzpicture}
