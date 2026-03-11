@@ -61,7 +61,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 6,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -76,7 +76,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 6,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -89,7 +89,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 4,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -104,7 +104,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 5,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -119,7 +119,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 6,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -134,7 +134,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 7,
         markerHeight: 7,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 
@@ -151,7 +151,7 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         refY: 5,
         markerWidth: 6,
         markerHeight: 6,
-        orient: 'auto',
+        orient: 'auto-start-reverse',
         color,
       }
 

@@ -293,8 +293,14 @@ function buildBendPath(
   const cx = mx + bendDir * perpX * bendDist
   const cy = my + bendDir * perpY * bendDist
 
+  // Elevate quadratic to cubic so cairosvg computes correct tangent angles for marker-end.
+  // Cubic equivalent: C1 = P0 + 2/3*(Q - P0),  C2 = P2 + 2/3*(Q - P2)
+  const c1x = from.x + (2 / 3) * (cx - from.x)
+  const c1y = from.y + (2 / 3) * (cy - from.y)
+  const c2x = to.x + (2 / 3) * (cx - to.x)
+  const c2y = to.y + (2 / 3) * (cy - to.y)
   return {
-    d: `Q ${cx} ${cy} ${to.x} ${to.y} `,
+    d: `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `,
     bbox: fromCorners(
       Math.min(from.x, cx, to.x), Math.min(from.y, cy, to.y),
       Math.max(from.x, cx, to.x), Math.max(from.y, cy, to.y)
