@@ -110,11 +110,26 @@
     return null;
   }
 
+  // ── tikzcd named sep presets (from tikzlibrarycd.code.tex, converted: 1em = 10pt) ──────────
+  const TIKZCD_COL_SEP = { huge: 48, large: 36, normal: 24, scriptsize: 18, small: 12, tiny: 6 };
+  const TIKZCD_ROW_SEP = { huge: 36, large: 27, normal: 18, scriptsize: 13.5, small: 9, tiny: 4.5 };
+
+  function resolveTikzcdSep(rawOpts, key, presets, defaultPt) {
+    const opt = rawOpts.find(o => o.key === key);
+    if (!opt) return defaultPt;
+    const v = (opt.value || '').trim();
+    if (presets[v] !== undefined) return presets[v];
+    const parsed = op.parseDimensionPt(v);
+    return parsed > 0 ? parsed : defaultPt;
+  }
+
   function buildMatrixFromGrid(grid, id, nodeReg, resolveOptsFn) {
     const position  = ft.coordRef(0, 0);
-    // tikzcd default separations (gap between node bounding boxes, measured from the reference)
-    const rowSepPt  = 17;
-    const colSepPt  = 23;
+    const rawOpts   = grid.rawOptions || [];
+    // Resolve column/row sep from diagram options; fall back to tikzcd `normal` defaults
+    const sepFallback = resolveTikzcdSep(rawOpts, 'sep', TIKZCD_COL_SEP, null);
+    const colSepPt  = resolveTikzcdSep(rawOpts, 'column sep', TIKZCD_COL_SEP, sepFallback ?? 24);
+    const rowSepPt  = resolveTikzcdSep(rawOpts, 'row sep',    TIKZCD_ROW_SEP, sepFallback ?? 18);
 
     const rows        = [];
     const cellNodeMap = {};
@@ -171,7 +186,6 @@
       }
     }
 
-    const rawOpts = grid.rawOptions || [];
     const style   = resolveOptsFn(rawOpts);
     const matrix  = ft.makeMatrix(position, rows, style, rawOpts, {
       name: id, columnSep: colSepPt, rowSep: rowSepPt,

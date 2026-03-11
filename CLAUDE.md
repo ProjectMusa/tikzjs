@@ -55,12 +55,17 @@ The generated `src/parser/_tikzjs.js` is committed and must be kept in sync.
 ## tikzcd Pipeline
 
 tikzcd is **not** converted to raw TikZ. The preprocessor:
+
 1. Extracts `\begin{tikzcd}...\end{tikzcd}` → parses into `TikzcdGrid` (structured cells + arrows)
 2. Replaces the environment with `\tikzjsTikzcd{id}` placeholder in the source string
 3. Passes the `Map<id, TikzcdGrid>` to the parser via `options.tikzcdGrids`
 
 The parser's `tikzcd_statement` rule consumes the placeholder and calls `buildMatrixFromGrid()`
 to produce `IRMatrix` + `IRTikzcdArrow[]` directly. No intermediate TikZ emission.
+
+## Edit Rules
+
+**DO NOT** change anything in the `/manuals` directory
 
 ## SVG Generator Rules
 
@@ -90,6 +95,7 @@ to produce `IRMatrix` + `IRTikzcdArrow[]` directly. No intermediate TikZ emissio
 ## TikZ Reference
 
 When behavior is ambiguous, consult in this order:
+
 1. `pgfmanual.pdf` — authoritative TikZ syntax and option names (available on CTAN)
 2. pgf source: `texmf-dist/tex/generic/pgf/` — TeX implementation is ground truth
 3. tikzjax in browser — quick visual check without local TeX
