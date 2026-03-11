@@ -172,7 +172,15 @@ function renderElements_pass1(
       }
 
       case 'coordinate': {
-        resolver.resolve(el.position)
+        const pt = resolver.resolve(el.position)
+        // Register as zero-size point so (name) references in paths resolve correctly.
+        nodeRegistry.register(el.id, el.name, {
+          centerX: pt.x,
+          centerY: pt.y,
+          halfWidth: 0,
+          halfHeight: 0,
+          bbox: { minX: pt.x, minY: pt.y, maxX: pt.x, maxY: pt.y },
+        })
         break
       }
     }

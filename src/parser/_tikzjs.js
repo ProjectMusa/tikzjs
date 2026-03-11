@@ -10,6 +10,73 @@
   const op = require('./optionParser');
   const sr = require('./styleResolver');
 
+  // ── Helper: detect (nodeA) --/to (nodeB) node[midway/pos, above/below/left/right]{text} ──────
+  // Returns an IREdge if the pattern matches, else null.
+  const POSITION_KEYS = new Set(['midway', 'near start', 'near end', 'at start', 'at end', 'very near start', 'very near end']);
+  const PLACEMENT_KEYS = new Set(['above', 'below', 'left', 'right']);
+
+  function tryBuildEdgeFromOps(ops, style, rawOpts, nodeReg) {
+    // Filter nulls
+    const items = ops.filter(Boolean);
+    // Pattern: coord(nodeRef A) [line|to] coord(nodeRef B) node(midway/pos)
+    // Optional: any number of trailing node ops
+    // Minimal: exactly 4 items: coord, line/to, coord, node
+    if (items.length < 4) return null;
+
+    const [first, conn, second, ...rest] = items;
+
+    // First must be a named-node coord reference
+    if (first.kind !== 'op-coord') return null;
+    if (first.coord.coord.cs !== 'node-anchor') return null;
+
+    // Connector must be line (--) or to
+    if (conn.kind !== 'op-line' && conn.kind !== 'op-to') return null;
+
+    // Second must also be a named-node coord
+    if (second.kind !== 'op-coord') return null;
+    if (second.coord.coord.cs !== 'node-anchor') return null;
+
+    // Rest: all must be op-node with position/placement options
+    if (rest.length === 0) return null;
+    if (!rest.every(item => item.kind === 'op-node')) return null;
+
+    // Check at least one node has a position key (midway etc.)
+    const labels = [];
+    for (const nodeItem of rest) {
+      const nodeRawOpts = nodeItem.node.rawOptions || [];
+      const keys = nodeRawOpts.map(o => o.key);
+      const hasPosition = keys.some(k => POSITION_KEYS.has(k));
+      if (!hasPosition) return null;  // not a midway label — don't convert
+
+      const position = keys.find(k => POSITION_KEYS.has(k)) || 'midway';
+      const placement = keys.find(k => PLACEMENT_KEYS.has(k)) || undefined;
+      const swap = keys.includes('swap');
+      const text = nodeItem.node.label || '';
+      labels.push({ text, position, placement, swap });
+    }
+
+    // Determine routing
+    let routing = { kind: 'straight' };
+    if (conn.kind === 'op-to') {
+      // Check for bend left/right in to options
+      const toOpts = conn.rawOpts || [];
+      const bendLeft  = toOpts.find(o => o.key === 'bend left');
+      const bendRight = toOpts.find(o => o.key === 'bend right');
+      if (bendLeft)  routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
+      else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
+    }
+
+    const fromNode = nodeReg[first.coord.coord.nodeName];
+    const toNode   = nodeReg[second.coord.coord.nodeName];
+    if (!fromNode || !toNode) return null;
+
+    return ft.makeEdge(fromNode, toNode, routing, style, rawOpts, {
+      fromAnchor: first.coord.coord.anchor !== 'center' ? first.coord.coord.anchor : undefined,
+      toAnchor:   second.coord.coord.anchor !== 'center' ? second.coord.coord.anchor : undefined,
+      labels,
+    });
+  }
+
   // ── Helper: build segment list from raw grammar operation array ──────────────
   function buildSegments(ops) {
     const rawSegs = [];
@@ -584,6 +651,8 @@ function peg$parse(input, options) {
       const combinedStr  = impliedOpts ? (opt ? impliedOpts + ',' + opt : impliedOpts) : opt;
       const rawOpts      = parseRaw(combinedStr);
       const style        = resolveOpts(rawOpts);
+      const edge = tryBuildEdgeFromOps(ops, style, rawOpts, nodeRegistry);
+      if (edge) return edge;
       const { segments, inlineNodes } = buildSegments(ops);
       return ft.makePath(segments, style, rawOpts, inlineNodes);
     };

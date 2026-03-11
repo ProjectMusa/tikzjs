@@ -309,7 +309,8 @@ export type EdgeRouting =
 export interface EdgeLabel {
   text: string // raw LaTeX
   position: number | 'midway' | 'near start' | 'near end' | 'at start' | 'at end'
-  swap?: boolean // label on the other side
+  swap?: boolean // label on the other side (tikzcd ' modifier)
+  placement?: 'above' | 'below' | 'left' | 'right' // absolute TikZ path node positioning
   style?: ResolvedStyle
 }
 

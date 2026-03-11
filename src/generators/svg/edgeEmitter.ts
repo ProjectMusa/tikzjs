@@ -266,27 +266,53 @@ function emitEdgeLabel(
     const { svgString, widthPx, heightPx } = mathRenderer(label.text)
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
 
-    // Compute unit arrow direction vector in SVG coords (y-down)
-    const adx = to.x - from.x
-    const ady = to.y - from.y
-    const len = Math.sqrt(adx * adx + ady * ady)
-    const ux = len > 1e-9 ? adx / len : 1
-    const uy = len > 1e-9 ? ady / len : 0
-
-    // Perpendicular: CW rotation in SVG y-down = "auto/above" for rightward arrow
-    // auto (no swap) = (uy, -ux);  swap (prime) = (-uy, ux)
-    const sign = label.swap ? -1 : 1
-    const px = sign * uy
-    const py = sign * (-ux)
-
-    // Offset magnitude: half the label extent in the perp direction + gap
     const GAP_PX = 4
-    const halfExtent = (Math.abs(px) * widthPx + Math.abs(py) * heightPx) / 2
-    const offset = halfExtent + GAP_PX
+    let cx: number
+    let cy: number
 
-    // Label center
-    const cx = midpoint.x + px * offset
-    const cy = midpoint.y + py * offset
+    if (label.placement) {
+      // Absolute placement: above/below/left/right in TikZ/SVG coordinates.
+      // "above" in TikZ = up = negative SVG y.
+      switch (label.placement) {
+        case 'above':
+          cx = midpoint.x
+          cy = midpoint.y - heightPx / 2 - GAP_PX
+          break
+        case 'below':
+          cx = midpoint.x
+          cy = midpoint.y + heightPx / 2 + GAP_PX
+          break
+        case 'left':
+          cx = midpoint.x - widthPx / 2 - GAP_PX
+          cy = midpoint.y
+          break
+        case 'right':
+          cx = midpoint.x + widthPx / 2 + GAP_PX
+          cy = midpoint.y
+          break
+      }
+    } else {
+      // Perpendicular placement relative to arrow direction (tikzcd-style).
+      // Compute unit arrow direction vector in SVG coords (y-down)
+      const adx = to.x - from.x
+      const ady = to.y - from.y
+      const len = Math.sqrt(adx * adx + ady * ady)
+      const ux = len > 1e-9 ? adx / len : 1
+      const uy = len > 1e-9 ? ady / len : 0
+
+      // CW rotation in SVG y-down = "auto/above" for rightward arrow
+      // auto (no swap) = (uy, -ux);  swap (prime) = (-uy, ux)
+      const sign = label.swap ? -1 : 1
+      const px = sign * uy
+      const py = sign * (-ux)
+
+      // Offset magnitude: half the label extent in the perp direction + gap
+      const halfExtent = (Math.abs(px) * widthPx + Math.abs(py) * heightPx) / 2
+      const offset = halfExtent + GAP_PX
+
+      cx = midpoint.x + px * offset
+      cy = midpoint.y + py * offset
+    }
 
     const tlx = cx - widthPx / 2
     const tly = cy - heightPx / 2
