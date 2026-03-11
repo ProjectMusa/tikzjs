@@ -86,3 +86,56 @@ export function toViewBox(bb: BoundingBox): string {
 export function isValidBBox(bb: BoundingBox): boolean {
   return isFinite(bb.minX) && isFinite(bb.maxX) && bb.maxX > bb.minX
 }
+
+/**
+ * Apply an SVG transform string to a bounding box and return the new axis-aligned bbox.
+ * Handles translate(tx,ty), rotate(deg,cx,cy), scale(s) — the same ops emitted by buildTransform.
+ */
+export function transformBBox(bb: BoundingBox, transform: string | undefined): BoundingBox {
+  if (!transform) return bb
+
+  // Decompose the 4 corners and apply each transform in sequence
+  let corners: [number, number][] = [
+    [bb.minX, bb.minY],
+    [bb.maxX, bb.minY],
+    [bb.maxX, bb.maxY],
+    [bb.minX, bb.maxY],
+  ]
+
+  // Parse and apply each space-separated transform function
+  const re = /(\w+)\(([^)]*)\)/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(transform)) !== null) {
+    const fn = m[1]
+    const args = m[2].split(',').map(Number)
+    corners = corners.map(([x, y]) => {
+      if (fn === 'translate') {
+        return [x + (args[0] ?? 0), y + (args[1] ?? 0)]
+      }
+      if (fn === 'rotate') {
+        const deg = args[0] ?? 0
+        const cx = args[1] ?? 0
+        const cy = args[2] ?? 0
+        const rad = (deg * Math.PI) / 180
+        const cos = Math.cos(rad)
+        const sin = Math.sin(rad)
+        const dx = x - cx
+        const dy = y - cy
+        return [cx + dx * cos - dy * sin, cy + dx * sin + dy * cos]
+      }
+      if (fn === 'scale') {
+        const sx = args[0] ?? 1
+        const sy = args[1] ?? sx
+        return [x * sx, y * sy]
+      }
+      return [x, y]
+    })
+  }
+
+  return {
+    minX: Math.min(...corners.map(([x]) => x)),
+    minY: Math.min(...corners.map(([, y]) => y)),
+    maxX: Math.max(...corners.map(([x]) => x)),
+    maxY: Math.max(...corners.map(([, y]) => y)),
+  }
+}

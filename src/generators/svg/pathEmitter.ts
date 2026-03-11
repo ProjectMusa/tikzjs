@@ -7,7 +7,7 @@
 
 import { IRPath, IRNode, PathSegment, CoordRef, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, clipToNodeBoundary, ptToPx } from './coordResolver.js'
-import { BoundingBox, emptyBBox, expandPoint, mergeBBoxes, fromCorners } from './boundingBox.js'
+import { BoundingBox, emptyBBox, expandPoint, mergeBBoxes, fromCorners, transformBBox } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
@@ -246,9 +246,11 @@ export function emitPath(
     elements.push(pathEl)
   }
 
+  const rawBBox = mergeBBoxes(bboxes)
+  const transform = buildTransform(path.style)
   return {
     elements,
-    bbox: mergeBBoxes(bboxes),
+    bbox: transformBBox(rawBBox, transform),
   }
 }
 
