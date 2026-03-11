@@ -8,7 +8,7 @@ from pathlib import Path
 import numpy as np
 import cv2
 
-from .config import REFS_DIR, REPORT_DIR, DIFF_THRESHOLD, RAW_FONT_THRESHOLD, AREA_TOLERANCE, VERBOSE
+from .config import REFS_DIR, REPORT_DIR, DIFF_THRESHOLD, RAW_FONT_THRESHOLD, STRUCT_HARD_THRESHOLD, AREA_TOLERANCE, VERBOSE
 from .svg import render_tikzjs, svg_to_png
 from .components import (
     extract_components,
@@ -188,9 +188,14 @@ def compare_fixture(name: str) -> CompareResult:
     # ── Check 3: structural diff ──────────────────────────────────────────────
 
     if struct_pct > DIFF_THRESHOLD:
-        # When struct_diff is high but raw_diff is low, the excess is attributed to
-        # font rendering differences (MathJax vs TeX CM glyphs) — warn, don't fail.
-        if raw_pct < RAW_FONT_THRESHOLD:
+        if struct_pct > STRUCT_HARD_THRESHOLD:
+            # Far above threshold — always a real rendering error, not font rendering.
+            result.fail(
+                f'structural diff {struct_pct:.2f}% > hard threshold {STRUCT_HARD_THRESHOLD:.1f}% '
+                f'(raw: {raw_pct:.1f}%)'
+            )
+        elif raw_pct < RAW_FONT_THRESHOLD:
+            # Moderately above threshold with low raw diff — likely font rendering difference.
             result.warn(
                 f'font rendering diff: struct {struct_pct:.2f}% > {DIFF_THRESHOLD:.1f}% '
                 f'(raw {raw_pct:.1f}% < {RAW_FONT_THRESHOLD:.1f}% — likely font difference)'

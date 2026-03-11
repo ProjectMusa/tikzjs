@@ -26,6 +26,11 @@ DIFF_THRESHOLD = float(os.environ.get('GOLDEN_DIFF_THRESHOLD', '5.0'))
 # layout errors — report as a WARNING rather than a FAILURE.
 RAW_FONT_THRESHOLD = float(os.environ.get('GOLDEN_RAW_FONT_THRESHOLD', '12.0'))
 
+# Hard ceiling: structural diff above this threshold always fails regardless of raw_diff.
+# Prevents genuinely broken rendering (e.g. missing grid lines) from being masked by
+# the font-rendering exception when raw pixel diff happens to be low.
+STRUCT_HARD_THRESHOLD = float(os.environ.get('GOLDEN_STRUCT_HARD_THRESHOLD', '20.0'))
+
 # Fractional tolerance for per-component area comparison
 AREA_TOLERANCE = float(os.environ.get('GOLDEN_AREA_TOLERANCE', '0.20'))
 

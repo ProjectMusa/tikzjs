@@ -9,6 +9,7 @@ import { IRPath, IRNode, PathSegment, CoordRef, ResolvedStyle } from '../../ir/t
 import { CoordResolver, NodeGeometryRegistry, clipToNodeBoundary, ptToPx } from './coordResolver.js'
 import { BoundingBox, emptyBBox, expandPoint, mergeBBoxes, fromCorners, transformBBox } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
+import { parseDimensionPt } from '../../parser/optionParser.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 
@@ -206,7 +207,10 @@ export function emitPath(
         // Grid: render as a series of lines. The grid is from lastPos to 'to'.
         const gridSeg = seg as any
         const to = resolver.resolve(gridSeg.to)
-        const gridPath = buildGridPath(lastPos, to)
+        // 'step'/'xstep'/'ystep' may be on the path-level \draw[...] options or on the grid[...] itself.
+        // Path-level comes first; grid-level options override if present.
+        const gridOpts = [...path.rawOptions, ...(gridSeg.rawOptions ?? [])]
+        const gridPath = buildGridPath(lastPos, to, gridOpts)
         d += gridPath.d
         bboxes.push(fromCorners(
           Math.min(lastPos.x, to.x), Math.min(lastPos.y, to.y),
@@ -384,53 +388,66 @@ function buildBendPath(
     }
   }
 
-  // Compute control point for bend.
-  // CW rotation in SVG (y-down) = CCW in TikZ (y-up) = "left" side of travel.
-  const mx = (from.x + to.x) / 2
-  const my = (from.y + to.y) / 2
+  // TikZ topaths formula (tikzlibrarytopaths.code.tex):
+  //   d = 0.3915 × dist × looseness
+  //   C1 = from + d × dir(out_angle)
+  //   C2 = to   + d × dir(in_angle)
+  // For bend left=θ:  tikzOut=+θ, tikzIn=180°-θ  (relative to line direction)
+  // For bend right=θ: tikzOut=-θ, tikzIn=180°+θ
+  // SVG has y-down, so TikZ CCW = SVG CW — negate TikZ relative angles.
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
-  const perpX = dy / len
-  const perpY = -dx / len
-  const bendDist = (len / 2) * Math.tan((bendAngle * Math.PI) / 180)
-  const cx = mx + bendDir * perpX * bendDist
-  const cy = my + bendDir * perpY * bendDist
+  const lineAngle = Math.atan2(dy, dx)
 
-  // Elevate quadratic to cubic so cairosvg computes correct tangent angles for marker-end.
-  // Cubic equivalent: C1 = P0 + 2/3*(Q - P0),  C2 = P2 + 2/3*(Q - P2)
-  const c1x = from.x + (2 / 3) * (cx - from.x)
-  const c1y = from.y + (2 / 3) * (cy - from.y)
-  const c2x = to.x + (2 / 3) * (cx - to.x)
-  const c2y = to.y + (2 / 3) * (cy - to.y)
+  const d = 0.3915 * len // looseness=1
+  const tikzOut = bendDir * bendAngle // degrees in TikZ relative frame
+  const DEG = Math.PI / 180
+  const svgOutAngle = lineAngle - tikzOut * DEG
+  const svgInAngle  = lineAngle - (180 - tikzOut) * DEG
+
+  const c1x = from.x + d * Math.cos(svgOutAngle)
+  const c1y = from.y + d * Math.sin(svgOutAngle)
+  const c2x = to.x   + d * Math.cos(svgInAngle)
+  const c2y = to.y   + d * Math.sin(svgInAngle)
   return {
     d: `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `,
     bbox: fromCorners(
-      Math.min(from.x, cx, to.x), Math.min(from.y, cy, to.y),
-      Math.max(from.x, cx, to.x), Math.max(from.y, cy, to.y)
+      Math.min(from.x, c1x, c2x, to.x), Math.min(from.y, c1y, c2y, to.y),
+      Math.max(from.x, c1x, c2x, to.x), Math.max(from.y, c1y, c2y, to.y)
     ),
   }
 }
 
 /** Build SVG path data for a grid from (fromX,fromY) to (toX,toY). */
-function buildGridPath(from: AbsoluteCoordinate, to: AbsoluteCoordinate): { d: string } {
+function buildGridPath(
+  from: AbsoluteCoordinate,
+  to: AbsoluteCoordinate,
+  rawOptions: { key: string; value?: string }[]
+): { d: string } {
   const minX = Math.min(from.x, to.x)
   const maxX = Math.max(from.x, to.x)
   const minY = Math.min(from.y, to.y)
   const maxY = Math.max(from.y, to.y)
 
-  // Default grid step: 52px (1cm)
-  const step = ptToPx(28.45) // 1cm in pt
+  const getOpt = (key: string) => rawOptions.find(o => o.key === key)?.value
+
+  const stepOpt  = getOpt('step')
+  const xstepOpt = getOpt('xstep')
+  const ystepOpt = getOpt('ystep')
+
+  const xstep = ptToPx(parseDimensionPt(xstepOpt ?? stepOpt) || 28.4528)
+  const ystep = ptToPx(parseDimensionPt(ystepOpt ?? stepOpt) || 28.4528)
 
   let d = ''
 
   // Vertical lines
-  for (let x = minX; x <= maxX + 0.01; x += step) {
+  for (let x = minX; x <= maxX + 0.01; x += xstep) {
     const xr = Math.round(x * 100) / 100
     d += `M ${xr} ${minY} L ${xr} ${maxY} `
   }
   // Horizontal lines
-  for (let y = minY; y <= maxY + 0.01; y += step) {
+  for (let y = minY; y <= maxY + 0.01; y += ystep) {
     const yr = Math.round(y * 100) / 100
     d += `M ${minX} ${yr} L ${maxX} ${yr} `
   }
