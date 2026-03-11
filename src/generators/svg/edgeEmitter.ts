@@ -133,8 +133,16 @@ function buildEdgePath(
       const { cx, cy } = computeBendControl(fromClippedBend, toClippedBend, angle, dir)
       const midX = (fromClippedBend.x + 2 * cx + toClippedBend.x) / 4
       const midY = (fromClippedBend.y + 2 * cy + toClippedBend.y) / 4
+      // Elevate quadratic to cubic so cairosvg computes correct tangent angles for marker-end.
+      // Cubic equivalent: C1 = P0 + 2/3*(Q - P0),  C2 = P2 + 2/3*(Q - P2)
+      const { x: x0, y: y0 } = fromClippedBend
+      const { x: x2, y: y2 } = toClippedBend
+      const c1x = x0 + (2 / 3) * (cx - x0)
+      const c1y = y0 + (2 / 3) * (cy - y0)
+      const c2x = x2 + (2 / 3) * (cx - x2)
+      const c2y = y2 + (2 / 3) * (cy - y2)
       return {
-        d: `M ${fromClippedBend.x} ${fromClippedBend.y} Q ${cx} ${cy} ${toClippedBend.x} ${toClippedBend.y}`,
+        d: `M ${x0} ${y0} C ${c1x} ${c1y} ${c2x} ${c2y} ${x2} ${y2}`,
         midpoint: { x: midX, y: midY },
         bbox: fromCorners(
           Math.min(fromClippedBend.x, cx, toClippedBend.x), Math.min(fromClippedBend.y, cy, toClippedBend.y),
