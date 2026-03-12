@@ -3,11 +3,9 @@
     "src/**/*"
   ],
   "compilerOptions": {
-    "target": "es2018",
+    "target": "ES2022",
     "module": "commonjs",
-    "lib": [
-      "DOM"
-    ],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "allowJs": true,
     "outDir": "dist/",
     "rootDir": "src/",
