@@ -354,8 +354,11 @@ tikzpicturetail
 /////////////////////// Option Blocks //////////////////////////
 
 option_block "option block"
-  = ws '[' content:option_content ']' ws { return content; }
-  / ws                                    { return ''; }
+  = ws first:('[' option_content ']') rest:(ws '[' option_content ']')* ws {
+      const parts = [first[1], ...rest.map(r => r[2])].filter(s => s.length > 0);
+      return parts.join(',');
+    }
+  / ws { return ''; }
 
 option_content = chars:option_char* { return chars.join(''); }
 
@@ -427,9 +430,10 @@ path_head "path command"
   / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
 standalone_node_statement
-  = '\\node' opt:option_block al:node_alias? at_coord:node_at cnt:node_content ';'
+  = '\\node' opt:option_block al:node_alias? at_coord:node_at opt2:option_block cnt:node_content ';'
     {
-      const rawOpts = parseRaw(opt);
+      const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
+      const rawOpts = parseRaw(merged);
       const pos     = at_coord || ft.coordRef(0, 0);
       const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
         { name: al || undefined, anchor: anchorFor(rawOpts) });
@@ -498,10 +502,10 @@ dim_unit
   / ws     { return 28.4528; }  // default TikZ unit = 1cm
 
 node_alias "node alias"
-  = '(' ws name:identifier ws ')' { return name; }
+  = '(' ws name:node_name ws ')' { return name; }
 
 node_alias_anchor "node alias with anchor"
-  = '(' ws name:identifier ws '.' ws anchor:anchor_name ws ')' { return [name, anchor]; }
+  = '(' ws name:node_name ws '.' ws anchor:anchor_name ws ')' { return [name, anchor]; }
 
 anchor_name
   = $('north east' / 'north west' / 'south east' / 'south west'
@@ -563,9 +567,10 @@ cos_op "cos"
   = ws 'cos' ws { return { kind: 'op-cos' }; }
 
 node_op "node"
-  = ws 'node' opt:option_block al:node_alias? cnt:node_content ws
+  = ws 'node' opt:option_block al:node_alias? opt2:option_block cnt:node_content ws
     {
-      const rawOpts = parseRaw(opt);
+      const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
+      const rawOpts = parseRaw(merged);
       const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
         { name: al || undefined, anchor: anchorFor(rawOpts) });
       registerNode(node);
@@ -589,6 +594,9 @@ node_body_char
 /////////////////////// Primitives //////////////////////////
 
 identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
+
+// Node names allow a leading digit (e.g. \node (1) ... is valid TikZ)
+node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-]*)
 
 number "number"
   = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*

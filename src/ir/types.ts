@@ -121,6 +121,9 @@ export interface ResolvedStyle {
   align?: 'left' | 'center' | 'right'
   fontSize?: number // pt
 
+  // Node labels (label=pos:text option)
+  nodeLabels?: Array<{ position: string; text: string }>
+
   // Transform
   rotate?: number // degrees
   xshift?: number // pt

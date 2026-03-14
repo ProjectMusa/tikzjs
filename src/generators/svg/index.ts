@@ -46,7 +46,6 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
 
   const nodeRegistry = new NodeGeometryRegistry()
   const markerRegistry: MarkerRegistry = new Map()
-  const coordResolver = new CoordResolver(nodeRegistry)
   const mathRenderer = opts.mathRenderer ?? defaultMathRenderer
 
   // Paths go first (behind), node groups go last (on top)
@@ -60,6 +59,16 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
 
   const globalStyle: ResolvedStyle = diagram.globalStyle ?? {}
 
+  // The tikzpicture-level `scale` is a coordinate transform (scales all positions),
+  // not a visual node scale. Extract it for the CoordResolver and strip it from the
+  // inherited style so it doesn't bleed into per-node visual scaling.
+  const coordScale = globalStyle.scale ?? 1
+  const inheritedStyle: ResolvedStyle = coordScale !== 1
+    ? { ...globalStyle, scale: undefined }
+    : globalStyle
+
+  const coordResolver = new CoordResolver(nodeRegistry, coordScale)
+
   renderElements_pass1(
     diagram.elements,
     document,
@@ -68,7 +77,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     nodeElements,
     allBBoxes,
     mathRenderer,
-    globalStyle
+    inheritedStyle
   )
 
   renderElements_pass2(
@@ -81,7 +90,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     nodeElements,
     allBBoxes,
     mathRenderer,
-    globalStyle
+    inheritedStyle
   )
 
   // Compute viewBox

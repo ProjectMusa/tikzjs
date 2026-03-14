@@ -176,12 +176,15 @@ export function clipToNodeBoundary(
 
 export class CoordResolver {
   private _nodeRegistry: NodeGeometryRegistry
+  /** Global coordinate scale from \begin{tikzpicture}[scale=...]. */
+  private _coordScale: number
   /** Current absolute position (updated as we move along a path). */
   private _currentX = 0
   private _currentY = 0
 
-  constructor(nodeRegistry: NodeGeometryRegistry) {
+  constructor(nodeRegistry: NodeGeometryRegistry, coordScale = 1) {
     this._nodeRegistry = nodeRegistry
+    this._coordScale = coordScale
   }
 
   /**
@@ -224,7 +227,7 @@ export class CoordResolver {
   resolveCoord(coord: Coord): AbsoluteCoordinate {
     switch (coord.cs) {
       case 'xy':
-        return { x: ptToPx(coord.x), y: -ptToPx(coord.y) } // SVG y-axis is inverted
+        return { x: ptToPx(coord.x * this._coordScale), y: -ptToPx(coord.y * this._coordScale) } // SVG y-axis is inverted
 
       case 'polar': {
         const rad = (coord.angle * Math.PI) / 180
@@ -299,7 +302,7 @@ export class CoordResolver {
 
   /** Create a clone for sub-path processing. */
   clone(): CoordResolver {
-    const c = new CoordResolver(this._nodeRegistry)
+    const c = new CoordResolver(this._nodeRegistry, this._coordScale)
     c._currentX = this._currentX
     c._currentY = this._currentY
     return c

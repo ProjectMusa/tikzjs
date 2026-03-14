@@ -214,6 +214,17 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
         if (fontSize !== undefined) style.fontSize = fontSize
       }
       break
+    case 'label': {
+      if (value) {
+        const s = (value as string).trim()
+        const m = s.match(/^(above left|above right|below left|below right|above|below|left|right|north|south|east|west|center)\s*:(.*)$/s)
+        const lbl = m
+          ? { position: m[1].trim(), text: m[2].trim() }
+          : { position: 'above', text: s }
+        style.nodeLabels = [...(style.nodeLabels ?? []), lbl]
+      }
+      break
+    }
 
     // ── Transform ─────────────────────────────────────────────
     case 'rotate':

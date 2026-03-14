@@ -9,7 +9,7 @@
 
 import { IRNode, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, NodeGeometry, getAnchorPosition, ptToPx } from './coordResolver.js'
-import { BoundingBox, fromCorners } from './boundingBox.js'
+import { BoundingBox, fromCorners, mergeBBoxes, transformBBox } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
 import { MathRenderer, defaultMathRenderer, renderMath } from '../../math/index.js'
 
@@ -124,16 +124,76 @@ export function emitNode(
     g.appendChild(foreignG)
   }
 
-  // Apply transform from style (rotate, shift)
+  // Render node labels (label=pos:text option) and collect their bboxes
+  const LABEL_GAP = ptToPx(3)
+  const extraBBoxes: BoundingBox[] = []
+  for (const lbl of node.style.nodeLabels ?? []) {
+    let lblResult
+    try {
+      lblResult = activeRenderer(lbl.text)
+    } catch {
+      lblResult = { svgString: `<text font-size="12">${escapeXml(lbl.text)}</text>`, widthPx: lbl.text.length * 7, heightPx: 14 }
+    }
+    let tx: number, ty: number
+    switch (lbl.position) {
+      case 'below': case 'south':
+        tx = centerX - lblResult.widthPx / 2
+        ty = centerY + halfHeight + LABEL_GAP
+        break
+      case 'above': case 'north':
+        tx = centerX - lblResult.widthPx / 2
+        ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
+        break
+      case 'right': case 'east':
+        tx = centerX + halfWidth + LABEL_GAP
+        ty = centerY - lblResult.heightPx / 2
+        break
+      case 'left': case 'west':
+        tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
+        ty = centerY - lblResult.heightPx / 2
+        break
+      case 'above right': case 'north east':
+        tx = centerX + halfWidth + LABEL_GAP
+        ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
+        break
+      case 'above left': case 'north west':
+        tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
+        ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
+        break
+      case 'below right': case 'south east':
+        tx = centerX + halfWidth + LABEL_GAP
+        ty = centerY + halfHeight + LABEL_GAP
+        break
+      case 'below left': case 'south west':
+        tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
+        ty = centerY + halfHeight + LABEL_GAP
+        break
+      default:
+        tx = centerX - lblResult.widthPx / 2
+        ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
+    }
+    const lg = document.createElementNS('http://www.w3.org/2000/svg', 'g')
+    lg.setAttribute('transform', `translate(${tx},${ty})`)
+    lg.innerHTML = lblResult.svgString
+    g.appendChild(lg)
+    extraBBoxes.push(fromCorners(tx, ty, tx + lblResult.widthPx, ty + lblResult.heightPx))
+  }
+
+  // Apply transform from style (rotate, shift, scale)
   const transform = buildTransform(node.style, centerX, centerY)
   if (transform) {
     const existing = g.getAttribute('transform') ?? ''
     g.setAttribute('transform', existing ? existing + ' ' + transform : transform)
   }
 
+  // Merge node bbox with all label bboxes, then apply any node transform so the
+  // viewBox correctly encloses both the shape and all attached labels.
+  const rawBBox = extraBBoxes.length > 0 ? mergeBBoxes([geo.bbox, ...extraBBoxes]) : geo.bbox
+  const finalBBox = transform ? transformBBox(rawBBox, transform) : rawBBox
+
   return {
     element: g,
-    bbox: geo.bbox,
+    bbox: finalBBox,
     geometry: geo,
   }
 }

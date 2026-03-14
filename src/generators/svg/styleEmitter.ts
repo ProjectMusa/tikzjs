@@ -141,7 +141,9 @@ export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0): string | u
   }
 
   if (style.scale && style.scale !== 1) {
-    parts.push(`scale(${style.scale})`)
+    // Scale around the node center, not the SVG origin.
+    // SVG has no scale(s, cx, cy) syntax, so we decompose into translate/scale/translate.
+    parts.push(`translate(${cx},${cy}) scale(${style.scale}) translate(${-cx},${-cy})`)
   }
 
   return parts.length > 0 ? parts.join(' ') : undefined

@@ -87,10 +87,39 @@ function hasMacros(table: MacroTable): boolean {
 }
 
 /**
+ * Pre-scan source for .style definitions embedded in \begin{tikzpicture}[...] option blocks.
+ * These are NOT stripped — the grammar still needs them — but they must be registered
+ * in the style registry before the content is parsed.
+ */
+function extractTikzpictureOptionStyles(src: string, registry: StyleRegistry): void {
+  const beginRe = /\\begin\s*\{\s*tikz(?:js)?picture\s*\}/g
+  let m: RegExpExecArray | null
+  while ((m = beginRe.exec(src)) !== null) {
+    let i = m.index + m[0].length
+    // Skip whitespace and comments up to the option block
+    while (i < src.length && /[ \t\r\n]/.test(src[i])) i++
+    if (src[i] !== '[') continue
+    // Read balanced bracket content
+    let depth = 0, j = i
+    while (j < src.length) {
+      if (src[j] === '[') depth++
+      else if (src[j] === ']') { depth--; if (depth === 0) break }
+      j++
+    }
+    const optContent = src.slice(i + 1, j)
+    parseTikzset(optContent, registry)
+  }
+}
+
+/**
  * Scan source for \tikzset{...} and \tikzstyle{name}=[...] commands,
  * collect into registry, and strip them from the source.
+ * Also extracts .style definitions from \begin{tikzpicture}[...] option blocks.
  */
 function collectAndStripStyles(src: string, registry: StyleRegistry): string {
+  // Pre-register any .style definitions from \begin{tikzpicture}[...] option blocks
+  // before the main scan, so they're available when node options are resolved.
+  extractTikzpictureOptionStyles(src, registry)
   const scanner = new Scanner(src)
   let result = ''
 
