@@ -606,4 +606,4 @@ number "number"
   / s:$[+\-]? ws i:$[0-9]+
     { return parseFloat((s||'') + i); }
 
-ws "whitespace" = [ \t\n\r]*
+ws "whitespace" = ([ \t\n\r]+ / ('%' [^\n]* '\n'?))*
