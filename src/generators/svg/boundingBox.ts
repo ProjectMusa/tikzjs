@@ -102,12 +102,16 @@ export function transformBBox(bb: BoundingBox, transform: string | undefined): B
     [bb.minX, bb.maxY],
   ]
 
-  // Parse and apply each space-separated transform function
+  // Parse all transform functions, then apply right-to-left (SVG convention:
+  // the rightmost transform is applied first to points in local space).
   const re = /(\w+)\(([^)]*)\)/g
+  const transforms: Array<{ fn: string; args: number[] }> = []
   let m: RegExpExecArray | null
   while ((m = re.exec(transform)) !== null) {
-    const fn = m[1]
-    const args = m[2].split(',').map(Number)
+    transforms.push({ fn: m[1], args: m[2].split(',').map(Number) })
+  }
+
+  for (const { fn, args } of transforms.reverse()) {
     corners = corners.map(([x, y]) => {
       if (fn === 'translate') {
         return [x + (args[0] ?? 0), y + (args[1] ?? 0)]

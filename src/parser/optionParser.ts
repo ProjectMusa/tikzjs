@@ -231,9 +231,10 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       if (value) {
         const s = (value as string).trim()
         const m = s.match(/^(above left|above right|below left|below right|above|below|left|right|north|south|east|west|center)\s*:(.*)$/s)
+        const stripBraces = (t: string) => t.startsWith('{') && t.endsWith('}') ? t.slice(1, -1) : t
         const lbl = m
-          ? { position: m[1].trim(), text: m[2].trim() }
-          : { position: 'above', text: s }
+          ? { position: m[1].trim(), text: stripBraces(m[2].trim()) }
+          : { position: 'above', text: stripBraces(s) }
         style.nodeLabels = [...(style.nodeLabels ?? []), lbl]
       }
       break
