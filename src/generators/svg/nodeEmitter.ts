@@ -11,7 +11,7 @@ import { IRNode, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, NodeGeometry, getAnchorPosition, ptToPx } from './coordResolver.js'
 import { BoundingBox, fromCorners } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
-import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, renderMath } from '../../math/index.js'
 
 /** Default inner padding around node content (px). TikZ default: inner sep = 3.333pt. */
 const DEFAULT_INNER_SEP_PX = ptToPx(3.333)
@@ -44,9 +44,15 @@ export function emitNode(
   let labelWidth = 0
   let labelHeight = 0
 
+  // Scale label rendering when node font sets a non-default font size
+  const fontScale = node.style.fontSize !== undefined ? node.style.fontSize / 10 : 1
+  const activeRenderer: MathRenderer = fontScale !== 1
+    ? (latex: string) => renderMath(latex, false, false, fontScale)
+    : mathRenderer
+
   if (labelSource.trim()) {
     try {
-      const result = mathRenderer(labelSource)
+      const result = activeRenderer(labelSource)
       svgContent = result.svgString
       labelWidth = result.widthPx
       labelHeight = result.heightPx

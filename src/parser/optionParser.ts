@@ -63,6 +63,15 @@ export function resolveOptions(
 ): ResolvedStyle {
   const style: ResolvedStyle = { ...inherited }
 
+  // Pre-pass: resolve node font first so em-based dimensions use the correct font size.
+  let emSizePt = inherited?.fontSize ?? 10
+  for (const opt of rawOptions) {
+    if (opt.key === 'node font' && opt.value) {
+      const fontSize = LATEX_FONT_SIZES[opt.value as string]
+      if (fontSize !== undefined) { emSizePt = fontSize; break }
+    }
+  }
+
   for (const opt of rawOptions) {
     // Check if it's a named style reference
     if (!opt.value && registry.has(opt.key)) {
@@ -72,7 +81,7 @@ export function resolveOptions(
       continue
     }
 
-    applyOption(opt, style)
+    applyOption(opt, style, emSizePt)
   }
 
   return style
@@ -80,8 +89,9 @@ export function resolveOptions(
 
 /**
  * Apply a single RawOption to a ResolvedStyle object (mutates in place).
+ * @param emSizePt  Current font em size in pt for resolving em/ex dimensions.
  */
-function applyOption(opt: RawOption, style: ResolvedStyle): void {
+function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void {
   const key = opt.key.trim()
   const value = typeof opt.value === 'string' ? opt.value.trim() : opt.value
 
@@ -176,19 +186,19 @@ function applyOption(opt: RawOption, style: ResolvedStyle): void {
 
     // ── Node geometry ─────────────────────────────────────────
     case 'inner sep':
-      if (value) style.innerSep = parseDimension(value as string)
+      if (value) style.innerSep = parseDimension(value as string, emSizePt)
       break
     case 'outer sep':
-      if (value) style.outerSep = parseDimension(value as string)
+      if (value) style.outerSep = parseDimension(value as string, emSizePt)
       break
     case 'minimum width':
-      if (value) style.minimumWidth = parseDimension(value as string)
+      if (value) style.minimumWidth = parseDimension(value as string, emSizePt)
       break
     case 'minimum height':
-      if (value) style.minimumHeight = parseDimension(value as string)
+      if (value) style.minimumHeight = parseDimension(value as string, emSizePt)
       break
     case 'minimum size':
-      if (value) { style.minimumWidth = parseDimension(value as string); style.minimumHeight = style.minimumWidth }
+      if (value) { style.minimumWidth = parseDimension(value as string, emSizePt); style.minimumHeight = style.minimumWidth }
       break
 
     // ── Text ──────────────────────────────────────────────────
@@ -198,16 +208,22 @@ function applyOption(opt: RawOption, style: ResolvedStyle): void {
     case 'align':
       if (value) style.align = value as 'left' | 'center' | 'right'
       break
+    case 'node font':
+      if (value) {
+        const fontSize = LATEX_FONT_SIZES[value as string]
+        if (fontSize !== undefined) style.fontSize = fontSize
+      }
+      break
 
     // ── Transform ─────────────────────────────────────────────
     case 'rotate':
       if (value) style.rotate = parseFloat(value as string)
       break
     case 'xshift':
-      if (value) style.xshift = parseDimension(value as string)
+      if (value) style.xshift = parseDimension(value as string, emSizePt)
       break
     case 'yshift':
-      if (value) style.yshift = parseDimension(value as string)
+      if (value) style.yshift = parseDimension(value as string, emSizePt)
       break
     case 'scale':
       if (value) style.scale = parseFloat(value as string)
@@ -398,31 +414,46 @@ function hex2(n: number): string {
 
 // ── Dimension parsing ─────────────────────────────────────────────────────────
 
-/** Unit conversion to pt (TeX points). */
+/** Unit conversion to pt (TeX points). em/ex are overridden per-node by font size. */
 const UNIT_TO_PT: Record<string, number> = {
   pt: 1,
   bp: 1.00375,   // big point (PostScript point)
   mm: 2.84528,
   cm: 28.4528,
   in: 72.27,
-  em: 10,        // approximate, depends on font
-  ex: 4.5,       // approximate
   pc: 12,
   dd: 1.07,
   cc: 12.84,
   sp: 1 / 65536,
 }
 
+/** LaTeX font-size commands → pt (standard 10pt document class). */
+export const LATEX_FONT_SIZES: Record<string, number> = {
+  '\\tiny': 5,
+  '\\scriptsize': 7,
+  '\\footnotesize': 8,
+  '\\small': 9,
+  '\\normalsize': 10,
+  '\\large': 12,
+  '\\Large': 14.4,
+  '\\LARGE': 17.28,
+  '\\huge': 20.74,
+  '\\Huge': 24.88,
+}
+
 /**
  * Parse a TikZ dimension string (e.g. "2cm", "10pt", "1.5em") to pt.
  * Returns 0 for unrecognized values.
+ * @param emSizePt  Current font size in pt, used for em/ex units (default: 10pt = \normalsize).
  */
-export function parseDimension(s: string): number {
+export function parseDimension(s: string, emSizePt = 10): number {
   const trimmed = s.trim()
   const m = trimmed.match(/^([+-]?[\d.]+)\s*(pt|bp|mm|cm|in|em|ex|pc|dd|cc|sp)?$/)
   if (!m) return 0
   const value = parseFloat(m[1])
   const unit = (m[2] ?? 'pt').toLowerCase()
+  if (unit === 'em') return value * emSizePt
+  if (unit === 'ex') return value * emSizePt * 0.45  // ex ≈ 0.45em
   return value * (UNIT_TO_PT[unit] ?? 1)
 }
 
