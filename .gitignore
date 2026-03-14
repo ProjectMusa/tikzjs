@@ -15,6 +15,9 @@ test/extra/
 # Python virtual environment
 .venv/
 
+# Line Counter
+.VSCodeCounter/
+
 # Python bytecode / build artifacts
 __pycache__/
 *.pyc
