@@ -462,6 +462,7 @@ path_operation
   / g:grid_op         { return g; }
   / b:curve_op        { return b; }
   / t:to_op           { return t; }
+  / e:edge_op         { return e; }
   / n:node_op         { return n; }
   / a:arc_op          { return a; }
   / ci:circle_op      { return ci; }
@@ -483,9 +484,9 @@ path_coordinate "coordinate"
   / a:node_alias          { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
 raw_coordinate "raw coordinate"
-  = '(' ws x:number u1:dim_unit ws ',' ws y:number u2:dim_unit ws ')'
+  = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
-  / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:number u1:dim_unit ws ',' ws 'y' ws '=' ws y:number u2:dim_unit ws ')'
+  / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:coord_num u1:dim_unit ws ',' ws 'y' ws '=' ws y:coord_num u2:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
   / '(' ws angle:number ws ':' ws radius:number u:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
@@ -536,6 +537,10 @@ curve_op "curve"
 
 to_op "to"
   = ws 'to' opt:option_block
+    { return { kind: 'op-to', rawOpts: parseRaw(opt) }; }
+
+edge_op "edge"
+  = ws 'edge' opt:option_block
     { return { kind: 'op-to', rawOpts: parseRaw(opt) }; }
 
 arc_op "arc"
@@ -605,5 +610,20 @@ number "number"
     { return parseFloat((s||'') + '0.' + f); }
   / s:$[+\-]? ws i:$[0-9]+
     { return parseFloat((s||'') + i); }
+
+// Unsigned number (no leading sign) — used in arithmetic tails.
+pos_number "positive number"
+  = i:$[0-9]+ '.' f:$[0-9]* { return parseFloat(i + '.' + (f||'0')); }
+  / '.' f:$[0-9]+            { return parseFloat('0.' + f); }
+  / i:$[0-9]+                { return parseFloat(i); }
+
+// Number that supports simple +/- arithmetic, e.g. 0-0.45 or 1+0.9-1.0.
+coord_num "coordinate number"
+  = head:number rest:coord_num_tail*
+    { return rest.reduce(function(a, b) { return a + b; }, head); }
+
+coord_num_tail
+  = op:$[+\-] ws n:pos_number
+    { return op === '+' ? n : -n; }
 
 ws "whitespace" = ([ \t\n\r]+ / ('%' [^\n]* '\n'?))*

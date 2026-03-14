@@ -158,6 +158,19 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       break
 
     // ── Arrow tips ────────────────────────────────────────────
+    case 'arrows': {
+      // Parse arrows={start-end} or arrows=start-end, e.g. "-Stealth[scale=1.2]"
+      const raw = ((value as string) || '').trim().replace(/^\{|\}$/g, '').trim()
+      const dashIdx = raw.indexOf('-')
+      if (dashIdx !== -1) {
+        const startStr = raw.slice(0, dashIdx).trim()
+        const endStr   = raw.slice(dashIdx + 1).trim()
+        const parseTip = (s: string) => { const m = s.match(/^(\w+)/) ; return m ? { kind: m[1] } : null }
+        if (startStr) { const t = parseTip(startStr); if (t) style.arrowStart = t }
+        if (endStr)   { const t = parseTip(endStr);   if (t) style.arrowEnd   = t }
+      }
+      break
+    }
     case '->':  style.arrowEnd   = { kind: 'default' }; style.arrowStart = undefined; break
     case '<-':  style.arrowStart = { kind: 'default' }; style.arrowEnd   = undefined; break
     case '<->': style.arrowStart = { kind: 'default' }; style.arrowEnd   = { kind: 'default' }; break
