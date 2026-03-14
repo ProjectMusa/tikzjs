@@ -19,8 +19,8 @@ const path = require('path')
 
 const PORT = parseInt(process.argv[2] || '3737', 10)
 const ROOT = path.join(__dirname, '..')
-const FIXTURES_DIR = path.join(ROOT, 'test/golden/fixtures')
-const REFS_DIR = path.join(ROOT, 'test/golden/refs')
+const FIXTURES_DIR = process.env.TIKZJS_FIXTURES_DIR || path.join(ROOT, 'test/golden/fixtures')
+const REFS_DIR = process.env.TIKZJS_REFS_DIR || path.join(ROOT, 'test/golden/refs')
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -208,7 +208,7 @@ function handleRawRef(name, res) {
 
 // ── Static file server for /tmp/tikzjs-diff/ ──────────────────────────────
 
-const DIFF_DIR = '/tmp/tikzjs-golden'
+const DIFF_DIR = process.env.TIKZJS_DIFF_DIR || '/tmp/tikzjs-golden'
 const MIME = { '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css' }
 
 function handleDiff(url, res) {
@@ -216,7 +216,7 @@ function handleDiff(url, res) {
   const file = path.join(DIFF_DIR, rel)
   if (!fs.existsSync(file)) {
     res.writeHead(404, { 'Content-Type': 'text/plain' })
-    res.end(`No diff report found at ${DIFF_DIR}. Run: make cdiff`)
+    res.end(`No diff report found at ${DIFF_DIR}. Run: make cdiff  (or make cdiff-extra)`)
     return
   }
   const ext = path.extname(file)

@@ -12,8 +12,10 @@ PACKAGE_DIR  = Path(__file__).resolve().parent
 PYTHON_DIR   = PACKAGE_DIR.parent
 PROJECT_ROOT = PYTHON_DIR.parent
 
-FIXTURES_DIR = PROJECT_ROOT / 'test' / 'golden' / 'fixtures'
-REFS_DIR     = PROJECT_ROOT / 'test' / 'golden' / 'refs'
+FIXTURES_DIR = Path(os.environ.get('TIKZJS_FIXTURES_DIR',
+                    str(PROJECT_ROOT / 'test' / 'golden' / 'fixtures')))
+REFS_DIR     = Path(os.environ.get('TIKZJS_REFS_DIR',
+                    str(PROJECT_ROOT / 'test' / 'golden' / 'refs')))
 DIST_INDEX   = PROJECT_ROOT / 'dist' / 'index.js'
 
 # ── Comparison thresholds ──────────────────────────────────────────────────────
@@ -42,7 +44,8 @@ SCALE = float(os.environ.get('GOLDEN_SCALE', '2.0'))
 DILATION_RADIUS = int(os.environ.get('GOLDEN_DILATION_RADIUS', '6'))
 
 # Output directory for PNG debug images and HTML report
-REPORT_DIR = Path(os.environ.get('GOLDEN_REPORT_DIR', '/tmp/tikzjs-golden'))
+REPORT_DIR = Path(os.environ.get('TIKZJS_REPORT_DIR',
+                  os.environ.get('GOLDEN_REPORT_DIR', '/tmp/tikzjs-golden')))
 
 # Set to True for verbose per-component output
 VERBOSE = os.environ.get('GOLDEN_VERBOSE', '0') == '1'

@@ -9,6 +9,9 @@ dist/
 # Misc
 sample/
 
+# Extra test fixtures fetched from HuggingFace (script kept, data ignored)
+test/extra/
+
 # Python virtual environment
 .venv/
 

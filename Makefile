@@ -15,6 +15,14 @@
 #   make serve         — start dev comparison server on :3737
 #   make clean         — remove dist/
 #   make install       — npm install (also runs gen + build via postinstall)
+#
+# Extra fixture targets (from HuggingFace dataset — fixtures not committed):
+#   make extra-fetch            — download fixtures from Navidium/tikz_dataset
+#   make extra-fetch COUNT=N    — download N fixtures (default: 50)
+#   make cdiff-extra            — run visual diff on extra fixtures
+#   make cdiff-extra-v          — cdiff-extra with verbose output
+#   make cdiff-one-extra NAME=N — compare a single extra fixture
+#   make serve-extra            — dev server for extra fixtures on :3738
 
 NODE_MODULES := ./node_modules/.bin
 PEGGY        := $(NODE_MODULES)/peggy
@@ -27,7 +35,14 @@ VENV         := .venv
 PYTHON       := $(VENV)/bin/python
 PIP          := $(VENV)/bin/pip
 
-.PHONY: all gen build test test-unit test-golden golden cdiff cdiff-v cdiff-one venv serve clean install watch
+EXTRA_FIXTURES := test/extra/fixtures
+EXTRA_REFS     := test/extra/refs
+EXTRA_REPORT   := /tmp/tikzjs-extra
+EXTRA_COUNT    ?= 50
+
+.PHONY: all gen build test test-unit test-golden golden \
+        cdiff cdiff-v cdiff-one venv serve clean install watch \
+        extra-fetch extra-golden cdiff-extra cdiff-extra-v cdiff-one-extra serve-extra
 
 # Default target
 all: build
@@ -108,6 +123,48 @@ serve:
 serve-%:
 	@echo "→ Starting dev server at http://localhost:$* ..."
 	node scripts/server.js $*
+
+# ── Extra fixtures (HuggingFace dataset) ──────────────────────────────────────
+
+# Generate TeX reference SVGs for extra fixtures (requires TeX Live).
+# Run after extra-fetch, or after re-fetching with updated fetch.py.
+extra-golden:
+	@echo "→ Generating extra SVG references (requires TeX Live)..."
+	bash scripts/generateExtra.sh
+
+# Fetch extra fixtures from Navidium/tikz_dataset.
+# Override count with: make extra-fetch COUNT=100
+extra-fetch: venv
+	@echo "→ Fetching $(EXTRA_COUNT) extra fixtures from HuggingFace..."
+	$(PYTHON) -m tikzjs_compare.fetch --count $(EXTRA_COUNT) --output $(EXTRA_FIXTURES)
+
+# Visual diff on extra fixtures (no golden refs — renders only, checks for errors).
+# Output: $(EXTRA_REPORT)/report.html
+cdiff-extra: build venv
+	@echo "→ Running extra fixture comparison..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) \
+	  $(PYTHON) -m tikzjs_compare
+
+cdiff-extra-v: build venv
+	@echo "→ Running extra fixture comparison (verbose)..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) GOLDEN_VERBOSE=1 \
+	  $(PYTHON) -m tikzjs_compare
+
+# Compare a single extra fixture: make cdiff-one-extra NAME=007
+cdiff-one-extra: build venv
+	@echo "→ Comparing extra fixture: $(NAME)"
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) GOLDEN_VERBOSE=1 \
+	  $(PYTHON) -m tikzjs_compare $(NAME)
+
+# Dev server for extra fixtures on :3738 (visual diff report served at /diff)
+serve-extra:
+	@echo "→ Starting extra dev server at http://localhost:3738 ..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
+	  TIKZJS_DIFF_DIR=$(EXTRA_REPORT) \
+	  node scripts/server.js 3738
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
 
