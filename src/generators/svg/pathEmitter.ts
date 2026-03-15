@@ -275,15 +275,14 @@ export function emitPath(
         const to = resolver.resolve((seg as any).to)
         const dx = to.x - lastPos.x
         const dy = to.y - lastPos.y
-        // Cubic Bézier approximating a quarter-period sine wave.
-        // sin maps [0, π/2]: starts at 0 (non-zero slope), ends at 1 (peak — horizontal tangent).
-        // c1: angled departure matching the rising slope at sin(0).
-        // c2: horizontal arrival at the peak (c2y = to.y so tangent is (k·dx, 0)).
-        // Factor k=0.5523882 from pgfcorepathconstruct.code.tex.
-        const k = TIKZ_CONSTANTS.SIN_COS_BEZIER_FACTOR
-        const c1x = lastPos.x + k * dx
-        const c1y = lastPos.y + k * dy
-        const c2x = to.x - k * dx
+        // Cubic Bézier approximating a quarter-period sine wave [0, π/2].
+        // Reference: P0=(0,0), P1≈(0.6433,0.6433), P2≈(0.9275,1), P3=(π/2,1).
+        // c1: angled departure (KX·dx, KY·dy). c2: horizontal arrival at peak (c2y=to.y).
+        const KX = TIKZ_CONSTANTS.SIN_BEZIER_KX
+        const KY = TIKZ_CONSTANTS.SIN_BEZIER_KY
+        const c1x = lastPos.x + KX * dx
+        const c1y = lastPos.y + KY * dy
+        const c2x = to.x - KX * dx
         const c2y = to.y
         d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
         bboxes.push(fromCorners(
@@ -299,15 +298,14 @@ export function emitPath(
         const to = resolver.resolve((seg as any).to)
         const dx = to.x - lastPos.x
         const dy = to.y - lastPos.y
-        // Cubic Bézier approximating a quarter-period cosine wave.
-        // cos maps [0, π/2]: starts at 1 (peak — horizontal tangent), ends at 0 (non-zero slope).
-        // c1: horizontal departure from the peak (c1y = lastPos.y so tangent is (k·dx, 0)).
-        // c2: angled arrival matching the descending slope at cos(π/2).
-        const k = TIKZ_CONSTANTS.SIN_COS_BEZIER_FACTOR
-        const c1x = lastPos.x + k * dx
+        // Cubic Bézier approximating a quarter-period cosine wave [0, π/2].
+        // Mirror of sin: c1 is horizontal departure from peak (c1y=lastPos.y). c2: angled arrival.
+        const KX = TIKZ_CONSTANTS.SIN_BEZIER_KX
+        const KY = TIKZ_CONSTANTS.SIN_BEZIER_KY
+        const c1x = lastPos.x + KX * dx
         const c1y = lastPos.y
-        const c2x = to.x - k * dx
-        const c2y = to.y - k * dy
+        const c2x = to.x - KX * dx
+        const c2y = to.y - KY * dy
         d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
         bboxes.push(fromCorners(
           Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),

@@ -49,11 +49,17 @@ export const TIKZ_CONSTANTS = Object.freeze({
   QUAD_TO_CUBIC_FACTOR: 2 / 3,
 
   /**
-   * Cubic Bézier control arm factor for TikZ `sin`/`cos` path operations.
-   * Source: pgfcorepathconstruct.code.tex — `\pgf@xa=.5523882\pgf@xa`.
-   * Approximates a quarter-period sine/cosine wave as a cubic Bézier segment.
+   * Cubic Bézier x-axis control arm factor for TikZ `sin`/`cos` path operations.
+   * The unit sine curve goes from (0,0) to (π/2, 1); control point P1 ≈ (0.6433, 0.6433).
+   * KX = 0.6433 / (π/2) — fraction of dx to offset c1x (and c2x symmetrically).
    */
-  SIN_COS_BEZIER_FACTOR: 0.5523882,
+  SIN_BEZIER_KX: 0.6433 * 2 / Math.PI,
+
+  /**
+   * Cubic Bézier y-axis control arm factor for TikZ `sin`/`cos` path operations.
+   * KY = 0.6433 — fraction of dy to offset c1y for sin (and c2y for cos).
+   */
+  SIN_BEZIER_KY: 0.6433,
 })
 
 // ── Generator-level constants (our rendering decisions) ────────────────────────
