@@ -135,9 +135,10 @@
   }
 
   // ── Helper: build segment list from raw grammar operation array ──────────────
-  function buildSegments(ops) {
+  function buildSegments(ops, nodeRegistry) {
     const rawSegs = [];
     const inlineNodes = [];
+    const inlineCoords = [];
     let lastCoord = ft.coordRef(0, 0);  // current path position for inline node placement
 
     for (const item of ops) {
@@ -196,10 +197,21 @@
         case 'op-close':
           rawSegs.push(ft.closeSegment());
           break;
+        case 'op-save-coord':
+          // inline `coordinate (name)` — registers current position as a named coordinate
+          if (item.name) {
+            const coord = ft.makeCoordinate(lastCoord, { name: item.name });
+            nodeRegistry[item.name] = coord.id;
+            inlineCoords.push(coord);
+          }
+          break;
+        case 'op-pic':
+          // `pic [opts] {body}` — not yet rendered; skip silently
+          break;
       }
     }
 
-    return { segments: resolvePending(rawSegs), inlineNodes };
+    return { segments: resolvePending(rawSegs), inlineNodes, inlineCoords };
   }
 
   function resolvePending(rawSegs) {
@@ -492,8 +504,12 @@ path_statement
         if (multiEdges.length === 1) return multiEdges[0];
         return ft.makeScope(multiEdges, {}, []);
       }
-      const { segments, inlineNodes } = buildSegments(ops);
-      return ft.makePath(segments, style, rawOpts, inlineNodes);
+      const { segments, inlineNodes, inlineCoords } = buildSegments(ops, nodeRegistry);
+      const path = ft.makePath(segments, style, rawOpts, inlineNodes);
+      if (inlineCoords.length > 0) {
+        return ft.makeScope([...inlineCoords, path], {}, []);
+      }
+      return path;
     }
 
 path_head "path command"
@@ -545,9 +561,22 @@ path_operation
   / pa:parabola_op    { return pa; }
   / s:sin_op          { return s; }
   / co:cos_op         { return co; }
+  / coord:coordinate_op { return coord; }
+  / p:pic_op          { return p; }
   / cycle_op          { return { kind: 'op-close' }; }
 
 cycle_op = ws 'cycle' ws
+
+coordinate_op "coordinate path op"
+  = ws 'coordinate' opt:option_block al:node_alias? ws
+    { return { kind: 'op-save-coord', name: al || null }; }
+
+pic_op "pic"
+  = ws 'pic' opt:option_block body:pic_body ws
+    { return { kind: 'op-pic' }; }
+
+pic_body "pic body"
+  = ws '{' inner:brace_content '}' { return inner; }
 
 /////////////////////// Coordinates //////////////////////////
 

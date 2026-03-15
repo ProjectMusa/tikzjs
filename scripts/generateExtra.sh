@@ -52,12 +52,28 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
       | grep -v '^%!preamble$' | grep -v '^%!end-preamble$' | sed 's/^%  //')"
     # Strip the preamble block from the fixture content passed to LaTeX
     FIXTURE_CONTENT="$(echo "$FIXTURE_CONTENT" | sed '/^%!preamble$/,/^%!end-preamble$/d')"
+    # Balance any unmatched braces in the extracted defs (fetch.py sometimes drops closing braces)
+    if [[ -n "$PREAMBLE_DEFS" ]]; then
+      open_count=$(echo "$PREAMBLE_DEFS" | tr -cd '{' | wc -c)
+      close_count=$(echo "$PREAMBLE_DEFS" | tr -cd '}' | wc -c)
+      if (( open_count > close_count )); then
+        for (( i=0; i < open_count - close_count; i++ )); do
+          PREAMBLE_DEFS+="}"
+        done
+      fi
+    fi
   fi
 
   # Conditionally add tikz-cd if the fixture uses it
   TIKZCD_PKG=""
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{tikzcd}'; then
     TIKZCD_PKG="\\usepackage{tikz-cd}"
+  fi
+
+  # Conditionally add mwe if the fixture uses \includegraphics (provides example-image etc.)
+  MWE_PKG=""
+  if echo "$FIXTURE_CONTENT" | grep -q '\\includegraphics'; then
+    MWE_PKG="\\usepackage{mwe}"
   fi
 
   # Wrap fixture in a standalone LaTeX document with a broad library set.
@@ -70,6 +86,7 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
 \\usepackage{amsmath,amssymb}
 \\usepackage{tikz}
 $TIKZCD_PKG
+$MWE_PKG
 \\usetikzlibrary{
   arrows, arrows.meta,
   shapes, shapes.geometric, shapes.symbols, shapes.arrows, shapes.multipart,
@@ -84,6 +101,8 @@ $TIKZCD_PKG
   through,
   intersections,
   automata,
+  angles,
+  quotes,
 }
 $PREAMBLE_DEFS
 \\begin{document}
@@ -91,10 +110,12 @@ $FIXTURE_CONTENT
 \\end{document}
 LATEX_EOF
 
-  # Run pdflatex
-  if ! pdflatex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
-      > "$tmpdir/pdflatex.log" 2>&1; then
-    echo "    WARNING: pdflatex failed for $base (see $tmpdir/pdflatex.log)"
+  # Run pdflatex — use nonstopmode and check PDF existence rather than exit code,
+  # since pdflatex exits non-zero even when it recovers from warnings and produces a valid PDF.
+  pdflatex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
+      > "$tmpdir/pdflatex.log" 2>&1 || true
+  if [[ ! -f "$tmpdir/doc.pdf" ]]; then
+    echo "    WARNING: pdflatex failed to produce PDF for $base (see $tmpdir/pdflatex.log)"
     continue
   fi
 

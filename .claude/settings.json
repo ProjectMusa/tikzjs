@@ -21,7 +21,17 @@
       "Bash(python3 -m tikzjs_compare --help)",
       "Bash(.venv/bin/python -m tikzjs_compare --help)",
       "Bash(grep -A 5 \"^tikz$\\\\|^tikz \")",
-      "Bash(make cdiff:*)"
+      "Bash(make cdiff:*)",
+      "Read(//tmp/**)",
+      "Bash(dvisvgm --pdf /tmp/tikz001/doc.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)",
+      "Bash(grep -v \"^[0-9]*:$\")",
+      "Bash(dvisvgm --pdf /tmp/tikz001/doc2.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)",
+      "Bash(ls /tmp/tikzjs-extra/001*)",
+      "Bash(grep -A10 \"● empty_tikz_test$\")",
+      "Bash(make cdiff-extra:*)",
+      "Bash(pdfinfo /usr/share/texlive/texmf-dist/tex/latex/mwe/example-image.pdf)",
+      "Bash(bash scripts/generateExtra.sh)",
+      "Bash(dvisvgm --pdf /tmp/tikz001_v2/doc.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)"
     ]
   }
 }

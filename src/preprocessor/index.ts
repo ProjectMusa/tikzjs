@@ -126,6 +126,13 @@ function collectAndStripStyles(src: string, registry: StyleRegistry): string {
   while (!scanner.done) {
     const ch = scanner.peek()
 
+    if (ch === '%') {
+      const start = scanner.save()
+      while (!scanner.done && scanner.peek() !== '\n') scanner.consume()
+      result += scanner.source.slice(start, scanner.save())
+      continue
+    }
+
     if (ch === '\\') {
       const token = scanner.readControlSequence()
 

@@ -51,7 +51,12 @@ export function emitNode(
     ? (latex: string) => renderMath(latex, false, false, fontScale)
     : mathRenderer
 
-  if (labelSource.trim()) {
+  const imgDims = parseIncludegraphics(labelSource)
+  if (imgDims) {
+    labelWidth  = ptToPx(imgDims.widthPt)
+    labelHeight = ptToPx(imgDims.heightPt)
+    svgContent  = buildImagePlaceholder(labelWidth, labelHeight)
+  } else if (labelSource.trim()) {
     try {
       const result = activeRenderer(labelSource)
       svgContent = result.svgString
@@ -269,4 +274,108 @@ function escapeXml(s: string): string {
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
+}
+
+// ── \includegraphics placeholder ──────────────────────────────────────────────
+
+/** Natural sizes (width × height in pt) for mwe example-image variants. */
+const EXAMPLE_IMAGE_SIZES: Record<string, [number, number]> = {
+  'example-image':            [320, 240],
+  'example-image-a':          [320, 240],
+  'example-image-b':          [320, 240],
+  'example-image-c':          [320, 240],
+  'example-image-plain':      [320, 240],
+  'example-image-empty':      [320, 240],
+  'example-image-1x1':        [200, 200],
+  'example-image-4x3':        [160, 120],
+  'example-image-16x10':      [320, 200],
+  'example-image-16x9':       [320, 180],
+  'example-image-10x16':      [200, 320],
+  'example-image-9x16':       [180, 320],
+  'example-image-golden':     [323.607, 200],
+  'example-image-golden-upright': [200, 323.607],
+  'example-image-a4':         [595.276, 841.89],
+  'example-image-a4-landscape': [841.89, 595.276],
+  'example-image-a3':         [841.89, 1190.55],
+  'example-image-a3-landscape': [1190.55, 841.89],
+  'example-image-letter':     [612, 792],
+  'example-image-letter-landscape': [792, 612],
+}
+
+/** Convert a dimension string with unit to pt. */
+function dimToPt(val: number, unit: string): number {
+  switch (unit.toLowerCase()) {
+    case 'cm':  return val * 28.4528
+    case 'mm':  return val * 2.84528
+    case 'in':  return val * 72.27
+    case 'pt':  return val
+    case 'em':  return val * 10
+    default:    return val
+  }
+}
+
+/**
+ * Parse a \includegraphics[opts]{filename} label and return the rendered
+ * size in pt, or null if the label is not a \includegraphics command.
+ */
+export function parseIncludegraphics(label: string): { widthPt: number; heightPt: number } | null {
+  const m = label.trim().match(/^\\includegraphics(?:\s*\[([^\]]*)\])?\s*\{([^}]+)\}$/)
+  if (!m) return null
+
+  const opts     = m[1] ?? ''
+  const filename = m[2].trim()
+  const natural  = EXAMPLE_IMAGE_SIZES[filename] ?? [320, 240]
+
+  let widthPt  = natural[0]
+  let heightPt = natural[1]
+
+  const scaleM = opts.match(/\bscale\s*=\s*([\d.]+)/)
+  if (scaleM) {
+    const s = parseFloat(scaleM[1])
+    widthPt  *= s
+    heightPt *= s
+  }
+
+  const wM = opts.match(/\bwidth\s*=\s*([\d.]+)\s*(cm|mm|in|pt|em)?/)
+  if (wM) {
+    widthPt  = dimToPt(parseFloat(wM[1]), wM[2] ?? 'pt')
+    heightPt = widthPt * natural[1] / natural[0]
+  }
+
+  const hM = opts.match(/\bheight\s*=\s*([\d.]+)\s*(cm|mm|in|pt|em)?/)
+  if (hM) {
+    heightPt = dimToPt(parseFloat(hM[1]), hM[2] ?? 'pt')
+    if (!wM) widthPt = heightPt * natural[0] / natural[1]
+  }
+
+  return { widthPt, heightPt }
+}
+
+/**
+ * Build an SVG placeholder for \includegraphics.
+ * The returned fragment has origin (0,0) at top-left, extending to (w, h) px.
+ * Matches the appearance of the mwe example-image placeholder:
+ *   gray fill + X/cross lines + border + "Image" label.
+ */
+export function buildImagePlaceholder(widthPx: number, heightPx: number): string {
+  const w   = widthPx.toFixed(3)
+  const h   = heightPx.toFixed(3)
+  const cx  = (widthPx / 2).toFixed(3)
+  const cy  = (heightPx / 2).toFixed(3)
+  // Reference uses ~0.12pt thin lines and ~0.24pt border; convert to px
+  const swThin   = (0.12 * (52 / 28.4528)).toFixed(3)  // ≈ 0.219 px
+  const swBorder = (0.24 * (52 / 28.4528)).toFixed(3)  // ≈ 0.437 px
+  const fontSize = Math.max(6, Math.min(11, widthPx * 0.13)).toFixed(1)
+  return (
+    `<rect x="0" y="0" width="${w}" height="${h}" fill="#bfbfbf"/>` +
+    `<g stroke="#999" stroke-width="${swThin}" fill="none">` +
+    `<line x1="0" y1="0" x2="${w}" y2="${h}"/>` +
+    `<line x1="${w}" y1="0" x2="0" y2="${h}"/>` +
+    `<line x1="${cx}" y1="0" x2="${cx}" y2="${h}"/>` +
+    `<line x1="0" y1="${cy}" x2="${w}" y2="${cy}"/>` +
+    `</g>` +
+    `<rect x="0" y="0" width="${w}" height="${h}" stroke="#000" stroke-width="${swBorder}" fill="none"/>` +
+    `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="central"` +
+    ` font-size="${fontSize}" font-family="serif" fill="#000">Image</text>`
+  )
 }
