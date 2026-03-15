@@ -592,8 +592,28 @@ raw_coordinate "raw coordinate"
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
   / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:coord_num u1:dim_unit ws ',' ws 'y' ws '=' ws y:coord_num u2:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
-  / '(' ws angle:number ws ':' ws radius:number u:dim_unit ws ')'
+  / '(' ws angle:coord_num ws ':' ws radius:coord_num u:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
+  / '($' ws e:calc_expr ws '$)'
+    { return { mode: 'absolute', coord: { cs: 'calc', expr: e } }; }
+
+// TikZ calc library expressions: $(A)!0.5!(B)$, $(A)+(B)$, etc.
+calc_expr "calc expression"
+  = a:calc_primary ws '!' ws t:number ws '!' ws b:calc_primary
+    { return { kind: 'midpoint', t: t, a: { kind: 'coord', ref: a }, b: { kind: 'coord', ref: b } }; }
+  / a:calc_primary ws '+' ws b:calc_primary
+    { return { kind: 'add', a: { kind: 'coord', ref: a }, b: { kind: 'coord', ref: b } }; }
+  / a:calc_primary ws '-' ws b:calc_primary
+    { return { kind: 'sub', a: { kind: 'coord', ref: a }, b: { kind: 'coord', ref: b } }; }
+  / f:number ws '*' ws a:calc_primary
+    { return { kind: 'scale', factor: f, expr: { kind: 'coord', ref: a } }; }
+  / a:calc_primary
+    { return { kind: 'coord', ref: a }; }
+
+calc_primary "calc primary"
+  = c:raw_coordinate             { return c; }
+  / a:node_alias_anchor          { return ft.nodeAnchorRef(a[0], a[1]); }
+  / a:node_alias                 { return ft.nodeAnchorRef(a, 'center'); }
 
 // Unit suffix → pt multiplier. No unit = TikZ default (1cm = 28.4528pt).
 dim_unit
@@ -704,8 +724,8 @@ node_body_char
 
 identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
 
-// Node names allow a leading digit (e.g. \node (1) ... is valid TikZ)
-node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-]*)
+// Node names allow a leading digit (e.g. \node (1) ... is valid TikZ) and trailing primes (A', B')
+node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-']*)
 
 number "number"
   = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*
@@ -721,13 +741,20 @@ pos_number "positive number"
   / '.' f:$[0-9]+            { return parseFloat('0.' + f); }
   / i:$[0-9]+                { return parseFloat(i); }
 
-// Number that supports simple +/- arithmetic, e.g. 0-0.45 or 1+0.9-1.0.
+// Full arithmetic expression supporting +, -, *, / for use in coordinate values
+// after \foreach variable substitution (e.g. -1*360/12, 2*1.1, 360/48-2*360/12).
 coord_num "coordinate number"
-  = head:number rest:coord_num_tail*
-    { return rest.reduce(function(a, b) { return a + b; }, head); }
+  = head:coord_term rest:(ws op:$[+\-] ws t:coord_term { return {op:op, t:t} })*
+    { return rest.reduce(function(a, b) { return b.op === '+' ? a + b.t : a - b.t; }, head); }
 
-coord_num_tail
-  = op:$[+\-] ws n:pos_number
-    { return op === '+' ? n : -n; }
+coord_term
+  = head:coord_factor rest:(ws op:$[*\/] ws f:coord_factor { return {op:op, f:f} })*
+    { return rest.reduce(function(a, b) { return b.op === '*' ? a * b.f : a / b.f; }, head); }
+
+coord_factor
+  = '(' ws e:coord_num ws ')' { return e; }
+  / '-' ws n:pos_number       { return -n; }
+  / '+' ws n:pos_number       { return n; }
+  / n:pos_number              { return n; }
 
 ws "whitespace" = ([ \t\n\r]+ / ('%' [^\n]* '\n'?))*

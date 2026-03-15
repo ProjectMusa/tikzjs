@@ -43,12 +43,23 @@ export function expandForeach(scanner: Scanner): string {
     throw new ScanError(`Expected '{' or '[' after 'in' in \\foreach at position ${scanner.pos}`)
   }
 
-  // Read the body {body}
+  // Read the body {body} or STATEMENT; (brace-less form)
   scanner.skipWhitespaceAndComments()
-  if (scanner.peek() !== '{') {
-    throw new ScanError(`Expected '{' for \\foreach body at position ${scanner.pos}`)
+  let body: string
+  if (scanner.peek() === '{') {
+    body = scanner.readGroup()
+  } else {
+    // Brace-less body: read until ';' at top-level brace depth (inclusive of ';')
+    body = ''
+    let depth = 0
+    while (!scanner.done) {
+      const ch = scanner.peek()
+      if (ch === '{') { depth++; body += scanner.consume() }
+      else if (ch === '}') { depth--; body += scanner.consume() }
+      else if (ch === ';' && depth === 0) { body += scanner.consume(); break }
+      else { body += scanner.consume() }
+    }
   }
-  const body = scanner.readGroup()
 
   // Parse the value list into arrays
   const values = parseForeachList(listStr)
@@ -137,7 +148,20 @@ function expandEllipsisList(items: string[], ellipsisIdx: number): string[][] {
   const last = parseFloat(after[after.length - 1])
 
   if (isNaN(first) || isNaN(last)) {
-    // Non-numeric — can't expand, return before + after
+    // Non-numeric — try alphabetic range (A, B, ..., F)
+    const firstChar = before[0].trim()
+    const lastChar = after[after.length - 1].trim()
+    if (firstChar.length === 1 && /[A-Za-z]/.test(firstChar) && lastChar.length === 1 && /[A-Za-z]/.test(lastChar)) {
+      const startCode = firstChar.charCodeAt(0)
+      const endCode = lastChar.charCodeAt(0)
+      const step = startCode <= endCode ? 1 : -1
+      const result: string[][] = []
+      for (let c = startCode; step > 0 ? c <= endCode : c >= endCode; c += step) {
+        result.push([String.fromCharCode(c)])
+      }
+      return result
+    }
+    // Can't expand — return before + after without ellipsis
     return [...before, ...after].map((v) => [v])
   }
 
