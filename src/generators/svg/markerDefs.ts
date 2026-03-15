@@ -51,16 +51,20 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
   switch (spec.kind) {
     case 'default':
     case '>':
+      // Two cubic Bézier curves meeting at the tip — matches PGF 'to' arrow geometry.
+      // Derived from pgfcorearrows.code.tex: move(-3a,4a) curveto(-2.75a,2.5a)(0,0.25a)(0.75a,0)
+      //                                      curveto(0,-0.25a)(-2.75a,-2.5a)(-3a,-4a)
+      // Scaled to 10×10 viewBox with tip at (10,5); stroke only, round caps.
       return {
         id,
         pathData: spec.reversed
-          ? `<path d="M 10 0 L 0 5 L 10 10 L 8 5 Z" fill="${color}"/>`
-          : `<path d="M 0 0 L 10 5 L 0 10 L 2 5 Z" fill="${color}"/>`,
+          ? `<path d="M 4.7 0 C 4.4 1.9 0.9 4.7 0 5 C 0.9 5.3 4.4 8.1 4.7 10" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`
+          : `<path d="M 5.3 0 C 5.6 1.9 9.1 4.7 10 5 C 9.1 5.3 5.6 8.1 5.3 10" stroke="${color}" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/>`,
         viewBox: '0 0 10 10',
         refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 6,
-        markerHeight: 6,
+        markerWidth: 7,
+        markerHeight: 7,
         orient: 'auto-start-reverse',
         color,
       }
