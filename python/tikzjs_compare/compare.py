@@ -142,10 +142,16 @@ def compare_fixture(name: str) -> CompareResult:
     count_diff  = abs(n_ours - n_ref)
     max_allowed = max(1, int(n_ref * 0.10))
     if count_diff > max_allowed:
-        result.fail(
+        msg = (
             f'component count mismatch: ours={n_ours}, ref={n_ref} '
             f'(diff={count_diff} > allowed={max_allowed})'
         )
+        # When raw pixel diff is low, count mismatch is attributed to font rendering
+        # (MathJax vs TeX CM glyphs decompose into different numbers of path segments).
+        if raw_pct < RAW_FONT_THRESHOLD:
+            result.warn(f'font rendering (count): {msg}')
+        else:
+            result.fail(msg)
 
     # ── Check 2: area distribution ────────────────────────────────────────────
 

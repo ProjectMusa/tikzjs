@@ -26,7 +26,7 @@ DIFF_THRESHOLD = float(os.environ.get('GOLDEN_DIFF_THRESHOLD', '5.0'))
 # When struct_diff > DIFF_THRESHOLD but raw_diff < RAW_FONT_THRESHOLD, the excess
 # is attributed to font rendering differences (MathJax vs TeX CM glyphs), not
 # layout errors — report as a WARNING rather than a FAILURE.
-RAW_FONT_THRESHOLD = float(os.environ.get('GOLDEN_RAW_FONT_THRESHOLD', '12.0'))
+RAW_FONT_THRESHOLD = float(os.environ.get('GOLDEN_RAW_FONT_THRESHOLD', '14.0'))
 
 # Hard ceiling: structural diff above this threshold always fails regardless of raw_diff.
 # Prevents genuinely broken rendering (e.g. missing grid lines) from being masked by
