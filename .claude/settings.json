@@ -19,7 +19,9 @@
       "Bash(make cdiff-one-extra:*)",
       "Bash(grep -rn \"threshold\\\\|hard_threshold\\\\|diff.*20\\\\|20.*diff\\\\|5\\\\.0\\\\|14\" scripts/ .venv/lib/*/site-packages/tikzjs_compare/)",
       "Bash(python3 -m tikzjs_compare --help)",
-      "Bash(.venv/bin/python -m tikzjs_compare --help)"
+      "Bash(.venv/bin/python -m tikzjs_compare --help)",
+      "Bash(grep -A 5 \"^tikz$\\\\|^tikz \")",
+      "Bash(make cdiff:*)"
     ]
   }
 }
