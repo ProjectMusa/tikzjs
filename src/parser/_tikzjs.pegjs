@@ -678,6 +678,10 @@ arc_op "arc"
 circle_op "circle"
   = ws 'circle' ws '(' ws r:number u:dim_unit ws ')'
     { return { kind: 'op-circle', radius: r * u }; }
+  / ws 'circle' ws '[' ws 'radius' ws '=' ws r:number u:dim_unit ws ']'
+    { return { kind: 'op-circle', radius: r * u }; }
+  / ws 'circle' ws '[' ws 'x' ws 'radius' ws '=' ws xr:number u1:dim_unit ws ',' ws 'y' ws 'radius' ws '=' ws yr:number u2:dim_unit ws ']'
+    { return { kind: 'op-ellipse', xRadius: xr * u1, yRadius: yr * u2 }; }
 
 ellipse_op "ellipse"
   = ws 'ellipse' ws '(' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
