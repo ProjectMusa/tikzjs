@@ -337,9 +337,21 @@ export function emitPath(
 
   const rawBBox = mergeBBoxes(bboxes)
   const transform = buildTransform(path.style)
+
+  // Expand bbox by half the stroke width so thick lines don't clip the viewBox.
+  const strokeHalfPx = ptToPx(
+    (path.style.drawWidth ?? TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT) / 2
+  )
+  const expandedBBox = rawBBox.minX <= rawBBox.maxX
+    ? fromCorners(
+        rawBBox.minX - strokeHalfPx, rawBBox.minY - strokeHalfPx,
+        rawBBox.maxX + strokeHalfPx, rawBBox.maxY + strokeHalfPx
+      )
+    : rawBBox
+
   return {
     elements,
-    bbox: mergeBBoxes([transformBBox(rawBBox, transform), ...worldBboxes]),
+    bbox: mergeBBoxes([transformBBox(expandedBBox, transform), ...worldBboxes]),
   }
 }
 
