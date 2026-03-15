@@ -70,16 +70,22 @@ export function emitNode(
     ? ptToPx(node.style.innerSep)
     : DEFAULT_INNER_SEP_PX
 
-  const halfWidth = Math.max(
+  let halfWidth = Math.max(
     MIN_HALF_SIZE,
     labelWidth / 2 + innerSep,
     node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
   )
-  const halfHeight = Math.max(
+  let halfHeight = Math.max(
     MIN_HALF_SIZE,
     labelHeight / 2 + innerSep,
     node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
   )
+  // TikZ circle shape: force equal half-dimensions (largest wins)
+  if (node.style.shape === 'circle') {
+    const r = Math.max(halfWidth, halfHeight)
+    halfWidth = r
+    halfHeight = r
+  }
 
   // Resolve position: the node's anchor sits at position
   const anchorPos = resolver.resolve(node.position)

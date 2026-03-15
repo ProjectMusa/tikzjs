@@ -77,6 +77,69 @@
     });
   }
 
+  // ── Helper: build multiple IREdges from path ops that use the `edge` keyword ──
+  // Pattern: (src) edge [opts] node* (dst)  — may repeat with different sources.
+  // `edge` semantics: source is the last explicit coord BEFORE the edge op; the
+  // destination coord does NOT update the "current source" (enabling same-source
+  // chaining: `(A) edge (B) edge (C)` → A→B and A→C).
+  function tryBuildMultiEdgesFromOps(ops, outerStyle, outerRawOpts, nodeReg) {
+    const items = ops.filter(Boolean);
+    if (!items.some(function(i) { return i.kind === 'op-edge'; })) return null;
+
+    var edges = [];
+    var currentSourceItem = null;
+    var inEdge = false;
+    var edgeOpts = [];
+    var edgeLabels = [];
+    var edgeSourceItem = null;
+
+    for (var idx = 0; idx < items.length; idx++) {
+      var item = items[idx];
+      if (item.kind === 'op-coord') {
+        if (!inEdge) {
+          currentSourceItem = item;
+        } else {
+          // This coord is the target of the pending edge
+          var dst = item;
+          if (edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor' &&
+              dst.coord.coord.cs === 'node-anchor') {
+            var fromId = nodeReg[edgeSourceItem.coord.coord.nodeName];
+            var toId   = nodeReg[dst.coord.coord.nodeName];
+            if (fromId && toId) {
+              var allOpts = outerRawOpts.concat(edgeOpts);
+              var bendLeft  = edgeOpts.find(function(o) { return o.key === 'bend left'; })
+                           || outerRawOpts.find(function(o) { return o.key === 'bend left'; });
+              var bendRight = edgeOpts.find(function(o) { return o.key === 'bend right'; })
+                           || outerRawOpts.find(function(o) { return o.key === 'bend right'; });
+              var routing = { kind: 'straight' };
+              if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
+              else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
+              edges.push(ft.makeEdge(fromId, toId, routing, outerStyle, allOpts, { labels: edgeLabels }));
+            }
+          }
+          inEdge = false;
+          edgeOpts = [];
+          edgeLabels = [];
+          edgeSourceItem = null;
+          // Do NOT update currentSourceItem — stays at pre-edge source for same-source chaining
+        }
+      } else if (item.kind === 'op-edge') {
+        edgeSourceItem = currentSourceItem;
+        edgeOpts = item.rawOpts || [];
+        edgeLabels = [];
+        inEdge = true;
+      } else if (item.kind === 'op-node' && inEdge) {
+        var keys = (item.node.rawOptions || []).map(function(o) { return o.key; });
+        var placement = keys.find(function(k) { return PLACEMENT_KEYS.has(k); });
+        var position  = keys.find(function(k) { return POSITION_KEYS.has(k); }) || 'midway';
+        var text = item.node.label || '';
+        if (text) edgeLabels.push({ text: text, position: position, placement: placement, swap: keys.includes('swap') });
+      }
+    }
+
+    return edges.length > 0 ? edges : null;
+  }
+
   // ── Helper: build segment list from raw grammar operation array ──────────────
   function buildSegments(ops) {
     const rawSegs = [];
@@ -104,6 +167,9 @@
           break;
         case 'op-to':
           rawSegs.push({ _pendingTo: item.rawOpts });
+          break;
+        case 'op-edge':
+          // edge ops are handled by tryBuildMultiEdgesFromOps; ignore here
           break;
         case 'op-arc': {
           const arcSeg = buildArcSegment(item.rawOpts);
@@ -728,6 +794,11 @@ function peg$parse(input, options) {
       const style        = resolveOpts(rawOpts);
       const edge = tryBuildEdgeFromOps(ops, style, rawOpts, nodeRegistry);
       if (edge) return edge;
+      const multiEdges = tryBuildMultiEdgesFromOps(ops, style, rawOpts, nodeRegistry);
+      if (multiEdges) {
+        if (multiEdges.length === 1) return multiEdges[0];
+        return ft.makeScope(multiEdges, {}, []);
+      }
       const { segments, inlineNodes } = buildSegments(ops);
       return ft.makePath(segments, style, rawOpts, inlineNodes);
     };
@@ -795,7 +866,7 @@ function peg$parse(input, options) {
   var peg$f69 = function(c0, c1) { return { kind: 'op-curve', controls: [c0.coord, c1.coord] }; };
   var peg$f70 = function(c0) { return { kind: 'op-curve', controls: [c0.coord] }; };
   var peg$f71 = function(opt) { return { kind: 'op-to', rawOpts: parseRaw(opt) }; };
-  var peg$f72 = function(opt) { return { kind: 'op-to', rawOpts: parseRaw(opt) }; };
+  var peg$f72 = function(opt) { return { kind: 'op-edge', rawOpts: parseRaw(opt) }; };
   var peg$f73 = function(sa, ea, xr, u1, yr, u2) { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: xr * u1, yRadius: yr * u2 }; };
   var peg$f74 = function(sa, ea, r, u) { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: r * u }; };
   var peg$f75 = function(opt) { return { kind: 'op-arc', rawOpts: parseRaw(opt) }; };
