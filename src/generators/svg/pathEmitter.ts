@@ -250,22 +250,49 @@ export function emitPath(
       }
 
       case 'parabola': {
+        // Cubic Bézier coefficients matching pgfcorepathconstruct.code.tex ("found by trial and error")
+        // Bend-at-start: C1=S+(dx/2,0),          C2=E-(0.1125*dx, 0.225*dy)
+        // Bend-at-end:   C1=S+(0.1125*dx,0.225*dy), C2=(S.x+dx/2, E.y)
+        // Explicit bend B: two segments — S→B uses bend-at-end formula, B→E uses bend-at-start formula
         if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve((seg as any).to)
-        let cx: number, cy: number
         if ((seg as any).bend) {
           const b = resolver.resolve((seg as any).bend)
-          cx = b.x; cy = b.y
-        } else if ((seg as any).bendAtEnd) {
-          cx = to.x; cy = lastPos.y
+          // Segment 1: lastPos → b (approach bend like bend-at-end)
+          const dx1 = b.x - lastPos.x, dy1 = b.y - lastPos.y
+          const c1x1 = lastPos.x + 0.1125 * dx1, c1y1 = lastPos.y + 0.225 * dy1
+          const c2x1 = lastPos.x + 0.5 * dx1,   c2y1 = b.y
+          d += `C ${c1x1} ${c1y1} ${c2x1} ${c2y1} ${b.x} ${b.y} `
+          bboxes.push(fromCorners(
+            Math.min(lastPos.x, c1x1, c2x1, b.x), Math.min(lastPos.y, c1y1, c2y1, b.y),
+            Math.max(lastPos.x, c1x1, c2x1, b.x), Math.max(lastPos.y, c1y1, c2y1, b.y)
+          ))
+          // Segment 2: b → to (depart bend like bend-at-start)
+          const dx2 = to.x - b.x, dy2 = to.y - b.y
+          const c1x2 = b.x + 0.5 * dx2,          c1y2 = b.y
+          const c2x2 = to.x - 0.1125 * dx2,      c2y2 = to.y - 0.225 * dy2
+          d += `C ${c1x2} ${c1y2} ${c2x2} ${c2y2} ${to.x} ${to.y} `
+          bboxes.push(fromCorners(
+            Math.min(b.x, c1x2, c2x2, to.x), Math.min(b.y, c1y2, c2y2, to.y),
+            Math.max(b.x, c1x2, c2x2, to.x), Math.max(b.y, c1y2, c2y2, to.y)
+          ))
         } else {
-          cx = lastPos.x; cy = to.y
+          const dx = to.x - lastPos.x, dy = to.y - lastPos.y
+          let c1x: number, c1y: number, c2x: number, c2y: number
+          if ((seg as any).bendAtEnd) {
+            c1x = lastPos.x + 0.1125 * dx; c1y = lastPos.y + 0.225 * dy
+            c2x = lastPos.x + 0.5 * dx;   c2y = to.y
+          } else {
+            // bend at start (default)
+            c1x = lastPos.x + 0.5 * dx; c1y = lastPos.y
+            c2x = to.x - 0.1125 * dx;  c2y = to.y - 0.225 * dy
+          }
+          d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
+          bboxes.push(fromCorners(
+            Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),
+            Math.max(lastPos.x, c1x, c2x, to.x), Math.max(lastPos.y, c1y, c2y, to.y)
+          ))
         }
-        d += `Q ${cx} ${cy} ${to.x} ${to.y} `
-        bboxes.push(fromCorners(
-          Math.min(lastPos.x, cx, to.x), Math.min(lastPos.y, cy, to.y),
-          Math.max(lastPos.x, cx, to.x), Math.max(lastPos.y, cy, to.y)
-        ))
         lastPos = to
         break
       }
