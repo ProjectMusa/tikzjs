@@ -13,10 +13,11 @@ import { CoordResolver, NodeGeometryRegistry, ptToPx } from './coordResolver.js'
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { emitNode } from './nodeEmitter.js'
 import { MathRenderer, mathModeRenderer } from '../../math/index.js'
+import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
 /** Default tikzcd separations (matching TikZ defaults). */
-const DEFAULT_COL_SEP_PX = ptToPx(56.9)  // 2cm
-const DEFAULT_ROW_SEP_PX = ptToPx(28.45) // 1cm
+const DEFAULT_COL_SEP_PX = ptToPx(TIKZ_CONSTANTS.DEFAULT_COL_SEP_PT) // 2cm
+const DEFAULT_ROW_SEP_PX = ptToPx(TIKZ_CONSTANTS.DEFAULT_ROW_SEP_PT) // 1cm
 
 export interface MatrixRenderResult {
   elements: Element[]
@@ -33,7 +34,8 @@ export function emitMatrix(
   document: Document,
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
-  mathRenderer: MathRenderer = mathModeRenderer
+  mathRenderer: MathRenderer = mathModeRenderer,
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
 ): MatrixRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
@@ -114,13 +116,13 @@ export function emitMatrix(
           coord: {
             cs: 'xy',
             // Convert back from px to pt for the coord system
-            x: nodeX / (52 / 28.4528),
-            y: -nodeY / (52 / 28.4528),
+            x: nodeX / constants.PT_TO_PX,
+            y: -nodeY / constants.PT_TO_PX,
           },
         },
       }
 
-      const result = emitNode(patchedNode, document, resolver, nodeRegistry, mathRenderer)
+      const result = emitNode(patchedNode, document, resolver, nodeRegistry, mathRenderer, constants)
       elements.push(result.element)
       bboxes.push(result.bbox)
     }
@@ -134,7 +136,7 @@ export function emitMatrix(
 
 /** Measure a node's natural half-width and half-height. */
 function measureNode(node: IRNode, mathRenderer: MathRenderer = mathModeRenderer): { hw: number; hh: number } {
-  const DEFAULT_INNER_SEP = ptToPx(3.333)
+  const DEFAULT_INNER_SEP = ptToPx(TIKZ_CONSTANTS.DEFAULT_INNER_SEP_PT)
   const DEFAULT_HALF = 1
 
   let labelWidth = 0

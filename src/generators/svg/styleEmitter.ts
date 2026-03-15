@@ -22,6 +22,7 @@ export interface SVGPathAttrs {
 
 /** Convert pt to SVG user units (px at the default scale). */
 import { ptToPx } from './coordResolver.js'
+import { TIKZ_CONSTANTS } from './constants.js'
 
 /**
  * Merge two ResolvedStyle objects.
@@ -57,7 +58,7 @@ export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string,
   if (style.drawWidth !== undefined) {
     attrs['stroke-width'] = String(ptToPx(style.drawWidth))
   } else if (style.draw && style.draw !== 'none') {
-    attrs['stroke-width'] = String(ptToPx(0.4)) // TikZ default line width = 0.4pt
+    attrs['stroke-width'] = String(ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT))
   }
 
   if (style.drawDash) {

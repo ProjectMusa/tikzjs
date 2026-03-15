@@ -12,11 +12,10 @@ import { CoordResolver, NodeGeometryRegistry, NodeGeometry, getAnchorPosition, p
 import { BoundingBox, fromCorners, mergeBBoxes, transformBBox } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
 import { MathRenderer, defaultMathRenderer, renderMath } from '../../math/index.js'
+import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
-/** Default inner padding around node content (px). TikZ default: inner sep = 3.333pt. */
-const DEFAULT_INNER_SEP_PX = ptToPx(3.333)
-/** Minimum node half-size (px). Keep small — TikZ has no enforced minimum unless minimum width/height is set. */
-const MIN_HALF_SIZE = 1
+/** Default inner padding around node content (px). Computed from TikZ spec — does not vary with generator constants. */
+const DEFAULT_INNER_SEP_PX = ptToPx(TIKZ_CONSTANTS.DEFAULT_INNER_SEP_PT)
 
 export interface NodeRenderResult {
   element: Element
@@ -36,8 +35,10 @@ export function emitNode(
   document: Document,
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
-  mathRenderer: MathRenderer = defaultMathRenderer
+  mathRenderer: MathRenderer = defaultMathRenderer,
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
 ): NodeRenderResult {
+  const MIN_HALF_SIZE = constants.MIN_HALF_SIZE_PX
   // Render the label
   const labelSource = node.label || ''
   let svgContent = ''
@@ -69,16 +70,22 @@ export function emitNode(
     ? ptToPx(node.style.innerSep)
     : DEFAULT_INNER_SEP_PX
 
-  const halfWidth = Math.max(
+  let halfWidth = Math.max(
     MIN_HALF_SIZE,
     labelWidth / 2 + innerSep,
     node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
   )
-  const halfHeight = Math.max(
+  let halfHeight = Math.max(
     MIN_HALF_SIZE,
     labelHeight / 2 + innerSep,
     node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
   )
+  // TikZ circle shape: force equal half-dimensions (largest wins)
+  if (node.style.shape === 'circle') {
+    const r = Math.max(halfWidth, halfHeight)
+    halfWidth = r
+    halfHeight = r
+  }
 
   // Resolve position: the node's anchor sits at position
   const anchorPos = resolver.resolve(node.position)
@@ -125,7 +132,7 @@ export function emitNode(
   }
 
   // Render node labels (label=pos:text option) and collect their bboxes
-  const LABEL_GAP = ptToPx(3)
+  const LABEL_GAP = ptToPx(constants.NODE_LABEL_GAP_PT)
   const extraBBoxes: BoundingBox[] = []
   for (const lbl of node.style.nodeLabels ?? []) {
     let lblResult

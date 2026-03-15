@@ -11,7 +11,15 @@
       "Bash(node -e \":*)",
       "Bash(make cdiff-one:*)",
       "Read(//tmp/tikzjs-golden/**)",
-      "Bash(find . -name *.py -path */tikzjs_compare*)"
+      "Bash(find . -name *.py -path */tikzjs_compare*)",
+      "Bash(npm test:*)",
+      "Bash(git stash:*)",
+      "Bash(grep -A 20 \"● empty_tikz_test$\")",
+      "Bash(find test/ -name *014* -o -name *extra*)",
+      "Bash(make cdiff-one-extra:*)",
+      "Bash(grep -rn \"threshold\\\\|hard_threshold\\\\|diff.*20\\\\|20.*diff\\\\|5\\\\.0\\\\|14\" scripts/ .venv/lib/*/site-packages/tikzjs_compare/)",
+      "Bash(python3 -m tikzjs_compare --help)",
+      "Bash(.venv/bin/python -m tikzjs_compare --help)"
     ]
   }
 }
