@@ -110,8 +110,26 @@ $FIXTURE_CONTENT
 \\end{document}
 LATEX_EOF
 
-  # Run pdflatex — use nonstopmode and check PDF existence rather than exit code,
-  # since pdflatex exits non-zero even when it recovers from warnings and produces a valid PDF.
+  # Prefer latex→DVI→dvisvgm over pdflatex→PDF→dvisvgm because dvisvgm processes
+  # PGF/TikZ specials (including fill patterns) directly from DVI, whereas converting
+  # via PDF drops pattern information (dvisvgm --pdf produces fill='none' for patterns).
+  if [[ "$SVG_TOOL" == "dvisvgm" ]] && command -v latex &>/dev/null; then
+    latex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
+        > "$tmpdir/latex.log" 2>&1 || true
+    if [[ -f "$tmpdir/doc.dvi" ]]; then
+      if ! dvisvgm --font-format=woff2 "$tmpdir/doc.dvi" -o "$REFS_DIR/$base.svg" \
+          > "$tmpdir/dvisvgm.log" 2>&1; then
+        echo "    WARNING: dvisvgm failed for $base (DVI path)"
+      else
+        echo "    OK -> $REFS_DIR/$base.svg"
+        continue
+      fi
+    fi
+    # Fall through to pdflatex if latex/dvisvgm DVI path failed
+  fi
+
+  # Fallback: pdflatex → PDF → dvisvgm/pdf2svg
+  # NOTE: dvisvgm --pdf does not render TikZ fill patterns; they appear as fill='none'.
   pdflatex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
       > "$tmpdir/pdflatex.log" 2>&1 || true
   if [[ ! -f "$tmpdir/doc.pdf" ]]; then

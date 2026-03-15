@@ -22,6 +22,7 @@ import { emitNode } from './nodeEmitter.js'
 import { emitPath } from './pathEmitter.js'
 import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
+import { ensurePattern } from './patternDefs.js'
 import { mathModeRenderer } from '../../math/index.js'
 
 // ── Handler type aliases ──────────────────────────────────────────────────────
@@ -78,7 +79,18 @@ const defaultPathHandler: PathHandler = (el, ctx) => {
     return acc
   }
   // Pass 2: render the path geometry.
-  const merged = { ...el, style: mergeStyles(ctx.inheritedStyle, el.style) }
+  let mergedStyle = mergeStyles(ctx.inheritedStyle, el.style)
+
+  // If a fill pattern is specified, register it and replace the fill with url(#id)
+  const patternName = mergedStyle.extra?.['pattern']
+  if (patternName) {
+    const patId = ensurePattern(patternName, ctx.patternRegistry)
+    if (patId) {
+      mergedStyle = { ...mergedStyle, fill: `url(#${patId})` }
+    }
+  }
+
+  const merged = { ...el, style: mergedStyle }
   const result = emitPath(merged, ctx.document, ctx.coordResolver.clone(), ctx.nodeRegistry, ctx.markerRegistry)
   return { pathElements: result.elements, nodeElements: [], bboxes: [result.bbox] }
 }

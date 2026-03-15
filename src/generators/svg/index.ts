@@ -18,6 +18,7 @@
 import { IRDiagram, IRElement, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTANCE_PT } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
+import { PatternRegistry, renderPatternDefs } from './patternDefs.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
 import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
 import { DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
@@ -46,6 +47,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   const C: SVGRenderingConstants = { ...DEFAULT_CONSTANTS, ...(opts.constants ?? {}) }
   const nodeRegistry = new NodeGeometryRegistry()
   const markerRegistry: MarkerRegistry = new Map()
+  const patternRegistry: PatternRegistry = new Map()
   const mathRenderer = opts.mathRenderer ?? defaultMathRenderer
   const registry: SVGRendererRegistry = { ...defaultSVGRegistry, ...(opts.registry ?? {}) }
 
@@ -67,6 +69,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     coordResolver,
     nodeRegistry,
     markerRegistry,
+    patternRegistry,
     mathRenderer,
     constants: C,
     inheritedStyle,
@@ -97,10 +100,15 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   svg.setAttribute('height',  `${heightPt}pt`)
   svg.setAttribute('viewBox', viewBox)
 
-  // Add <defs> with marker definitions if any
-  if (markerRegistry.size > 0) {
-    const defs = renderMarkerDefs(document, markerRegistry)
-    svg.appendChild(defs)
+  // Add <defs> with marker and pattern definitions if any
+  const hasDefs = markerRegistry.size > 0 || patternRegistry.size > 0
+  if (hasDefs) {
+    if (markerRegistry.size > 0) {
+      const defs = renderMarkerDefs(document, markerRegistry)
+      svg.appendChild(defs)
+    }
+    const patternDefs = renderPatternDefs(document, patternRegistry)
+    if (patternDefs) svg.appendChild(patternDefs)
   }
 
   // Paths first (behind), then node groups (on top)

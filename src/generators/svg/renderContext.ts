@@ -10,6 +10,7 @@ import { CoordResolver } from '../core/coordResolver.js'
 import { NodeGeometryRegistry } from '../core/coordResolver.js'
 import { BoundingBox } from '../core/boundingBox.js'
 import { MarkerRegistry } from './markerDefs.js'
+import { PatternRegistry } from './patternDefs.js'
 import { MathRenderer } from '../../math/index.js'
 import { SVGRenderingConstants } from './constants.js'
 import type { SVGRendererRegistry } from './rendererRegistry.js'
@@ -42,6 +43,7 @@ export interface RenderContext {
   coordResolver: CoordResolver
   nodeRegistry: NodeGeometryRegistry
   markerRegistry: MarkerRegistry
+  patternRegistry: PatternRegistry
   mathRenderer: MathRenderer
   constants: SVGRenderingConstants
   /** Style inherited from enclosing scopes. */

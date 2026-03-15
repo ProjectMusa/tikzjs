@@ -140,13 +140,33 @@
     const inlineNodes = [];
     const inlineCoords = [];
     let lastCoord = ft.coordRef(0, 0);  // current path position for inline node placement
+    // Last known absolute position (for resolving relative ++ offsets in inline node placement).
+    let lastAbsCoord = ft.coordRef(0, 0);
 
     for (const item of ops) {
       if (!item) continue;
       switch (item.kind) {
         case 'op-coord':
           rawSegs.push(ft.moveSegment(item.coord));
-          lastCoord = item.coord;
+          if (item.coord.mode === 'absolute') {
+            lastCoord = item.coord;
+            lastAbsCoord = item.coord;
+          } else if (item.coord.mode === 'relative') {
+            // ++ relative: synthesize calc add so inline nodes placed after this get the right absolute position
+            lastCoord = { mode: 'absolute', coord: { cs: 'calc', expr: {
+              kind: 'add',
+              a: { kind: 'coord', ref: lastAbsCoord },
+              b: { kind: 'coord', ref: { mode: 'absolute', coord: item.coord.coord } }
+            }}};
+            lastAbsCoord = lastCoord;
+          } else {
+            // relative-pass (+): current position advances but lastAbsCoord doesn't
+            lastCoord = { mode: 'absolute', coord: { cs: 'calc', expr: {
+              kind: 'add',
+              a: { kind: 'coord', ref: lastAbsCoord },
+              b: { kind: 'coord', ref: { mode: 'absolute', coord: item.coord.coord } }
+            }}};
+          }
           break;
         case 'op-line':
           rawSegs.push({ _pendingLine: item.lineKind });
