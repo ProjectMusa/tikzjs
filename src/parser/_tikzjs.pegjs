@@ -525,7 +525,7 @@ standalone_node_statement
     {
       const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
-      const pos     = at_coord || ft.coordRef(0, 0);
+      const pos     = at_coord || ft.extractPlacementRef(rawOpts) || ft.coordRef(0, 0);
       const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
         { name: al || undefined, anchor: anchorFor(rawOpts) });
       registerNode(node);

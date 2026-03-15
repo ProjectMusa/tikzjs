@@ -25,6 +25,7 @@ import {
   XYCoord,
   SourceSpan,
   StyleDefinition,
+  NodePlacementCoord,
 } from '../ir/types.js'
 
 // ── ID generation ─────────────────────────────────────────────────────────────
@@ -67,6 +68,45 @@ export function polarRef(
   mode: CoordRef['mode'] = 'absolute'
 ): CoordRef {
   return { mode, coord: { cs: 'polar', angle, radius } }
+}
+
+/** Simple dimension string → pt (only handles common units; used for placement distances). */
+function parsePlacementDist(s: string): number {
+  const m = s.trim().match(/^([\d.]+)\s*(cm|mm|pt|in|em|ex)$/)
+  if (!m) return 0
+  const v = parseFloat(m[1])
+  switch (m[2]) {
+    case 'cm':  return v * 28.4528
+    case 'mm':  return v * 2.84528
+    case 'in':  return v * 72.27
+    case 'em':  return v * 10
+    case 'ex':  return v * 4.3
+    default:    return v
+  }
+}
+
+/**
+ * Scan rawOptions for TikZ `positioning` library options: `below=of NODE`, `above=DIST of NODE`, etc.
+ * Returns a CoordRef with NodePlacementCoord if found, otherwise null.
+ */
+export function extractPlacementRef(rawOptions: RawOption[]): CoordRef | null {
+  const DIRS = new Set(['above', 'below', 'left', 'right'])
+  for (const opt of rawOptions) {
+    if (!DIRS.has(opt.key)) continue
+    const val = (opt.value as string || '').trim()
+    // Match: "of NODENAME" or "DIST of NODENAME"
+    const m = /^(?:([\d.]+\s*(?:cm|mm|pt|in|em|ex))\s+)?of\s+(.+)$/i.exec(val)
+    if (!m) continue
+    const distPt = m[1] ? parsePlacementDist(m[1]) : 0 // 0 = use diagram node distance
+    const coord: NodePlacementCoord = {
+      cs: 'node-placement',
+      refName: m[2].trim(),
+      direction: opt.key as NodePlacementCoord['direction'],
+      distancePt: distPt,
+    }
+    return { mode: 'absolute', coord }
+  }
+  return null
 }
 
 // ── Element factories ─────────────────────────────────────────────────────────

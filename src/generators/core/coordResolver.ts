@@ -15,6 +15,7 @@ import {
   PolarCoord,
   NodeAnchorCoord,
   CalcCoord,
+  NodePlacementCoord,
   CalcExpr,
   IRNode,
   IRMatrix,
@@ -165,17 +166,23 @@ export function clipToNodeBoundary(
 
 // ── Main resolver ─────────────────────────────────────────────────────────────
 
+/** Default node distance for `below=of` positioning (1cm in pt). */
+export const DEFAULT_NODE_DISTANCE_PT = 28.4528
+
 export class CoordResolver {
   private _nodeRegistry: NodeGeometryRegistry
   /** Global coordinate scale from \begin{tikzpicture}[scale=...]. */
   private _coordScale: number
+  /** node distance (pt) for positioning library: `below=of NODE` etc. */
+  private _nodeDistancePt: number
   /** Current absolute position (updated as we move along a path). */
   private _currentX = 0
   private _currentY = 0
 
-  constructor(nodeRegistry: NodeGeometryRegistry, coordScale = 1) {
+  constructor(nodeRegistry: NodeGeometryRegistry, coordScale = 1, nodeDistancePt = DEFAULT_NODE_DISTANCE_PT) {
     this._nodeRegistry = nodeRegistry
     this._coordScale = coordScale
+    this._nodeDistancePt = nodeDistancePt
   }
 
   /**
@@ -236,6 +243,21 @@ export class CoordResolver {
         return getAnchorPosition(geo, coord.anchor)
       }
 
+      case 'node-placement': {
+        // TikZ positioning library: below=of NODE, above=of NODE, etc.
+        // Returns the anchor position (e.g. the 'north' point for below=of).
+        // The new node's center is then computed by nodeEmitter via anchorOffsetFromAnchor.
+        const refGeo = this._nodeRegistry.getByName(coord.refName)
+        if (!refGeo) return { x: 0, y: 0 }
+        const distPx = ptToPx(coord.distancePt > 0 ? coord.distancePt : this._nodeDistancePt)
+        switch (coord.direction) {
+          case 'below': return { x: refGeo.centerX, y: refGeo.centerY + refGeo.halfHeight + distPx }
+          case 'above': return { x: refGeo.centerX, y: refGeo.centerY - refGeo.halfHeight - distPx }
+          case 'right': return { x: refGeo.centerX + refGeo.halfWidth + distPx, y: refGeo.centerY }
+          case 'left':  return { x: refGeo.centerX - refGeo.halfWidth - distPx, y: refGeo.centerY }
+        }
+      }
+
       case 'calc':
         return this.resolveCalc(coord.expr)
     }
@@ -291,7 +313,7 @@ export class CoordResolver {
 
   /** Create a clone for sub-path processing. */
   clone(): CoordResolver {
-    const c = new CoordResolver(this._nodeRegistry, this._coordScale)
+    const c = new CoordResolver(this._nodeRegistry, this._coordScale, this._nodeDistancePt)
     c._currentX = this._currentX
     c._currentY = this._currentY
     return c

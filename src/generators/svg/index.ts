@@ -16,7 +16,7 @@
  */
 
 import { IRDiagram, IRElement, ResolvedStyle } from '../../ir/types.js'
-import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt } from './coordResolver.js'
+import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTANCE_PT } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
 import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
@@ -59,7 +59,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     ? { ...globalStyle, scale: undefined }
     : globalStyle
 
-  const coordResolver = new CoordResolver(nodeRegistry, coordScale)
+  const nodeDistancePt = globalStyle.nodeDistance ?? DEFAULT_NODE_DISTANCE_PT
+  const coordResolver = new CoordResolver(nodeRegistry, coordScale, nodeDistancePt)
 
   const baseCtx: RenderContext = {
     document,

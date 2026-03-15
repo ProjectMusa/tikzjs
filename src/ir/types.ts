@@ -44,7 +44,19 @@ export interface CalcCoord {
   expr: CalcExpr
 }
 
-export type Coord = XYCoord | PolarCoord | NodeAnchorCoord | CalcCoord
+/**
+ * TikZ `positioning` library: `below=of NODE`, `above=of NODE`, etc.
+ * Places the new node's anchor (opposite of direction) at NODE's border + distancePt gap.
+ * distancePt=0 means use the diagram's `node distance` setting.
+ */
+export interface NodePlacementCoord {
+  cs: 'node-placement'
+  refName: string
+  direction: 'above' | 'below' | 'left' | 'right'
+  distancePt: number
+}
+
+export type Coord = XYCoord | PolarCoord | NodeAnchorCoord | CalcCoord | NodePlacementCoord
 
 /**
  * How the coordinate is applied relative to the current point.
@@ -115,6 +127,7 @@ export interface ResolvedStyle {
   minimumWidth?: number // pt
   minimumHeight?: number // pt
   minimumSize?: number // pt (sets both width and height)
+  nodeDistance?: number // pt — TikZ `node distance`, for `below=of NODE` positioning
 
   // Text
   textColor?: string

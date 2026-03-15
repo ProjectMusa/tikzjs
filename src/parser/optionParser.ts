@@ -232,6 +232,9 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'minimum size':
       if (value) { style.minimumWidth = parseDimension(value as string, emSizePt); style.minimumHeight = style.minimumWidth }
       break
+    case 'node distance':
+      if (value) style.nodeDistance = parseDimension(value as string, emSizePt)
+      break
 
     // ── Text ──────────────────────────────────────────────────
     case 'text':
