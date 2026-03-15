@@ -1,20 +1,19 @@
 /**
  * SVG fill pattern definitions for TikZ `patterns` library.
  *
- * Supports the common named patterns:
- *   north east lines, north west lines, horizontal lines, vertical lines,
- *   grid, crosshatch, dots, crosshatch dots
+ * Tile geometry matches pgflibrarypatterns.code.tex:
+ *   - diagonal patterns:  4pt × 4pt tile, 0.4pt line width
+ *   - axis-aligned:       4pt × 4pt tile (H/V lines: spacing = 4pt)
+ *   - dots:               4pt × 4pt tile, r = 0.5pt
+ *
+ * North/east/west lines use corner-to-corner diagonals in a square tile —
+ * perpendicular spacing = 4/√2 ≈ 2.83pt, which matches PGF's default.
  */
 
 import { ptToPx } from './coordResolver.js'
 
 /** Registry: pattern name → SVG pattern element id. */
 export type PatternRegistry = Map<string, string>
-
-/** Line separation (pt) for hatch patterns — matches TikZ default. */
-const SEP_PT = 3
-/** Line width (pt) for pattern strokes. */
-const LW_PT = 0.4
 
 /**
  * Return the SVG pattern id for the given TikZ pattern name.
@@ -51,124 +50,76 @@ export function renderPatternDefs(document: Document, registry: PatternRegistry)
   return defs
 }
 
+function line(document: Document, x1: number, y1: number, x2: number, y2: number, lw: number): Element {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'line')
+  el.setAttribute('x1', String(x1)); el.setAttribute('y1', String(y1))
+  el.setAttribute('x2', String(x2)); el.setAttribute('y2', String(y2))
+  el.setAttribute('stroke', 'currentColor')
+  el.setAttribute('stroke-width', String(lw))
+  return el
+}
+
+function circle(document: Document, cx: number, cy: number, r: number): Element {
+  const el = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
+  el.setAttribute('cx', String(cx)); el.setAttribute('cy', String(cy))
+  el.setAttribute('r', String(r)); el.setAttribute('fill', 'currentColor')
+  return el
+}
+
 function buildPatternElement(document: Document, name: string, id: string): Element | null {
-  const s = ptToPx(SEP_PT)
-  const lw = ptToPx(LW_PT)
-  const r = ptToPx(0.5) // dot radius
+  // PGF defaults: 4pt tile, 0.4pt line width, 0.5pt dot radius
+  const t = ptToPx(4)    // tile size
+  const lw = ptToPx(0.4) // line width
+  const r = ptToPx(0.5)  // dot radius
 
   const pat = document.createElementNS('http://www.w3.org/2000/svg', 'pattern')
   pat.setAttribute('id', id)
   pat.setAttribute('patternUnits', 'userSpaceOnUse')
+  pat.setAttribute('width', String(t))
+  pat.setAttribute('height', String(t))
 
   switch (name) {
-    case 'north east lines': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      pat.setAttribute('patternTransform', 'rotate(45)')
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      line.setAttribute('x1', '0'); line.setAttribute('y1', '0')
-      line.setAttribute('x2', '0'); line.setAttribute('y2', String(s))
-      line.setAttribute('stroke', 'currentColor')
-      line.setAttribute('stroke-width', String(lw))
-      pat.appendChild(line)
+    case 'north east lines':
+      // "/" diagonal: (0,t)→(t,0) in SVG y-down — perpendicular spacing = t/√2 ≈ 2.83pt
+      pat.appendChild(line(document, 0, t, t, 0, lw))
       break
-    }
 
-    case 'north west lines': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      pat.setAttribute('patternTransform', 'rotate(-45)')
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      line.setAttribute('x1', '0'); line.setAttribute('y1', '0')
-      line.setAttribute('x2', '0'); line.setAttribute('y2', String(s))
-      line.setAttribute('stroke', 'currentColor')
-      line.setAttribute('stroke-width', String(lw))
-      pat.appendChild(line)
+    case 'north west lines':
+      // "\" diagonal: (0,0)→(t,t) in SVG y-down — same spacing
+      pat.appendChild(line(document, 0, 0, t, t, lw))
       break
-    }
 
-    case 'horizontal lines': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      line.setAttribute('x1', '0'); line.setAttribute('y1', String(s / 2))
-      line.setAttribute('x2', String(s)); line.setAttribute('y2', String(s / 2))
-      line.setAttribute('stroke', 'currentColor')
-      line.setAttribute('stroke-width', String(lw))
-      pat.appendChild(line)
+    case 'horizontal lines':
+      // horizontal line at mid-tile; spacing = t = 4pt
+      pat.appendChild(line(document, 0, t / 2, t, t / 2, lw))
       break
-    }
 
-    case 'vertical lines': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      line.setAttribute('x1', String(s / 2)); line.setAttribute('y1', '0')
-      line.setAttribute('x2', String(s / 2)); line.setAttribute('y2', String(s))
-      line.setAttribute('stroke', 'currentColor')
-      line.setAttribute('stroke-width', String(lw))
-      pat.appendChild(line)
+    case 'vertical lines':
+      // vertical line at mid-tile; spacing = t = 4pt
+      pat.appendChild(line(document, t / 2, 0, t / 2, t, lw))
       break
-    }
 
-    case 'grid': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      const h = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      h.setAttribute('x1', '0'); h.setAttribute('y1', String(s / 2))
-      h.setAttribute('x2', String(s)); h.setAttribute('y2', String(s / 2))
-      h.setAttribute('stroke', 'currentColor'); h.setAttribute('stroke-width', String(lw))
-      const v = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      v.setAttribute('x1', String(s / 2)); v.setAttribute('y1', '0')
-      v.setAttribute('x2', String(s / 2)); v.setAttribute('y2', String(s))
-      v.setAttribute('stroke', 'currentColor'); v.setAttribute('stroke-width', String(lw))
-      pat.appendChild(h); pat.appendChild(v)
+    case 'grid':
+      pat.appendChild(line(document, 0, t / 2, t, t / 2, lw))
+      pat.appendChild(line(document, t / 2, 0, t / 2, t, lw))
       break
-    }
 
-    case 'crosshatch': {
-      // NE + NW diagonals
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      // NE line: from bottom-left to top-right corner
-      const ne = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      ne.setAttribute('x1', '0'); ne.setAttribute('y1', String(s))
-      ne.setAttribute('x2', String(s)); ne.setAttribute('y2', '0')
-      ne.setAttribute('stroke', 'currentColor'); ne.setAttribute('stroke-width', String(lw))
-      const nw = document.createElementNS('http://www.w3.org/2000/svg', 'line')
-      nw.setAttribute('x1', '0'); nw.setAttribute('y1', '0')
-      nw.setAttribute('x2', String(s)); nw.setAttribute('y2', String(s))
-      nw.setAttribute('stroke', 'currentColor'); nw.setAttribute('stroke-width', String(lw))
-      pat.appendChild(ne); pat.appendChild(nw)
+    case 'crosshatch':
+      // Both diagonals
+      pat.appendChild(line(document, 0, t, t, 0, lw))  // "/"
+      pat.appendChild(line(document, 0, 0, t, t, lw))  // "\"
       break
-    }
 
-    case 'dots': {
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-      circle.setAttribute('cx', String(s / 2)); circle.setAttribute('cy', String(s / 2))
-      circle.setAttribute('r', String(r))
-      circle.setAttribute('fill', 'currentColor')
-      pat.appendChild(circle)
+    case 'dots':
+      pat.appendChild(circle(document, t / 2, t / 2, r))
       break
-    }
 
-    case 'crosshatch dots': {
-      // Dots at corners and center of a diamond pattern
-      pat.setAttribute('width', String(s))
-      pat.setAttribute('height', String(s))
-      const positions = [
-        [0, 0], [s, 0], [0, s], [s, s], [s / 2, s / 2],
-      ]
-      for (const [cx, cy] of positions) {
-        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle')
-        c.setAttribute('cx', String(cx)); c.setAttribute('cy', String(cy))
-        c.setAttribute('r', String(r)); c.setAttribute('fill', 'currentColor')
-        pat.appendChild(c)
+    case 'crosshatch dots':
+      // Dots at tile corners (shared between tiles) and center
+      for (const [cx, cy] of [[0, 0], [t, 0], [0, t], [t, t], [t / 2, t / 2]]) {
+        pat.appendChild(circle(document, cx, cy, r))
       }
       break
-    }
 
     default:
       return null
