@@ -12,6 +12,7 @@ import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
 import { MathRenderer, defaultMathRenderer, scriptMathModeRenderer } from '../../math/index.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
+import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
 export interface EdgeRenderResult {
   elements: Element[]
@@ -26,7 +27,8 @@ export function emitEdge(
   document: Document,
   nodeRegistry: NodeGeometryRegistry,
   markerRegistry: MarkerRegistry,
-  mathRenderer: MathRenderer = defaultMathRenderer
+  mathRenderer: MathRenderer = defaultMathRenderer,
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
 ): EdgeRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
@@ -46,7 +48,7 @@ export function emitEdge(
   const toCenter   = getAnchorPosition(toGeo, 'center')
 
   // Build the path geometry
-  const { d, midpoint, bbox } = buildEdgePath(fromGeo, toGeo, fromAnchor, toAnchor, edge.routing)
+  const { d, midpoint, bbox } = buildEdgePath(fromGeo, toGeo, fromAnchor, toAnchor, edge.routing, constants)
   bboxes.push(bbox)
 
   if (d) {
@@ -86,7 +88,7 @@ export function emitEdge(
 
   // Render labels
   for (const label of edge.labels) {
-    const result = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer)
+    const result = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer, constants)
     if (result) {
       elements.push(result.el)
       bboxes.push(result.bbox)
@@ -102,7 +104,8 @@ function buildEdgePath(
   toGeo: import('./coordResolver.js').NodeGeometry,
   fromAnchor: string,
   toAnchor: string,
-  routing: EdgeRouting
+  routing: EdgeRouting,
+  constants: SVGRenderingConstants
 ): { d: string; midpoint: AbsoluteCoordinate; bbox: BoundingBox } {
   const from = getAnchorPosition(fromGeo, fromAnchor === 'center' ? 'center' : fromAnchor)
   const to   = getAnchorPosition(toGeo,   toAnchor   === 'center' ? 'center' : toAnchor)
@@ -137,10 +140,10 @@ function buildEdgePath(
       // Cubic equivalent: C1 = P0 + 2/3*(Q - P0),  C2 = P2 + 2/3*(Q - P2)
       const { x: x0, y: y0 } = fromClippedBend
       const { x: x2, y: y2 } = toClippedBend
-      const c1x = x0 + (2 / 3) * (cx - x0)
-      const c1y = y0 + (2 / 3) * (cy - y0)
-      const c2x = x2 + (2 / 3) * (cx - x2)
-      const c2y = y2 + (2 / 3) * (cy - y2)
+      const c1x = x0 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cx - x0)
+      const c1y = y0 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cy - y0)
+      const c2x = x2 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cx - x2)
+      const c2y = y2 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cy - y2)
       return {
         d: `M ${x0} ${y0} C ${c1x} ${c1y} ${c2x} ${c2y} ${x2} ${y2}`,
         midpoint: { x: midX, y: midY },
@@ -166,7 +169,7 @@ function buildEdgePath(
       const { inAngle, outAngle } = routing
       const outRad = (outAngle * Math.PI) / 180
       const inRad = (inAngle * Math.PI) / 180
-      const dist = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2) * 0.4
+      const dist = Math.sqrt((to.x - from.x) ** 2 + (to.y - from.y) ** 2) * constants.EDGE_INOUT_DISTANCE_FACTOR
       const c1x = fromClipped.x + dist * Math.cos(outRad)
       const c1y = fromClipped.y - dist * Math.sin(outRad)
       const c2x = toClipped.x + dist * Math.cos(inRad + Math.PI)
@@ -258,7 +261,8 @@ function emitEdgeLabel(
   from: AbsoluteCoordinate,
   to: AbsoluteCoordinate,
   document: Document,
-  mathRenderer: MathRenderer
+  mathRenderer: MathRenderer,
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
 ): { el: Element; bbox: BoundingBox } | null {
   if (!label.text.trim()) return null
 
@@ -266,7 +270,7 @@ function emitEdgeLabel(
     const { svgString, widthPx, heightPx } = mathRenderer(label.text)
     const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
 
-    const GAP_PX = 4
+    const GAP_PX = constants.EDGE_LABEL_GAP_PX
     let cx: number
     let cy: number
 
@@ -325,7 +329,7 @@ function emitEdgeLabel(
 
     if (label.description) {
       // White background rectangle in g's local coordinate space (origin = top-left of label)
-      const PAD = 2
+      const PAD = constants.EDGE_LABEL_DESCRIPTION_PAD_PX
       const rectSvg = `<rect x="${-PAD}" y="${-PAD}" width="${widthPx + 2 * PAD}" height="${heightPx + 2 * PAD}" fill="#fff"/>`
       g.innerHTML = rectSvg + svgString
     } else {

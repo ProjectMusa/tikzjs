@@ -7,6 +7,7 @@
 
 import { IRPath, IRNode, PathSegment, CoordRef, ResolvedStyle } from '../../ir/types.js'
 import { CoordResolver, NodeGeometryRegistry, clipToNodeBoundary, ptToPx } from './coordResolver.js'
+import { TIKZ_CONSTANTS } from './constants.js'
 import { BoundingBox, emptyBBox, expandPoint, mergeBBoxes, fromCorners, transformBBox } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { parseDimensionPt } from '../../parser/optionParser.js'
@@ -400,7 +401,7 @@ function buildBendPath(
   const len = Math.sqrt(dx * dx + dy * dy)
   const lineAngle = Math.atan2(dy, dx)
 
-  const d = 0.3915 * len // looseness=1
+  const d = TIKZ_CONSTANTS.TO_PATH_LOOSENESS * len // looseness=1
   const tikzOut = bendDir * bendAngle // degrees in TikZ relative frame
   const DEG = Math.PI / 180
   const svgOutAngle = lineAngle - tikzOut * DEG
@@ -436,8 +437,8 @@ function buildGridPath(
   const xstepOpt = getOpt('xstep')
   const ystepOpt = getOpt('ystep')
 
-  const xstep = ptToPx(parseDimensionPt(xstepOpt ?? stepOpt) || 28.4528)
-  const ystep = ptToPx(parseDimensionPt(ystepOpt ?? stepOpt) || 28.4528)
+  const xstep = ptToPx(parseDimensionPt(xstepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT)
+  const ystep = ptToPx(parseDimensionPt(ystepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT)
 
   let d = ''
 
