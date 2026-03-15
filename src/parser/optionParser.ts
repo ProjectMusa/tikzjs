@@ -250,6 +250,12 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'yshift':
       if (value) style.yshift = parseDimension(value as string, emSizePt)
       break
+    case 'xslant':
+      if (value) style.xslant = parseFloat(value as string)
+      break
+    case 'yslant':
+      if (value) style.yslant = parseFloat(value as string)
+      break
     case 'scale':
       if (value) style.scale = parseFloat(value as string)
       break

@@ -132,6 +132,10 @@ export function transformBBox(bb: BoundingBox, transform: string | undefined): B
         const sy = args[1] ?? sx
         return [x * sx, y * sy]
       }
+      if (fn === 'matrix') {
+        const [a = 1, b = 0, c = 0, d = 1, e = 0, f = 0] = args
+        return [a * x + c * y + e, b * x + d * y + f]
+      }
       return [x, y]
     })
   }

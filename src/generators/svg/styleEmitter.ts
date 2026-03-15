@@ -146,6 +146,20 @@ export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0): string | u
     parts.push(`translate(${cx},${cy}) scale(${style.scale}) translate(${-cx},${-cy})`)
   }
 
+  if (style.xslant) {
+    // TikZ xslant=s: (x,y) → (x+s·y, y) in TikZ coords.
+    // With SVG y-axis inverted: x_svg' = x_svg - s·y_svg → matrix(1,0,-s,1,0,0).
+    const s = style.xslant
+    parts.push(`matrix(1,0,${-s},1,0,0)`)
+  }
+
+  if (style.yslant) {
+    // TikZ yslant=s: (x,y) → (x, y+s·x) in TikZ coords.
+    // With SVG y-axis inverted: y_svg' = y_svg - s·x_svg → matrix(1,-s,0,1,0,0).
+    const s = style.yslant
+    parts.push(`matrix(1,${-s},0,1,0,0)`)
+  }
+
   return parts.length > 0 ? parts.join(' ') : undefined
 }
 

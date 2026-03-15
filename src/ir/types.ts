@@ -128,6 +128,8 @@ export interface ResolvedStyle {
   rotate?: number // degrees
   xshift?: number // pt
   yshift?: number // pt
+  xslant?: number // dimensionless shear factor
+  yslant?: number // dimensionless shear factor
   scale?: number
 
   // Path geometry
