@@ -67,8 +67,9 @@ function circle(document: Document, cx: number, cy: number, r: number): Element 
 }
 
 function buildPatternElement(document: Document, name: string, id: string): Element | null {
-  // PGF defaults: 4pt tile, 0.4pt line width, 0.5pt dot radius
-  const t = ptToPx(4)    // tile size
+  // PGF defaults: 3bp tile (≈2.989pt), 0.4pt line width, 0.5pt dot radius.
+  // Using 3pt is close enough; perpendicular spacing = 3/√2 ≈ 2.12pt vs PGF's 2.989/√2 ≈ 2.11pt.
+  const t = ptToPx(3)    // tile size
   const lw = ptToPx(0.4) // line width
   const r = ptToPx(0.5)  // dot radius
 

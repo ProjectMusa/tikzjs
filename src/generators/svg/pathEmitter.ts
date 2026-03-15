@@ -161,21 +161,36 @@ export function emitPath(
         const ry = yRadius !== undefined ? ptToPx(yRadius) : rx
         const startRad = (startAngle * Math.PI) / 180
         const endRad = (endAngle * Math.PI) / 180
+        const startX = lastPos.x
+        const startY = lastPos.y
         // In SVG coords, y is inverted
-        const endX = lastPos.x + rx * (Math.cos(endRad) - Math.cos(startRad))
-        const endY = lastPos.y - ry * (Math.sin(endRad) - Math.sin(startRad))
+        const endX = startX + rx * (Math.cos(endRad) - Math.cos(startRad))
+        const endY = startY - ry * (Math.sin(endRad) - Math.sin(startRad))
         // TikZ angles increase CCW (y-up). The y-flip to SVG reverses rotation direction,
         // so TikZ CCW (endAngle > startAngle) maps to SVG sweep=0 (CCW in y-down).
         const sweep = endAngle > startAngle ? 0 : 1
         const largeArc = Math.abs(endAngle - startAngle) > 180 ? 1 : 0
         d += `A ${rx} ${ry} 0 ${largeArc} ${sweep} ${endX} ${endY} `
         lastPos = { x: endX, y: endY }
-        bboxes.push(fromCorners(
-          Math.min(lastPos.x, endX) - rx,
-          Math.min(lastPos.y, endY) - ry,
-          Math.max(lastPos.x, endX) + rx,
-          Math.max(lastPos.y, endY) + ry
-        ))
+        // Correct arc bbox: arc center + check axis-aligned extremes within arc range
+        const arcCx = startX - rx * Math.cos(startRad)
+        const arcCy = startY + ry * Math.sin(startRad)
+        let bMinX = Math.min(startX, endX), bMaxX = Math.max(startX, endX)
+        let bMinY = Math.min(startY, endY), bMaxY = Math.max(startY, endY)
+        // Check 4 axis-aligned extremes (0°, 90°, 180°, 270°)
+        for (const θdeg of [0, 90, 180, 270]) {
+          const inArc = endAngle < startAngle
+            ? ((((θdeg - endAngle) % 360) + 360) % 360) <= ((((startAngle - endAngle) % 360) + 360) % 360)
+            : ((((θdeg - startAngle) % 360) + 360) % 360) <= ((((endAngle - startAngle) % 360) + 360) % 360)
+          if (inArc) {
+            const θrad = (θdeg * Math.PI) / 180
+            const px = arcCx + rx * Math.cos(θrad)
+            const py = arcCy - ry * Math.sin(θrad)  // SVG y-down
+            bMinX = Math.min(bMinX, px); bMaxX = Math.max(bMaxX, px)
+            bMinY = Math.min(bMinY, py); bMaxY = Math.max(bMaxY, py)
+          }
+        }
+        bboxes.push(fromCorners(bMinX, bMinY, bMaxX, bMaxY))
         break
       }
 

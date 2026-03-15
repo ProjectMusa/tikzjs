@@ -4438,7 +4438,7 @@ function peg$parse(input, options) {
       }
       if (s4 !== peg$FAILED) {
         s5 = peg$parsews();
-        s6 = peg$parsenumber();
+        s6 = peg$parsecoord_num();
         if (s6 !== peg$FAILED) {
           s7 = peg$parsews();
           if (input.charCodeAt(peg$currPos) === 58) {
@@ -4450,7 +4450,7 @@ function peg$parse(input, options) {
           }
           if (s8 !== peg$FAILED) {
             s9 = peg$parsews();
-            s10 = peg$parsenumber();
+            s10 = peg$parsecoord_num();
             if (s10 !== peg$FAILED) {
               s11 = peg$parsews();
               if (input.charCodeAt(peg$currPos) === 58) {
@@ -4462,7 +4462,7 @@ function peg$parse(input, options) {
               }
               if (s12 !== peg$FAILED) {
                 s13 = peg$parsews();
-                s14 = peg$parsenumber();
+                s14 = peg$parsecoord_num();
                 if (s14 !== peg$FAILED) {
                   s15 = peg$parsedim_unit();
                   if (s15 !== peg$FAILED) {
@@ -4476,7 +4476,7 @@ function peg$parse(input, options) {
                     }
                     if (s17 !== peg$FAILED) {
                       s18 = peg$parsews();
-                      s19 = peg$parsenumber();
+                      s19 = peg$parsecoord_num();
                       if (s19 !== peg$FAILED) {
                         s20 = peg$parsedim_unit();
                         if (s20 !== peg$FAILED) {
@@ -4560,7 +4560,7 @@ function peg$parse(input, options) {
         }
         if (s4 !== peg$FAILED) {
           s5 = peg$parsews();
-          s6 = peg$parsenumber();
+          s6 = peg$parsecoord_num();
           if (s6 !== peg$FAILED) {
             s7 = peg$parsews();
             if (input.charCodeAt(peg$currPos) === 58) {
@@ -4572,7 +4572,7 @@ function peg$parse(input, options) {
             }
             if (s8 !== peg$FAILED) {
               s9 = peg$parsews();
-              s10 = peg$parsenumber();
+              s10 = peg$parsecoord_num();
               if (s10 !== peg$FAILED) {
                 s11 = peg$parsews();
                 if (input.charCodeAt(peg$currPos) === 58) {
@@ -4584,7 +4584,7 @@ function peg$parse(input, options) {
                 }
                 if (s12 !== peg$FAILED) {
                   s13 = peg$parsews();
-                  s14 = peg$parsenumber();
+                  s14 = peg$parsecoord_num();
                   if (s14 !== peg$FAILED) {
                     s15 = peg$parsedim_unit();
                     if (s15 !== peg$FAILED) {

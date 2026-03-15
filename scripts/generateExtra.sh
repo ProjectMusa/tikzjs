@@ -110,26 +110,51 @@ $FIXTURE_CONTENT
 \\end{document}
 LATEX_EOF
 
-  # Run pdflatex — use nonstopmode and check PDF existence rather than exit code,
-  # since pdflatex exits non-zero even when it recovers from warnings and produces a valid PDF.
-  pdflatex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
-      > "$tmpdir/pdflatex.log" 2>&1 || true
-  if [[ ! -f "$tmpdir/doc.pdf" ]]; then
-    echo "    WARNING: pdflatex failed to produce PDF for $base (see $tmpdir/pdflatex.log)"
-    continue
+  # Detect if fixture uses TikZ fill patterns — pdflatex/dvisvgm --pdf strips these to fill='none'.
+  # Use the DVI path (latex + dvisvgm) for pattern fixtures to preserve hatch/dot fills.
+  USE_DVI=0
+  if echo "$FIXTURE_CONTENT" | grep -qE 'pattern\s*=\s*(north|south|horizontal|vertical|grid|crosshatch|dots)'; then
+    USE_DVI=1
   fi
 
-  # Convert to SVG
-  if [[ "$SVG_TOOL" == "dvisvgm" ]]; then
-    if ! dvisvgm --pdf "$tmpdir/doc.pdf" -o "$REFS_DIR/$base.svg" \
-        > "$tmpdir/dvisvgm.log" 2>&1; then
-      echo "    WARNING: dvisvgm failed for $base"
+  if [[ "$USE_DVI" == "1" ]]; then
+    # DVI path: preserves pattern fills
+    latex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
+        > "$tmpdir/latex.log" 2>&1 || true
+    if [[ ! -f "$tmpdir/doc.dvi" ]]; then
+      echo "    WARNING: latex failed to produce DVI for $base (see $tmpdir/latex.log)"
+      continue
+    fi
+    if [[ "$SVG_TOOL" == "dvisvgm" ]]; then
+      if ! dvisvgm "$tmpdir/doc.dvi" -o "$REFS_DIR/$base.svg" \
+          > "$tmpdir/dvisvgm.log" 2>&1; then
+        echo "    WARNING: dvisvgm failed for $base"
+        continue
+      fi
+    else
+      echo "    WARNING: pdf2svg cannot process DVI — skipping pattern fixture $base"
       continue
     fi
   else
-    if ! pdf2svg "$tmpdir/doc.pdf" "$REFS_DIR/$base.svg"; then
-      echo "    WARNING: pdf2svg failed for $base"
+    # PDF path: better text rendering for non-pattern fixtures
+    pdflatex -interaction=nonstopmode -output-directory="$tmpdir" "$tmpdir/doc.tex" \
+        > "$tmpdir/pdflatex.log" 2>&1 || true
+    if [[ ! -f "$tmpdir/doc.pdf" ]]; then
+      echo "    WARNING: pdflatex failed to produce PDF for $base (see $tmpdir/pdflatex.log)"
       continue
+    fi
+
+    if [[ "$SVG_TOOL" == "dvisvgm" ]]; then
+      if ! dvisvgm --pdf "$tmpdir/doc.pdf" -o "$REFS_DIR/$base.svg" \
+          > "$tmpdir/dvisvgm.log" 2>&1; then
+        echo "    WARNING: dvisvgm failed for $base"
+        continue
+      fi
+    else
+      if ! pdf2svg "$tmpdir/doc.pdf" "$REFS_DIR/$base.svg"; then
+        echo "    WARNING: pdf2svg failed for $base"
+        continue
+      fi
     fi
   fi
 

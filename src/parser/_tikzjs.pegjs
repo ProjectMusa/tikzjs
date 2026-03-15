@@ -688,9 +688,9 @@ edge_op "edge"
     { return { kind: 'op-edge', rawOpts: parseRaw(opt) }; }
 
 arc_op "arc"
-  = ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws xr:number u1:dim_unit ws 'and' ws yr:number u2:dim_unit ws ')'
+  = ws 'arc' ws '(' ws sa:coord_num ws ':' ws ea:coord_num ws ':' ws xr:coord_num u1:dim_unit ws 'and' ws yr:coord_num u2:dim_unit ws ')'
     { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: xr * u1, yRadius: yr * u2 }; }
-  / ws 'arc' ws '(' ws sa:number ws ':' ws ea:number ws ':' ws r:number u:dim_unit ws ')'
+  / ws 'arc' ws '(' ws sa:coord_num ws ':' ws ea:coord_num ws ':' ws r:coord_num u:dim_unit ws ')'
     { return { kind: 'op-arc-short', startAngle: sa, endAngle: ea, xRadius: r * u }; }
   / ws 'arc' opt:option_block
     { return { kind: 'op-arc', rawOpts: parseRaw(opt) }; }
