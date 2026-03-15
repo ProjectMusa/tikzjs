@@ -349,6 +349,7 @@ export interface EdgeLabel {
   position: number | 'midway' | 'near start' | 'near end' | 'at start' | 'at end'
   swap?: boolean // label on the other side (tikzcd ' modifier)
   placement?: 'above' | 'below' | 'left' | 'right' // absolute TikZ path node positioning
+  description?: boolean // tikzcd `description` style: label at midpoint with white background
   style?: ResolvedStyle
 }
 

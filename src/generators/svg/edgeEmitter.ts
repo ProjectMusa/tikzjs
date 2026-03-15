@@ -270,7 +270,11 @@ function emitEdgeLabel(
     let cx: number
     let cy: number
 
-    if (label.placement) {
+    if (label.description) {
+      // `description` style: label sits at the midpoint of the arrow, centered, with white background.
+      cx = midpoint.x
+      cy = midpoint.y
+    } else if (label.placement) {
       // Absolute placement: above/below/left/right in TikZ/SVG coordinates.
       // "above" in TikZ = up = negative SVG y.
       switch (label.placement) {
@@ -316,8 +320,18 @@ function emitEdgeLabel(
 
     const tlx = cx - widthPx / 2
     const tly = cy - heightPx / 2
+
     g.setAttribute('transform', `translate(${tlx},${tly})`)
-    g.innerHTML = svgString
+
+    if (label.description) {
+      // White background rectangle in g's local coordinate space (origin = top-left of label)
+      const PAD = 2
+      const rectSvg = `<rect x="${-PAD}" y="${-PAD}" width="${widthPx + 2 * PAD}" height="${heightPx + 2 * PAD}" fill="#fff"/>`
+      g.innerHTML = rectSvg + svgString
+    } else {
+      g.innerHTML = svgString
+    }
+
     return { el: g, bbox: fromCorners(tlx, tly, tlx + widthPx, tly + heightPx) }
   } catch {
     return null

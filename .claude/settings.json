@@ -9,7 +9,9 @@
       "Read(test/extra/**)",
       "Glob(test/extra/**)",
       "Bash(node -e \":*)",
-      "Bash(make cdiff-one:*)"
+      "Bash(make cdiff-one:*)",
+      "Read(//tmp/tikzjs-golden/**)",
+      "Bash(find . -name *.py -path */tikzjs_compare*)"
     ]
   }
 }

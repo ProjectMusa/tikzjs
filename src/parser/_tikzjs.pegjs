@@ -267,17 +267,21 @@
         const toId   = cellNodeMap[toRow + ',' + toCol];
         if (!fromId || !toId) continue;
 
-        // Quoted string options like "f" or "g"' (swap) are labels, not style opts
+        // Quoted string options like "f" or "g"' (swap) or "\phi" description are labels
         const labels = [];
         const styleRawOpts = [];
         for (const opt of (ar.rawOptions || [])) {
           const k = opt.key || '';
           if (k.startsWith('"')) {
-            let text = k;
-            let swap = false;
-            if (text.endsWith("'")) { swap = true; text = text.slice(0, -1); }
-            if (text.startsWith('"') && text.endsWith('"')) text = text.slice(1, -1);
-            if (text) labels.push({ text, position: 'midway', swap });
+            // Find the closing quote (may have trailing ' or style keywords after)
+            const closeIdx = k.indexOf('"', 1);
+            let text = closeIdx !== -1 ? k.slice(1, closeIdx) : k.slice(1);
+            const rest = closeIdx !== -1 ? k.slice(closeIdx + 1) : '';
+            const swap = rest.trimStart().startsWith("'");
+            const styleWord = rest.replace(/^['\s]*/, '').trim(); // e.g. "description"
+            const isDescription = styleWord === 'description';
+            if (text) labels.push({ text, position: 'midway', swap, description: isDescription || undefined });
+            if (styleWord && !isDescription) styleRawOpts.push({ key: styleWord });
           } else {
             styleRawOpts.push(opt);
           }
