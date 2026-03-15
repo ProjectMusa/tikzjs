@@ -275,11 +275,16 @@ export function emitPath(
         const to = resolver.resolve((seg as any).to)
         const dx = to.x - lastPos.x
         const dy = to.y - lastPos.y
-        // Cubic bezier: horizontal departure, vertical arrival
-        const c1x = lastPos.x + dx / 3
-        const c1y = lastPos.y
-        const c2x = to.x
-        const c2y = to.y - dy / 3
+        // Cubic Bézier approximating a quarter-period sine wave.
+        // sin maps [0, π/2]: starts at 0 (non-zero slope), ends at 1 (peak — horizontal tangent).
+        // c1: angled departure matching the rising slope at sin(0).
+        // c2: horizontal arrival at the peak (c2y = to.y so tangent is (k·dx, 0)).
+        // Factor k=0.5523882 from pgfcorepathconstruct.code.tex.
+        const k = TIKZ_CONSTANTS.SIN_COS_BEZIER_FACTOR
+        const c1x = lastPos.x + k * dx
+        const c1y = lastPos.y + k * dy
+        const c2x = to.x - k * dx
+        const c2y = to.y
         d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
         bboxes.push(fromCorners(
           Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),
@@ -294,11 +299,15 @@ export function emitPath(
         const to = resolver.resolve((seg as any).to)
         const dx = to.x - lastPos.x
         const dy = to.y - lastPos.y
-        // Cubic bezier: vertical departure, horizontal arrival
-        const c1x = lastPos.x
-        const c1y = lastPos.y + dy / 3
-        const c2x = to.x - dx / 3
-        const c2y = to.y
+        // Cubic Bézier approximating a quarter-period cosine wave.
+        // cos maps [0, π/2]: starts at 1 (peak — horizontal tangent), ends at 0 (non-zero slope).
+        // c1: horizontal departure from the peak (c1y = lastPos.y so tangent is (k·dx, 0)).
+        // c2: angled arrival matching the descending slope at cos(π/2).
+        const k = TIKZ_CONSTANTS.SIN_COS_BEZIER_FACTOR
+        const c1x = lastPos.x + k * dx
+        const c1y = lastPos.y
+        const c2x = to.x - k * dx
+        const c2y = to.y - k * dy
         d += `C ${c1x} ${c1y} ${c2x} ${c2y} ${to.x} ${to.y} `
         bboxes.push(fromCorners(
           Math.min(lastPos.x, c1x, c2x, to.x), Math.min(lastPos.y, c1y, c2y, to.y),

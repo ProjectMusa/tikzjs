@@ -47,6 +47,13 @@ export const TIKZ_CONSTANTS = Object.freeze({
    * Cubic equivalent: C1 = P0 + 2/3*(Q - P0), C2 = P2 + 2/3*(Q - P2).
    */
   QUAD_TO_CUBIC_FACTOR: 2 / 3,
+
+  /**
+   * Cubic Bézier control arm factor for TikZ `sin`/`cos` path operations.
+   * Source: pgfcorepathconstruct.code.tex — `\pgf@xa=.5523882\pgf@xa`.
+   * Approximates a quarter-period sine/cosine wave as a cubic Bézier segment.
+   */
+  SIN_COS_BEZIER_FACTOR: 0.5523882,
 })
 
 // ── Generator-level constants (our rendering decisions) ────────────────────────
