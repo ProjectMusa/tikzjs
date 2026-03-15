@@ -52,7 +52,7 @@ export interface CalcCoord {
 export interface NodePlacementCoord {
   cs: 'node-placement'
   refName: string
-  direction: 'above' | 'below' | 'left' | 'right'
+  direction: 'above' | 'below' | 'left' | 'right' | 'above left' | 'above right' | 'below left' | 'below right'
   distancePt: number
 }
 

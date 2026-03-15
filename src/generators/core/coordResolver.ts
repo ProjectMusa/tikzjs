@@ -250,11 +250,17 @@ export class CoordResolver {
         const refGeo = this._nodeRegistry.getByName(coord.refName)
         if (!refGeo) return { x: 0, y: 0 }
         const distPx = ptToPx(coord.distancePt > 0 ? coord.distancePt : this._nodeDistancePt)
+        const { centerX: cx, centerY: cy, halfWidth: hw, halfHeight: hh } = refGeo
         switch (coord.direction) {
-          case 'below': return { x: refGeo.centerX, y: refGeo.centerY + refGeo.halfHeight + distPx }
-          case 'above': return { x: refGeo.centerX, y: refGeo.centerY - refGeo.halfHeight - distPx }
-          case 'right': return { x: refGeo.centerX + refGeo.halfWidth + distPx, y: refGeo.centerY }
-          case 'left':  return { x: refGeo.centerX - refGeo.halfWidth - distPx, y: refGeo.centerY }
+          case 'below':       return { x: cx,          y: cy + hh + distPx }
+          case 'above':       return { x: cx,          y: cy - hh - distPx }
+          case 'right':       return { x: cx + hw + distPx, y: cy }
+          case 'left':        return { x: cx - hw - distPx, y: cy }
+          // Diagonal: both axes offset by distPx; anchor matches anchorFromPlacement
+          case 'above left':  return { x: cx - hw - distPx, y: cy - hh - distPx }
+          case 'above right': return { x: cx + hw + distPx, y: cy - hh - distPx }
+          case 'below left':  return { x: cx - hw - distPx, y: cy + hh + distPx }
+          case 'below right': return { x: cx + hw + distPx, y: cy + hh + distPx }
         }
       }
 

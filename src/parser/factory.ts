@@ -90,7 +90,7 @@ function parsePlacementDist(s: string): number {
  * Returns a CoordRef with NodePlacementCoord if found, otherwise null.
  */
 export function extractPlacementRef(rawOptions: RawOption[]): CoordRef | null {
-  const DIRS = new Set(['above', 'below', 'left', 'right'])
+  const DIRS = new Set(['above', 'below', 'left', 'right', 'above left', 'above right', 'below left', 'below right'])
   for (const opt of rawOptions) {
     if (!DIRS.has(opt.key)) continue
     const val = (opt.value as string || '').trim()
