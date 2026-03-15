@@ -31,7 +31,8 @@
       "Bash(make cdiff-extra:*)",
       "Bash(pdfinfo /usr/share/texlive/texmf-dist/tex/latex/mwe/example-image.pdf)",
       "Bash(bash scripts/generateExtra.sh)",
-      "Bash(dvisvgm --pdf /tmp/tikz001_v2/doc.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)"
+      "Bash(dvisvgm --pdf /tmp/tikz001_v2/doc.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)",
+      "Bash(ls /home/lind/gits/tikzjs/src/generators/svg/math*.ts)"
     ]
   }
 }

@@ -41,7 +41,20 @@ export function parseRawOptions(optStr: string): RawOption[] {
 }
 
 function isArrowShorthand(s: string): boolean {
-  return /^(<->|->|<-|>->|<-<|=>|<=|>|<|\|->|\|-|stealth|latex|to)$/.test(s.toLowerCase())
+  if (/^(<->|->|<-|>->|<-<|=>|<=|>|<|\|->|\|-|stealth|latex|to)$/.test(s.toLowerCase())) return true
+  // Dashed tip specs: -latex, latex-, -stealth, stealth-latex, etc.
+  return /^(latex|stealth|to|>>?|\.)?-(latex|stealth|to|>>?|\.)?$/i.test(s)
+}
+
+/** Map lowercase/traditional arrow tip names to our marker kind strings. */
+function normalizeTipKind(name: string): string {
+  switch (name.toLowerCase()) {
+    case 'latex':   return 'Latex'
+    case 'stealth': return 'Stealth'
+    case 'to':      return 'default'
+    case '>>':      return 'twohead'
+    default:        return name
+  }
 }
 
 // ── Style resolution ──────────────────────────────────────────────────────────
@@ -178,6 +191,12 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case '-|':  style.arrowEnd   = { kind: 'bar' };     break
     case '>->': style.arrowStart = { kind: 'tail' };    style.arrowEnd = { kind: 'default' }; break
     case '->>': style.arrowEnd   = { kind: 'twohead' }; break
+    // Named tip shorthands (traditional arrow library): -latex, latex-, stealth-, -stealth, etc.
+    case 'latex':   case '-latex':  style.arrowEnd = { kind: 'Latex' };   style.arrowStart = undefined; break
+    case 'latex-':                  style.arrowStart = { kind: 'Latex' }; style.arrowEnd   = undefined; break
+    case 'stealth': case '-stealth': style.arrowEnd = { kind: 'Stealth' }; style.arrowStart = undefined; break
+    case 'stealth-':                style.arrowStart = { kind: 'Stealth' }; style.arrowEnd = undefined; break
+    case 'to': case '-to': style.arrowEnd = { kind: 'default' }; style.arrowStart = undefined; break
 
     // arrows.meta style: \ar[Rightarrow], \ar[hook], etc.
     case 'Rightarrow':     style.arrowEnd = { kind: 'Rightarrow' }; break
@@ -324,6 +343,15 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
 
     // ── Named colors as standalone options ────────────────────
     default: {
+      // General named tip arrow specs: start-end (e.g. latex-stealth, to-latex, .-Stealth)
+      const tipSpecMatch = /^([a-z]*)-([a-z]+)$/i.exec(key)
+      if (tipSpecMatch) {
+        const [, startStr, endStr] = tipSpecMatch
+        if (startStr) style.arrowStart = { kind: normalizeTipKind(startStr) }
+        else style.arrowStart = undefined
+        style.arrowEnd = { kind: normalizeTipKind(endStr) }
+        break
+      }
       // Recognise bare color expressions: named ("red") or mixed ("green!30", "blue!50!white")
       const isColorExpr = isNamedColor(key) || /^[a-zA-Z][a-zA-Z0-9]*!\d/.test(key)
       if (isColorExpr) {

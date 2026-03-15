@@ -57,16 +57,25 @@ export function emitNode(
     labelHeight = ptToPx(imgDims.heightPt)
     svgContent  = buildImagePlaceholder(labelWidth, labelHeight)
   } else if (labelSource.trim()) {
-    try {
-      const result = activeRenderer(labelSource)
-      svgContent = result.svgString
-      labelWidth = result.widthPx
-      labelHeight = result.heightPx
-    } catch {
-      // Fallback: render as plain text
-      svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
-      labelWidth = labelSource.length * 7
-      labelHeight = 14
+    // Split on \\ (LaTeX line break) for multiline labels
+    const lineParts = labelSource.split('\\\\').map(l => l.trim()).filter(l => l !== '')
+    if (lineParts.length > 1) {
+      const multi = renderMultilineLabel(lineParts, activeRenderer)
+      svgContent = multi.svgContent
+      labelWidth = multi.labelWidth
+      labelHeight = multi.labelHeight
+    } else {
+      try {
+        const result = activeRenderer(labelSource)
+        svgContent = result.svgString
+        labelWidth = result.widthPx
+        labelHeight = result.heightPx
+      } catch {
+        // Fallback: render as plain text
+        svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
+        labelWidth = labelSource.length * 7
+        labelHeight = 14
+      }
     }
   }
 
@@ -300,6 +309,32 @@ const EXAMPLE_IMAGE_SIZES: Record<string, [number, number]> = {
   'example-image-a3-landscape': [1190.55, 841.89],
   'example-image-letter':     [612, 792],
   'example-image-letter-landscape': [792, 612],
+}
+
+/**
+ * Render a multiline label (split on \\) as stacked MathJax SVG lines.
+ * Each non-empty line is rendered separately; lines are centered horizontally.
+ */
+function renderMultilineLabel(
+  lines: string[],
+  renderer: MathRenderer,
+): { svgContent: string; labelWidth: number; labelHeight: number } {
+  const LINE_GAP_PX = 4
+  const rendered = lines.map(line => {
+    if (!line) return { svgString: '', widthPx: 0, heightPx: 12 }
+    try { return renderer(line) }
+    catch { return { svgString: `<text font-size="12">${escapeXml(line)}</text>`, widthPx: line.length * 7, heightPx: 14 } }
+  })
+  const maxWidth = Math.max(...rendered.map(r => r.widthPx), 0)
+  const totalHeight = rendered.reduce((s, r) => s + r.heightPx, 0) + LINE_GAP_PX * (rendered.length - 1)
+  let svgContent = ''
+  let yOff = 0
+  for (const r of rendered) {
+    const xOff = (maxWidth - r.widthPx) / 2
+    svgContent += `<g transform="translate(${xOff},${yOff})">${r.svgString}</g>`
+    yOff += r.heightPx + LINE_GAP_PX
+  }
+  return { svgContent, labelWidth: maxWidth, labelHeight: totalHeight }
 }
 
 /** Convert a dimension string with unit to pt. */
