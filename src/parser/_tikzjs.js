@@ -649,7 +649,7 @@ function peg$parse(input, options) {
   var peg$r2 = /^[a-zA-Z_]/;
   var peg$r3 = /^[a-zA-Z0-9_\-]/;
   var peg$r4 = /^[a-zA-Z0-9_]/;
-  var peg$r5 = /^[a-zA-Z0-9_\-']/;
+  var peg$r5 = /^[a-zA-Z0-9_\-+']/;
   var peg$r6 = /^[+\-]/;
   var peg$r7 = /^[0-9]/;
   var peg$r8 = /^[*\/]/;
@@ -770,7 +770,7 @@ function peg$parse(input, options) {
   var peg$e111 = peg$classExpectation([["a", "z"], ["A", "Z"], "_"], false, false);
   var peg$e112 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_", "-"], false, false);
   var peg$e113 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_"], false, false);
-  var peg$e114 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_", "-", "'"], false, false);
+  var peg$e114 = peg$classExpectation([["a", "z"], ["A", "Z"], ["0", "9"], "_", "-", "+", "'"], false, false);
   var peg$e115 = peg$otherExpectation("number");
   var peg$e116 = peg$classExpectation(["+", "-"], false, false);
   var peg$e117 = peg$classExpectation([["0", "9"]], false, false);
@@ -2863,7 +2863,7 @@ function peg$parse(input, options) {
   }
 
   function peg$parsepath_coordinate() {
-    var s0, s1, s2;
+    var s0, s1, s2, s3;
 
     var key = peg$currPos * 60 + 27;
     var cached = peg$resultsCache[key];
@@ -2884,10 +2884,11 @@ function peg$parse(input, options) {
       if (peg$silentFails === 0) { peg$fail(peg$e32); }
     }
     if (s1 !== peg$FAILED) {
-      s2 = peg$parseraw_coordinate();
-      if (s2 !== peg$FAILED) {
+      s2 = peg$parsews();
+      s3 = peg$parseraw_coordinate();
+      if (s3 !== peg$FAILED) {
         peg$savedPos = s0;
-        s0 = peg$f51(s2);
+        s0 = peg$f51(s3);
       } else {
         peg$currPos = s0;
         s0 = peg$FAILED;
@@ -2906,10 +2907,11 @@ function peg$parse(input, options) {
         if (peg$silentFails === 0) { peg$fail(peg$e33); }
       }
       if (s1 !== peg$FAILED) {
-        s2 = peg$parseraw_coordinate();
-        if (s2 !== peg$FAILED) {
+        s2 = peg$parsews();
+        s3 = peg$parseraw_coordinate();
+        if (s3 !== peg$FAILED) {
           peg$savedPos = s0;
-          s0 = peg$f52(s2);
+          s0 = peg$f52(s3);
         } else {
           peg$currPos = s0;
           s0 = peg$FAILED;

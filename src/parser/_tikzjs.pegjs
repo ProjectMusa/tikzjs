@@ -581,11 +581,11 @@ pic_body "pic body"
 /////////////////////// Coordinates //////////////////////////
 
 path_coordinate "coordinate"
-  = '++' c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
-  / '+'  c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
-  / c:raw_coordinate      { return { kind: 'op-coord', coord: c }; }
-  / a:node_alias_anchor   { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
-  / a:node_alias          { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
+  = '++' ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
+  / '+'  ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
+  / c:raw_coordinate         { return { kind: 'op-coord', coord: c }; }
+  / a:node_alias_anchor      { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
+  / a:node_alias             { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
 raw_coordinate "raw coordinate"
   = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
@@ -728,8 +728,9 @@ node_body_char
 
 identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
 
-// Node names allow a leading digit (e.g. \node (1) ... is valid TikZ) and trailing primes (A', B')
-node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-']*)
+// Node names allow a leading digit (e.g. \node (1) ... is valid TikZ), trailing primes (A', B'),
+// and embedded arithmetic chars (ar+1, r-1).
+node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-+']*)
 
 number "number"
   = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*
