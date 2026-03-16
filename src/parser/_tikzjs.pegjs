@@ -184,7 +184,9 @@
           rawSegs.push({ _pendingTo: item.rawOpts });
           break;
         case 'op-edge':
-          // edge ops are handled by tryBuildMultiEdgesFromOps; ignore here
+          // Node-name edges are handled by tryBuildMultiEdgesFromOps before buildSegments is called.
+          // When edge connects bare coordinates, treat as a 'to' line segment.
+          rawSegs.push({ _pendingTo: item.rawOpts });
           break;
         case 'op-arc': {
           const arcSeg = buildArcSegment(item.rawOpts);
@@ -525,7 +527,12 @@ path_statement
         return ft.makeScope(multiEdges, {}, []);
       }
       const { segments, inlineNodes, inlineCoords } = buildSegments(ops, nodeRegistry);
-      const path = ft.makePath(segments, style, rawOpts, inlineNodes);
+      // TikZ: `edge` in a path implies drawing (even with `\path` instead of `\draw`).
+      const hasEdgeOp = ops.some(function(o) { return o && o.kind === 'op-edge'; });
+      const effectiveStyle = (hasEdgeOp && !style.draw)
+        ? Object.assign({}, style, { draw: 'currentColor' })
+        : style;
+      const path = ft.makePath(segments, effectiveStyle, rawOpts, inlineNodes);
       if (inlineCoords.length > 0) {
         return ft.makeScope([...inlineCoords, path], {}, []);
       }
