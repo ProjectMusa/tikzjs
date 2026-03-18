@@ -19,8 +19,6 @@ echo "Generating extra SVGs..."
 echo "  Fixtures: $FIXTURES_DIR"
 echo "  Refs:     $REFS_DIR"
 
-mkdir -p "$REFS_DIR"
-
 # Check for required tools
 if ! command -v pdflatex &>/dev/null; then
   echo "ERROR: pdflatex not found. Install TeX Live."
@@ -36,12 +34,21 @@ else
   exit 1
 fi
 
-for tikz_file in "$FIXTURES_DIR"/*.tikz; do
+# Walk each numbered batch subdirectory (0/, 1/, 2/, …)
+for batch_dir in "$FIXTURES_DIR"/*/; do
+  [[ -d "$batch_dir" ]] || continue
+  batch_name="$(basename "$batch_dir")"
+  batch_refs="$REFS_DIR/$batch_name"
+  mkdir -p "$batch_refs"
+  echo "Batch $batch_name → $batch_refs/"
+
+for tikz_file in "$batch_dir"*.tikz; do
+  [[ -e "$tikz_file" ]] || continue
   base="$(basename "$tikz_file" .tikz)"
-  tmpdir="$TMPDIR_BASE/$base"
+  tmpdir="$TMPDIR_BASE/${batch_name}_${base}"
   mkdir -p "$tmpdir"
 
-  echo "  Processing: $base"
+  echo "  Processing: $batch_name/$base"
 
   FIXTURE_CONTENT="$(cat "$tikz_file")"
 
@@ -126,7 +133,7 @@ LATEX_EOF
       continue
     fi
     if [[ "$SVG_TOOL" == "dvisvgm" ]]; then
-      if ! dvisvgm "$tmpdir/doc.dvi" -o "$REFS_DIR/$base.svg" \
+      if ! dvisvgm "$tmpdir/doc.dvi" -o "$batch_refs/$base.svg" \
           > "$tmpdir/dvisvgm.log" 2>&1; then
         echo "    WARNING: dvisvgm failed for $base"
         continue
@@ -145,21 +152,23 @@ LATEX_EOF
     fi
 
     if [[ "$SVG_TOOL" == "dvisvgm" ]]; then
-      if ! dvisvgm --pdf "$tmpdir/doc.pdf" -o "$REFS_DIR/$base.svg" \
+      if ! dvisvgm --pdf "$tmpdir/doc.pdf" -o "$batch_refs/$base.svg" \
           > "$tmpdir/dvisvgm.log" 2>&1; then
         echo "    WARNING: dvisvgm failed for $base"
         continue
       fi
     else
-      if ! pdf2svg "$tmpdir/doc.pdf" "$REFS_DIR/$base.svg"; then
+      if ! pdf2svg "$tmpdir/doc.pdf" "$batch_refs/$base.svg"; then
         echo "    WARNING: pdf2svg failed for $base"
         continue
       fi
     fi
   fi
 
-  echo "    OK -> $REFS_DIR/$base.svg"
-done
+  echo "    OK -> $batch_refs/$base.svg"
+done  # tikz_file
+
+done  # batch_dir
 
 rm -rf "$TMPDIR_BASE"
 echo "Done. References saved to $REFS_DIR/"

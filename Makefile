@@ -17,12 +17,16 @@
 #   make install       — npm install (also runs gen + build via postinstall)
 #
 # Extra fixture targets (from HuggingFace dataset — fixtures not committed):
-#   make extra-fetch            — download fixtures from Navidium/tikz_dataset
-#   make extra-fetch COUNT=N    — download N fixtures (default: 50)
-#   make cdiff-extra            — run visual diff on extra fixtures
-#   make cdiff-extra-v          — cdiff-extra with verbose output
-#   make cdiff-one-extra NAME=N — compare a single extra fixture
-#   make serve-extra            — dev server for extra fixtures on :3738
+#   make extra-fetch                  — fetch 5 batches (batch/0=Navidium, 1+=DaTikZ-V4)
+#   make extra-fetch EXTRA_BATCHES=N  — fetch N batches
+#   make extra-golden                 — generate SVG refs for all batches
+#   make cdiff-extra                  — run visual diff on batch 0
+#   make cdiff-extra BATCH=2          — run visual diff on batch 2
+#   make cdiff-extra-v BATCH=2        — cdiff-extra with verbose output
+#   make cdiff-one-extra NAME=007     — compare a single fixture in BATCH
+#   make cdiff-one-extra NAME=007 BATCH=2
+#   make serve-extra                  — dev server for extra fixtures on :3738
+#   make serve-extra BATCH=2          — dev server for batch 2
 
 NODE_MODULES := ./node_modules/.bin
 PEGGY        := $(NODE_MODULES)/peggy
@@ -38,7 +42,8 @@ PIP          := $(VENV)/bin/pip
 EXTRA_FIXTURES := test/extra/fixtures
 EXTRA_REFS     := test/extra/refs
 EXTRA_REPORT   := /tmp/tikzjs-extra
-EXTRA_COUNT    ?= 50
+EXTRA_BATCHES  ?= 5
+BATCH          ?= 0
 
 .PHONY: all gen build test test-unit test-golden golden \
         cdiff cdiff-v cdiff-one venv serve clean install watch \
@@ -132,38 +137,38 @@ extra-golden:
 	@echo "→ Generating extra SVG references (requires TeX Live)..."
 	bash scripts/generateExtra.sh
 
-# Fetch extra fixtures from Navidium/tikz_dataset.
-# Override count with: make extra-fetch COUNT=100
+# Fetch extra fixtures: batch/0 from Navidium, batches 1+ from nllg/DaTikZ-V4.
+# Override batch count with: make extra-fetch EXTRA_BATCHES=10
 extra-fetch: venv
-	@echo "→ Fetching $(EXTRA_COUNT) extra fixtures from HuggingFace..."
-	$(PYTHON) -m tikzjs_compare.fetch --count $(EXTRA_COUNT) --output $(EXTRA_FIXTURES)
+	@echo "→ Fetching $(EXTRA_BATCHES) batch(es) of extra fixtures from HuggingFace..."
+	$(PYTHON) -m tikzjs_compare.fetch --batches $(EXTRA_BATCHES) --output $(EXTRA_FIXTURES)
 
-# Visual diff on extra fixtures (no golden refs — renders only, checks for errors).
-# Output: $(EXTRA_REPORT)/report.html
+# Visual diff on extra fixtures. Use BATCH=N to select a batch (default: 0).
+# Output: $(EXTRA_REPORT)/$(BATCH)/report.html
 cdiff-extra: build venv
-	@echo "→ Running extra fixture comparison..."
-	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
-	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) \
+	@echo "→ Running extra fixture comparison (batch $(BATCH))..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES)/$(BATCH) TIKZJS_REFS_DIR=$(EXTRA_REFS)/$(BATCH) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT)/$(BATCH) \
 	  $(PYTHON) -m tikzjs_compare
 
 cdiff-extra-v: build venv
-	@echo "→ Running extra fixture comparison (verbose)..."
-	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
-	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) GOLDEN_VERBOSE=1 \
+	@echo "→ Running extra fixture comparison (batch $(BATCH), verbose)..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES)/$(BATCH) TIKZJS_REFS_DIR=$(EXTRA_REFS)/$(BATCH) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT)/$(BATCH) GOLDEN_VERBOSE=1 \
 	  $(PYTHON) -m tikzjs_compare
 
-# Compare a single extra fixture: make cdiff-one-extra NAME=007
+# Compare a single extra fixture: make cdiff-one-extra NAME=007 [BATCH=0]
 cdiff-one-extra: build venv
-	@echo "→ Comparing extra fixture: $(NAME)"
-	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
-	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT) GOLDEN_VERBOSE=1 \
+	@echo "→ Comparing extra fixture: batch $(BATCH) / $(NAME)"
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES)/$(BATCH) TIKZJS_REFS_DIR=$(EXTRA_REFS)/$(BATCH) \
+	  TIKZJS_REPORT_DIR=$(EXTRA_REPORT)/$(BATCH) GOLDEN_VERBOSE=1 \
 	  $(PYTHON) -m tikzjs_compare $(NAME)
 
-# Dev server for extra fixtures on :3738 (visual diff report served at /diff)
+# Dev server for extra fixtures on :3738. Use BATCH=N to select a batch (default: 0).
 serve-extra:
-	@echo "→ Starting extra dev server at http://localhost:3738 ..."
-	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES) TIKZJS_REFS_DIR=$(EXTRA_REFS) \
-	  TIKZJS_DIFF_DIR=$(EXTRA_REPORT) \
+	@echo "→ Starting extra dev server (batch $(BATCH)) at http://localhost:3738 ..."
+	TIKZJS_FIXTURES_DIR=$(EXTRA_FIXTURES)/$(BATCH) TIKZJS_REFS_DIR=$(EXTRA_REFS)/$(BATCH) \
+	  TIKZJS_DIFF_DIR=$(EXTRA_REPORT)/$(BATCH) \
 	  node scripts/server.js 3738
 
 # ── Utilities ─────────────────────────────────────────────────────────────────

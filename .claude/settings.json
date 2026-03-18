@@ -32,7 +32,15 @@
       "Bash(pdfinfo /usr/share/texlive/texmf-dist/tex/latex/mwe/example-image.pdf)",
       "Bash(bash scripts/generateExtra.sh)",
       "Bash(dvisvgm --pdf /tmp/tikz001_v2/doc.pdf -o /home/lind/gits/tikzjs/test/extra/refs/001.svg)",
-      "Bash(ls /home/lind/gits/tikzjs/src/generators/svg/math*.ts)"
+      "Bash(ls /home/lind/gits/tikzjs/src/generators/svg/math*.ts)",
+      "Bash(python3 -c \"import sys; sys.path.insert\\(0,''python''\\); from tikzjs_compare.fetch import main; print\\(''OK''\\)\")",
+      "Bash(python3 -c \":*)",
+      "Bash(python3 -m tikzjs_compare.fetch --count 100 --output extra/fixtures)",
+      "Bash(.venv/bin/python -m tikzjs_compare.fetch --count 100 --output extra/fixtures)",
+      "Bash(python3 -c \"import ast, pathlib; ast.parse\\(pathlib.Path\\(''python/tikzjs_compare/fetch.py''\\).read_text\\(\\)\\); print\\(''AST OK''\\)\")",
+      "Bash(.venv/bin/python -m tikzjs_compare.fetch --batches 5)",
+      "Bash(bash -n /home/lind/gits/tikzjs/scripts/generateExtra.sh)",
+      "Bash(make -n cdiff-extra BATCH=2)"
     ]
   }
 }

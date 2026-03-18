@@ -6,7 +6,7 @@ import base64
 from pathlib import Path
 
 from .compare import CompareResult
-from .config import REPORT_DIR, DIFF_THRESHOLD, AREA_TOLERANCE
+from .config import REPORT_DIR, DIFF_THRESHOLD
 
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -73,20 +73,6 @@ tr.detail-row.open .detail-panel { display: block; }
 .img-card img { display: block; max-height: 160px; max-width: 320px;
                 border: 1px solid #444; border-radius: 3px; }
 
-/* component table */
-table.cc { border-collapse: collapse; font-size: 11px; font-family: monospace; }
-table.cc th { background: #333; color: #bbb; padding: 4px 10px; text-align: right; }
-table.cc th:first-child { text-align: center; }
-table.cc td { padding: 3px 10px; text-align: right; border-bottom: 1px solid #333; color: #ccc; }
-table.cc td:first-child { text-align: center; }
-table.cc tr.cc-ok td { color: #8f8; }
-table.cc tr.cc-bad td { color: #f88; }
-table.cc tr.cc-ok td:last-child::after { content: ' ✓'; }
-table.cc tr.cc-bad td:last-child::after { content: ' ✗'; }
-
-/* ratio bar inside component table */
-.ratio-cell { min-width: 90px; }
-.ratio-bar { display: inline-block; height: 8px; border-radius: 2px; vertical-align: middle; }
 """
 
 # ── JS ────────────────────────────────────────────────────────────────────────
@@ -141,51 +127,11 @@ def _diff_bar(pct: float) -> str:
     </div>'''
 
 
-def _ratio_bar(ratio: float) -> str:
-    """Bar showing deviation from ideal ratio=1."""
-    clamped = min(ratio, 2.0)
-    if ratio <= 1.0:
-        w = int((1.0 - ratio) / 1.0 * 50)
-        color = '#f88' if w > int(AREA_TOLERANCE * 50) else '#fa8'
-        return (f'<span class="ratio-bar" style="width:{w}px;background:#666"></span>'
-                f'<span class="ratio-bar" style="width:4px;background:#fff"></span>'
-                f'<span style="margin-left:4px">{ratio:.2f}</span>')
-    else:
-        w = int((clamped - 1.0) / 1.0 * 50)
-        color = '#f88' if w > int(AREA_TOLERANCE * 50) else '#fa8'
-        return (f'<span class="ratio-bar" style="width:4px;background:#fff"></span>'
-                f'<span class="ratio-bar" style="width:{w}px;background:{color}"></span>'
-                f'<span style="margin-left:4px">{ratio:.2f}</span>')
-
-
-def _component_table(result: CompareResult) -> str:
-    if not result.component_rows:
-        return '<p style="color:#888;font-size:11px">No component data.</p>'
-
-    rows_html = []
-    for r in result.component_rows:
-        cls   = 'cc-ok' if r.ok else 'cc-bad'
-        ratio = _ratio_bar(r.ratio)
-        rows_html.append(f'''<tr class="{cls}">
-          <td>{r.rank}</td>
-          <td>{r.our_area:.0f}</td>
-          <td>{r.ref_area:.0f}</td>
-          <td class="ratio-cell">{ratio}</td>
-        </tr>''')
-
-    return f'''<table class="cc">
-      <tr><th>#</th><th>ours px</th><th>ref px</th><th>ratio</th></tr>
-      {''.join(rows_html)}
-    </table>'''
-
-
 def _detail_panel(result: CompareResult) -> str:
-    b_ours    = _b64(result.name, 'ours')
-    b_ref     = _b64(result.name, 'ref')
-    b_diff    = _b64(result.name, 'diff')
-    b_struct  = _b64(result.name, 'struct')
-    b_cc_ours = _b64(result.name, 'cc_ours')
-    b_cc_ref  = _b64(result.name, 'cc_ref')
+    b_ours   = _b64(result.name, 'ours')
+    b_ref    = _b64(result.name, 'ref')
+    b_diff   = _b64(result.name, 'diff')
+    b_struct = _b64(result.name, 'struct')
 
     return f'''<div class="detail-panel">
   <div class="detail-grid">
@@ -211,21 +157,6 @@ def _detail_panel(result: CompareResult) -> str:
       </div>
       <div class="img-strip">
         {_img_card(f'struct diff {result.struct_diff:.2f}%', b_struct)}
-      </div>
-    </div>
-
-    <div>
-      <div class="section-title">Connected components</div>
-      <div class="img-strip" style="align-items:flex-start;gap:20px">
-        <div>
-          {_img_card('ours (labeled)', b_cc_ours)}
-        </div>
-        <div>
-          {_img_card('reference (labeled)', b_cc_ref)}
-        </div>
-        <div style="margin-top:22px">
-          {_component_table(result)}
-        </div>
       </div>
     </div>
 
@@ -277,15 +208,14 @@ def write_html_report(results: list[CompareResult]) -> Path:
     <span class="fail-count">{n_fail} failed</span>
     <span class="meta">of {len(results)} fixtures</span>
     <span class="meta">struct diff threshold: {DIFF_THRESHOLD}%</span>
-    <span class="meta">area tolerance: ±{int(AREA_TOLERANCE * 100)}%</span>
   </div>
 
   <div class="legend">
     <span class="leg"><span class="swatch" style="background:#3d3"></span> pass</span>
     <span class="leg"><span class="swatch" style="background:#d33"></span> fail</span>
-    <span class="leg"><span class="swatch" style="background:#aaa"></span> both (struct)</span>
-    <span class="leg"><span class="swatch" style="background:#44f"></span> extra in ours (struct)</span>
-    <span class="leg"><span class="swatch" style="background:#f44"></span> missing from ours (struct)</span>
+    <span class="leg"><span class="swatch" style="background:#aaa"></span> both</span>
+    <span class="leg"><span class="swatch" style="background:#44f"></span> extra in ours</span>
+    <span class="leg"><span class="swatch" style="background:#f44"></span> missing from ours</span>
     <span style="color:#888">— click any row to expand detail</span>
   </div>
 

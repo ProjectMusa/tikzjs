@@ -7,7 +7,7 @@ With no arguments, runs all fixtures found in test/golden/fixtures/.
 import sys
 from pathlib import Path
 
-from .config import FIXTURES_DIR, REPORT_DIR, DIFF_THRESHOLD, AREA_TOLERANCE, SCALE
+from .config import FIXTURES_DIR, REPORT_DIR, DIFF_THRESHOLD, SCALE
 from .compare import compare_fixture
 from .report import write_html_report
 
@@ -26,7 +26,6 @@ def main(argv: list[str] | None = None) -> int:
 
     print(f'Running golden comparison on {len(names)} fixture(s)...')
     print(f'  diff threshold : {DIFF_THRESHOLD}%')
-    print(f'  area tolerance : ±{int(AREA_TOLERANCE * 100)}%')
     print(f'  render scale   : {SCALE}x')
     print(f'  report dir     : {REPORT_DIR}')
     print()
