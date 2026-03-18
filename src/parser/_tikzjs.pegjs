@@ -576,7 +576,7 @@ operation_list
   = ops:(ws o:path_operation ws { return o; })* { return ops; }
 
 path_operation
-  = c:path_coordinate { return c; }
+  = c:path_op_coord   { return c; }
   / l:line_op         { return l; }
   / r:rectangle_op    { return r; }
   / g:grid_op         { return g; }
@@ -610,12 +610,17 @@ pic_body "pic body"
 
 /////////////////////// Coordinates //////////////////////////
 
+// Used only inside path_operation — absorbs a trailing [opts] block (e.g. (coord)[out=...,in=...] to)
+path_op_coord "coordinate"
+  = c:path_coordinate option_block { return c; }
+
 path_coordinate "coordinate"
-  = '++' ws c:raw_coordinate option_block { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
-  / '+'  ws c:raw_coordinate option_block { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
-  / c:raw_coordinate         option_block { return { kind: 'op-coord', coord: c }; }
-  / a:node_alias_anchor      option_block { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
-  / a:node_alias             option_block { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
+  = '++' ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
+  / '+'  ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
+  / c:raw_coordinate         { return { kind: 'op-coord', coord: c }; }
+  / a:node_alias_anchor      { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
+  / a:node_alias             { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
+  / '(' ws ')'               { return { kind: 'op-coord', coord: ft.coordRef(0, 0) }; }
 
 raw_coordinate "raw coordinate"
   = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
@@ -687,6 +692,7 @@ anchor_name
      / 'north' / 'south' / 'east' / 'west'
      / 'center' / 'mid east' / 'mid west' / 'base east' / 'base west'
      / 'mid' / 'base')
+  / $('-'? [0-9]+)
   / identifier
 
 /////////////////////// Path Operations //////////////////////////
