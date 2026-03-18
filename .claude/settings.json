@@ -40,7 +40,9 @@
       "Bash(python3 -c \"import ast, pathlib; ast.parse\\(pathlib.Path\\(''python/tikzjs_compare/fetch.py''\\).read_text\\(\\)\\); print\\(''AST OK''\\)\")",
       "Bash(.venv/bin/python -m tikzjs_compare.fetch --batches 5)",
       "Bash(bash -n /home/lind/gits/tikzjs/scripts/generateExtra.sh)",
-      "Bash(make -n cdiff-extra BATCH=2)"
+      "Bash(make -n cdiff-extra BATCH=2)",
+      "Bash(grep -n \"foreach\\\\|preprocessor\\\\|expand\" src/preprocessor/*.ts)",
+      "Bash(grep -v \"^>\\\\|^$\")"
     ]
   },
   "defaultMode": "bypassPermissions"

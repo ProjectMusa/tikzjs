@@ -490,6 +490,8 @@ statement
   / standalone_node_statement
   / standalone_coordinate_statement
   / tikzcd_statement
+  / ws ';' { return null; }
+  / ws '{' cnt:tikzcontent '}' { return cnt.length === 1 ? cnt[0] : (cnt.length > 0 ? ft.makeScope(cnt, {}, []) : null); }
 
 /////////////////////// Scope //////////////////////////
 
@@ -591,8 +593,9 @@ path_operation
   / coord:coordinate_op { return coord; }
   / p:pic_op          { return p; }
   / cycle_op          { return { kind: 'op-close' }; }
+  / plot_op           { return null; }
 
-cycle_op = ws 'cycle' ws
+cycle_op = ws 'cycle' ws ('{' ws '}' ws)?
 
 coordinate_op "coordinate path op"
   = ws 'coordinate' opt:option_block al:node_alias? ws
@@ -608,11 +611,11 @@ pic_body "pic body"
 /////////////////////// Coordinates //////////////////////////
 
 path_coordinate "coordinate"
-  = '++' ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
-  / '+'  ws c:raw_coordinate { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
-  / c:raw_coordinate         { return { kind: 'op-coord', coord: c }; }
-  / a:node_alias_anchor      { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
-  / a:node_alias             { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
+  = '++' ws c:raw_coordinate option_block { return { kind: 'op-coord', coord: { mode: 'relative',      coord: c.coord } }; }
+  / '+'  ws c:raw_coordinate option_block { return { kind: 'op-coord', coord: { mode: 'relative-pass', coord: c.coord } }; }
+  / c:raw_coordinate         option_block { return { kind: 'op-coord', coord: c }; }
+  / a:node_alias_anchor      option_block { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a[0], a[1]) }; }
+  / a:node_alias             option_block { return { kind: 'op-coord', coord: ft.nodeAnchorRef(a, 'center') }; }
 
 raw_coordinate "raw coordinate"
   = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
@@ -621,8 +624,28 @@ raw_coordinate "raw coordinate"
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
   / '(' ws angle:coord_num ws ':' ws radius:coord_num u:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
+  / '(' ws dir:direction_name ws ':' ws radius:coord_num u:dim_unit ws ')'
+    { return { mode: 'absolute', coord: { cs: 'polar', angle: dir, radius: radius * u } }; }
   / '($' ws e:calc_expr ws '$)'
     { return { mode: 'absolute', coord: { cs: 'calc', expr: e } }; }
+  / '(' ws '[' option_content ']' ws name:node_name ws '.' ws anchor:anchor_name ws ')'
+    { return ft.nodeAnchorRef(name, anchor); }
+  / '(' ws '[' option_content ']' ws name:node_name ws ')'
+    { return ft.nodeAnchorRef(name, 'center'); }
+
+direction_name "direction"
+  = 'north east' { return 45; }
+  / 'north west' { return 135; }
+  / 'south east' { return -45; }
+  / 'south west' { return -135; }
+  / 'north'      { return 90; }
+  / 'south'      { return -90; }
+  / 'east'       { return 0; }
+  / 'west'       { return 180; }
+  / 'up'         { return 90; }
+  / 'down'       { return -90; }
+  / 'right'      { return 0; }
+  / 'left'       { return 180; }
 
 // TikZ calc library expressions: $(A)!0.5!(B)$, $(A)+(B)$, etc.
 calc_expr "calc expression"
@@ -726,13 +749,31 @@ sin_op "sin"
 cos_op "cos"
   = ws 'cos' ws { return { kind: 'op-cos' }; }
 
+// plot path operation — consumed as no-op (expression evaluation not supported)
+plot_op "plot"
+  = ws 'plot' opt:option_block body:plot_body ws { return null; }
+
+plot_body "plot body"
+  = '(' plot_inner ')' { return null; }
+  / '{' brace_content '}' plot_body { return null; }
+  / '' { return null; }
+
+plot_inner "plot inner"
+  = chars:plot_inner_char* { return null; }
+
+plot_inner_char
+  = '{' brace_content '}' { return null; }
+  / '(' plot_inner ')' { return null; }
+  / c:[^{}()] { return null; }
+
 node_op "node"
-  = ws 'node' opt:option_block al:node_alias? opt2:option_block cnt:node_content ws
+  = ws 'node' opt:option_block al:node_alias? at_coord:node_at opt2:option_block cnt:node_content ws
     {
       const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
       const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
         { name: al || undefined, anchor: anchorFor(rawOpts) });
+      if (at_coord) node.pos = at_coord;
       registerNode(node);
       return { kind: 'op-node', node };
     }
@@ -785,6 +826,7 @@ coord_term
 
 coord_factor
   = '(' ws e:coord_num ws ')' { return e; }
+  / '{' ws e:coord_num ws '}' { return e; }
   / '-' ws n:pos_number       { return -n; }
   / '+' ws n:pos_number       { return n; }
   / n:pos_number              { return n; }
