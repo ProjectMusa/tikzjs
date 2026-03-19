@@ -209,7 +209,7 @@ function computeCubicBendControls(
   if (len < 1e-9) return { c1: { x: from.x, y: from.y }, c2: { x: to.x, y: to.y } }
   const ux = dx / len
   const uy = dy / len
-  const d = 0.3915 * len
+  const d = TIKZ_CONSTANTS.TO_PATH_LOOSENESS * len
   const rad = (angle * Math.PI) / 180
   const cosA = Math.cos(rad)
   const sinA = Math.sin(rad)
