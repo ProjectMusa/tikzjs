@@ -1,0 +1,33 @@
+\begin{tikzpicture}[scale=1.1]
+
+\draw[rounded corners=4pt, thick] (0,0) rectangle (3,5);
+
+\fill (1.0,5) circle (2.2pt);
+\fill (2.0,5) circle (2.2pt);
+\fill (1.0,0) circle (2.2pt);
+\fill (2.0,0) circle (2.2pt);
+
+\begin{knot}[
+  clip width    = 6,
+  end tolerance = 2pt,
+  background color = white,
+  flip crossing = 1,   %% top-right: B over loop
+  flip crossing = 4,   %% top-left:  A over loop
+]
+  %% Loop declared FIRST → over by default.
+  %% Crossings 1 & 4 (top) are flipped so strands pass over the loop there.
+  %% Crossings 2 & 3 (bottom) keep default → loop passes over strands there.
+  \strand[thick] (1.5,4.0)
+    .. controls (2.7,4.0) and (2.7,0.8) .. (1.5,0.8)
+    .. controls (0.3,0.8) and (0.3,4.0) .. (1.5,4.0);
+
+  %% Strand A: top-left → bottom-right
+  \strand[thick] (1.0,5)
+    .. controls (1.0,3.0) and (2.0,2.0) .. (2.0,0);
+
+  %% Strand B: top-right → bottom-left
+  \strand[thick] (2.0,5)
+    .. controls (2.0,3.0) and (1.0,2.0) .. (1.0,0);
+
+\end{knot}
+\end{tikzpicture}

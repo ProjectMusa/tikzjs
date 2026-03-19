@@ -30,6 +30,8 @@ export interface ElementRenderResult {
   nodeElements: Element[]
   /** Bounding boxes of all rendered geometry (for viewBox computation). */
   bboxes: BoundingBox[]
+  /** <clipPath> elements that must be placed inside <defs>. */
+  clipDefs?: Element[]
 }
 
 // ── Context type ──────────────────────────────────────────────────────────────

@@ -15,6 +15,7 @@ import {
   IRMatrix,
   IREdge,
   IRTikzcdArrow,
+  IRKnot,
   IRElement,
   CoordRef,
   PathSegment,
@@ -27,6 +28,7 @@ import {
   StyleDefinition,
   NodePlacementCoord,
 } from '../ir/types.js'
+import { KnotEnvironment, strandDrawWidth } from '../preprocessor/knotPreprocessor.js'
 
 // ── ID generation ─────────────────────────────────────────────────────────────
 
@@ -279,6 +281,22 @@ function makeBendRouting(rawOptions: RawOption[]): EdgeRouting {
     }
   }
   return { kind: 'straight' }
+}
+
+// ── Knot factory ──────────────────────────────────────────────────────────────
+
+export function makeKnot(id: string, env: KnotEnvironment): IRKnot {
+  return {
+    kind: 'knot',
+    id,
+    strands: env.strands.map(s => ({
+      segments: s.segments,
+      drawWidth: strandDrawWidth(s.optStr),
+    })),
+    clipWidth: env.clipWidth,
+    flipCrossings: env.flipCrossings,
+    style: {},
+  }
 }
 
 // ── Diagram factory ───────────────────────────────────────────────────────────

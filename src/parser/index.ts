@@ -29,6 +29,7 @@ export function parseExpanded(doc: ExpandedDoc, opts: ParseOptions = {}): IRDiag
   const diagram = generatedParser.parse(doc.source, {
     styleRegistry: doc.styleRegistry,
     tikzcdGrids: doc.tikzcdGrids,
+    knotEnvs: doc.knotEnvs,
     nodeRegistry,
   }) as IRDiagram
 

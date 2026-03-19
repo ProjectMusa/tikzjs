@@ -100,15 +100,21 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   svg.setAttribute('height',  `${heightPt}pt`)
   svg.setAttribute('viewBox', viewBox)
 
-  // Add <defs> with marker and pattern definitions if any
-  const hasDefs = markerRegistry.size > 0 || patternRegistry.size > 0
+  // Add <defs> with marker, pattern, and clip-path definitions if any
+  const allClipDefs = [...(r2.clipDefs ?? [])]
+  const hasDefs = markerRegistry.size > 0 || patternRegistry.size > 0 || allClipDefs.length > 0
   if (hasDefs) {
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs')
     if (markerRegistry.size > 0) {
-      const defs = renderMarkerDefs(document, markerRegistry)
-      svg.appendChild(defs)
+      const markerDefs = renderMarkerDefs(document, markerRegistry)
+      for (const child of Array.from(markerDefs.childNodes)) defs.appendChild(child)
     }
     const patternDefs = renderPatternDefs(document, patternRegistry)
-    if (patternDefs) svg.appendChild(patternDefs)
+    if (patternDefs) {
+      for (const child of Array.from(patternDefs.childNodes)) defs.appendChild(child)
+    }
+    for (const cd of allClipDefs) defs.appendChild(cd)
+    svg.appendChild(defs)
   }
 
   // Paths first (behind), then node groups (on top)
@@ -126,7 +132,7 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
  * Returns accumulated path elements, node elements, and bounding boxes.
  */
 export function renderPass(elements: IRElement[], ctx: RenderContext): ElementRenderResult {
-  const accum: ElementRenderResult = { pathElements: [], nodeElements: [], bboxes: [] }
+  const accum: ElementRenderResult = { pathElements: [], nodeElements: [], bboxes: [], clipDefs: [] }
   for (const el of elements) {
     const handler = ctx.registry[el.kind as keyof SVGRendererRegistry]
     if (!handler) continue
@@ -135,6 +141,7 @@ export function renderPass(elements: IRElement[], ctx: RenderContext): ElementRe
       accum.pathElements.push(...result.pathElements)
       accum.nodeElements.push(...result.nodeElements)
       accum.bboxes.push(...result.bboxes)
+      if (result.clipDefs) accum.clipDefs!.push(...result.clipDefs)
     }
   }
   return accum

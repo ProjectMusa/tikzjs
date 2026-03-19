@@ -407,6 +407,7 @@
   // Per-parse initializer
   const registry     = (options && options.styleRegistry) ? options.styleRegistry : { has: () => false, get: () => undefined, toRecord: () => ({}) };
   const tikzcdGrids  = (options && options.tikzcdGrids)   ? options.tikzcdGrids   : new Map();
+  const knotEnvs     = (options && options.knotEnvs)      ? options.knotEnvs      : new Map();
   const nodeRegistry = (options && options.nodeRegistry)  ? options.nodeRegistry  : {};
 
   function resolveOpts(rawOpts) { return op.resolveOptions(rawOpts, registry); }
@@ -490,6 +491,7 @@ statement
   / standalone_node_statement
   / standalone_coordinate_statement
   / tikzcd_statement
+  / knot_statement
   / ws ';' { return null; }
   / ws '{' cnt:tikzcontent '}' { return cnt.length === 1 ? cnt[0] : (cnt.length > 0 ? ft.makeScope(cnt, {}, []) : null); }
 
@@ -510,6 +512,16 @@ tikzcd_statement
       const grid = tikzcdGrids.get(id);
       if (!grid) return null;
       return buildMatrixFromGrid(grid, id, nodeRegistry, resolveOpts);
+    }
+
+/////////////////////// Knot placeholder //////////////////////////
+
+knot_statement
+  = '\\tikzjsKnot' ws '{' id:identifier '}'
+    {
+      const env = knotEnvs.get(id);
+      if (!env) return null;
+      return ft.makeKnot(id, env);
     }
 
 /////////////////////// Path Statements //////////////////////////

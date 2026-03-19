@@ -21,10 +21,12 @@ import { MacroTable, collectAndStripMacros, expandMacros } from './macroExpander
 import { StyleRegistry, parseTikzset, parseTikzstyle } from './styleRegistry.js'
 import { expandAllForeach } from './foreachExpander.js'
 import { extractTikzcdEnvironments, TikzcdGrid } from './tikzcdPreprocessor.js'
+import { extractKnotEnvironments, KnotEnvironment } from './knotPreprocessor.js'
 import { Scanner } from './scanner.js'
 
 export { MacroTable, StyleRegistry }
 export type { TikzcdGrid } from './tikzcdPreprocessor.js'
+export type { KnotEnvironment, IRKnotBezier, KnotStrand } from './knotPreprocessor.js'
 
 export interface ExpandedDoc {
   /** Preprocessed source string, ready for the PEG parser. */
@@ -35,6 +37,8 @@ export interface ExpandedDoc {
   macroTable: MacroTable
   /** Parsed tikzcd grids keyed by their placeholder IDs. */
   tikzcdGrids: Map<string, TikzcdGrid>
+  /** Knot environments keyed by their placeholder IDs. */
+  knotEnvs: Map<string, KnotEnvironment>
 }
 
 /**
@@ -68,8 +72,9 @@ export function preprocess(rawSource: string): ExpandedDoc {
     src = expandMacros(src, macroTable)
   }
 
-  // Pass 5: Flatten \begin{knot}...\end{knot} environments
-  src = flattenKnotEnvironments(src)
+  // Pass 5: Extract \begin{knot}...\end{knot} environments
+  const { expandedSource: knotExpanded, knots: knotEnvs } = extractKnotEnvironments(src)
+  src = knotExpanded
 
   // Pass 6: Extract tikzcd environments
   const { expandedSource, grids: tikzcdGrids } = extractTikzcdEnvironments(src)
@@ -80,6 +85,7 @@ export function preprocess(rawSource: string): ExpandedDoc {
     styleRegistry,
     macroTable,
     tikzcdGrids,
+    knotEnvs,
   }
 }
 
@@ -189,26 +195,6 @@ function collectAndStripStyles(src: string, registry: StyleRegistry): string {
   return result
 }
 
-/**
- * Flatten \begin{knot}[opts]...\end{knot} environments.
- *
- * The `knots` TikZ library draws strands with over/under crossing effects that
- * tikzjs cannot reproduce. We approximate by:
- *   - Replacing \begin{knot}[opts] with \begin{scope}[opts]
- *   - Replacing \strand with \draw
- *   - Replacing \end{knot} with \end{scope}
- *
- * Crossing options (clip width, end tolerance, flip crossing) are silently dropped.
- */
-function flattenKnotEnvironments(src: string): string {
-  // Replace \begin{knot}[...] with \begin{scope}[...]
-  src = src.replace(/\\begin\s*\{\s*knot\s*\}/g, '\\begin{scope}')
-  // Replace \end{knot} with \end{scope}
-  src = src.replace(/\\end\s*\{\s*knot\s*\}/g, '\\end{scope}')
-  // Replace \strand with \draw
-  src = src.replace(/\\strand\b/g, '\\draw')
-  return src
-}
 
 /**
  * Convenience: preprocess and return just the source string.

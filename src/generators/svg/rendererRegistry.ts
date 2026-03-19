@@ -15,6 +15,7 @@ import {
   IRMatrix,
   IRScope,
   IRNamedCoordinate,
+  IRKnot,
 } from '../../ir/types.js'
 import { ElementRenderResult, RenderContext } from './renderContext.js'
 import { mergeStyles } from './styleEmitter.js'
@@ -22,11 +23,13 @@ import { emitNode } from './nodeEmitter.js'
 import { emitPath } from './pathEmitter.js'
 import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
+import { emitKnot } from './knotEmitter.js'
 import { ensurePattern } from './patternDefs.js'
 import { mathModeRenderer } from '../../math/index.js'
 
 // ── Handler type aliases ──────────────────────────────────────────────────────
 
+export type KnotHandler       = (el: IRKnot,            ctx: RenderContext) => ElementRenderResult | null
 export type NodeHandler       = (el: IRNode,            ctx: RenderContext) => ElementRenderResult | null
 export type PathHandler       = (el: IRPath,            ctx: RenderContext) => ElementRenderResult | null
 export type EdgeHandler       = (el: IREdge,            ctx: RenderContext) => ElementRenderResult | null
@@ -48,6 +51,7 @@ export interface SVGRendererRegistry {
   matrix:          MatrixHandler
   scope:           ScopeHandler
   coordinate:      CoordinateHandler
+  knot:            KnotHandler
 }
 
 // ── Default handlers (wrap existing emitter functions) ────────────────────────
@@ -117,7 +121,7 @@ const defaultScopeHandler: ScopeHandler = (el, ctx) => {
   }
   // We need access to the renderPass loop. Since renderPass is in index.ts, we store
   // the loop function in a registry-accessible way. For now, inline the loop here.
-  const accum: ElementRenderResult = { pathElements: [], nodeElements: [], bboxes: [] }
+  const accum: ElementRenderResult = { pathElements: [], nodeElements: [], bboxes: [], clipDefs: [] }
   for (const child of el.children) {
     const handler = childCtx.registry[child.kind as keyof SVGRendererRegistry]
     if (!handler) continue
@@ -126,6 +130,7 @@ const defaultScopeHandler: ScopeHandler = (el, ctx) => {
       accum.pathElements.push(...result.pathElements)
       accum.nodeElements.push(...result.nodeElements)
       accum.bboxes.push(...result.bboxes)
+      if (result.clipDefs) accum.clipDefs!.push(...result.clipDefs)
     }
   }
   return accum
@@ -152,6 +157,13 @@ const defaultCoordinateHandler: CoordinateHandler = (el, ctx) => {
  * the renderPass loop in index.ts, which peeks at path.inlineNodes in pass 1.
  */
 
+const defaultKnotHandler: KnotHandler = (el, ctx) => {
+  if (ctx.pass !== 2) return null
+  const merged = { ...el, style: mergeStyles(ctx.inheritedStyle, el.style) }
+  const result = emitKnot(merged, ctx.document, ctx.inheritedStyle, ctx.coordResolver.coordScale)
+  return { pathElements: result.elements, nodeElements: [], bboxes: [result.bbox], clipDefs: result.clipDefs }
+}
+
 // ── Default registry export ───────────────────────────────────────────────────
 
 export const defaultSVGRegistry: SVGRendererRegistry = {
@@ -162,4 +174,5 @@ export const defaultSVGRegistry: SVGRendererRegistry = {
   matrix:         defaultMatrixHandler,
   scope:          defaultScopeHandler,
   coordinate:     defaultCoordinateHandler,
+  knot:           defaultKnotHandler,
 }

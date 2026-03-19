@@ -398,6 +398,35 @@ export interface IRTikzcdArrow extends IREdge {
   colDelta: number
 }
 
+// ── Knot diagram ──────────────────────────────────────────────────────────────
+
+/** One cubic bezier segment stored in the IR (coordinates in TeX points). */
+export interface IRKnotBezier {
+  x0: number; y0: number    // start
+  cx1: number; cy1: number  // control point 1
+  cx2: number; cy2: number  // control point 2
+  x3: number; y3: number    // end
+}
+
+export interface IRKnotStrand {
+  segments: IRKnotBezier[]
+  drawWidth: number  // pt
+}
+
+/**
+ * A \begin{knot}...\end{knot} environment from the `knots` TikZ library.
+ * Rendered with over/under crossing effects: first strand over by default,
+ * flipCrossings[i] indexes (0-based) the crossings where later strand goes over.
+ */
+export interface IRKnot {
+  kind: 'knot'
+  id: string
+  strands: IRKnotStrand[]
+  clipWidth: number       // multiplier for the white-gap stroke (default 5)
+  flipCrossings: number[] // 0-based crossing indices where over/under is flipped
+  style: ResolvedStyle
+}
+
 export type IRElement =
   | IRNode
   | IRNamedCoordinate
@@ -406,6 +435,7 @@ export type IRElement =
   | IRMatrix
   | IREdge
   | IRTikzcdArrow
+  | IRKnot
 
 // ── Style Registry ────────────────────────────────────────────────────────────
 
