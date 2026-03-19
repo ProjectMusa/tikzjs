@@ -126,30 +126,29 @@ function buildEdgePath(
     }
 
     case 'bend': {
-      const angle = routing.angle
-      const dir = routing.direction === 'left' ? 1 : -1
-      // Compute control point from unclipped centers to get the correct tangent directions.
-      // Then re-clip using those tangents so the arrow exits/enters the node at the bend angle.
-      const { cx: cxApprox, cy: cyApprox } = computeBendControl(from, to, angle, dir)
-      const fromClippedBend = clipToNodeBoundary({ x: cxApprox, y: cyApprox }, from, fromGeo)
-      const toClippedBend   = clipToNodeBoundary({ x: cxApprox, y: cyApprox }, to, toGeo)
-      const { cx, cy } = computeBendControl(fromClippedBend, toClippedBend, angle, dir)
-      const midX = (fromClippedBend.x + 2 * cx + toClippedBend.x) / 4
-      const midY = (fromClippedBend.y + 2 * cy + toClippedBend.y) / 4
-      // Elevate quadratic to cubic so cairosvg computes correct tangent angles for marker-end.
-      // Cubic equivalent: C1 = P0 + 2/3*(Q - P0),  C2 = P2 + 2/3*(Q - P2)
+      const rawAngle = routing.angle
+      const angle = Math.abs(rawAngle)
+      // In TikZ, bend right=-X is equivalent to bend left=X (negative angle flips direction)
+      const baseDir = routing.direction === 'left' ? 1 : -1
+      const dir = rawAngle < 0 ? -baseDir : baseDir
+      // Use TikZ's actual cubic bezier formula: control points at distance 0.3915*len
+      // placed at the rotated chord direction (not a quadratic approximation).
+      // First compute approx control points from unclipped centers for tangent-clipping.
+      const { c1: c1Approx, c2: c2Approx } = computeCubicBendControls(from, to, angle, dir)
+      const fromClippedBend = clipToNodeBoundary(c1Approx, from, fromGeo)
+      const toClippedBend   = clipToNodeBoundary(c2Approx, to, toGeo)
+      const { c1, c2 } = computeCubicBendControls(fromClippedBend, toClippedBend, angle, dir)
       const { x: x0, y: y0 } = fromClippedBend
       const { x: x2, y: y2 } = toClippedBend
-      const c1x = x0 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cx - x0)
-      const c1y = y0 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cy - y0)
-      const c2x = x2 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cx - x2)
-      const c2y = y2 + TIKZ_CONSTANTS.QUAD_TO_CUBIC_FACTOR * (cy - y2)
+      // Midpoint of cubic bezier at t=0.5: (P0 + 3*C1 + 3*C2 + P3) / 8
+      const midX = (x0 + 3 * c1.x + 3 * c2.x + x2) / 8
+      const midY = (y0 + 3 * c1.y + 3 * c2.y + y2) / 8
       return {
-        d: `M ${x0} ${y0} C ${c1x} ${c1y} ${c2x} ${c2y} ${x2} ${y2}`,
+        d: `M ${x0} ${y0} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${x2} ${y2}`,
         midpoint: { x: midX, y: midY },
         bbox: fromCorners(
-          Math.min(fromClippedBend.x, cx, toClippedBend.x), Math.min(fromClippedBend.y, cy, toClippedBend.y),
-          Math.max(fromClippedBend.x, cx, toClippedBend.x), Math.max(fromClippedBend.y, cy, toClippedBend.y)
+          Math.min(x0, c1.x, c2.x, x2), Math.min(y0, c1.y, c2.y, y2),
+          Math.max(x0, c1.x, c2.x, x2), Math.max(y0, c1.y, c2.y, y2)
         ),
       }
     }
@@ -188,24 +187,42 @@ function buildEdgePath(
   }
 }
 
-function computeBendControl(
+/**
+ * Compute TikZ-accurate cubic bezier control points for a bend edge.
+ *
+ * TikZ places c1 and c2 at distance d = 0.3915 * len (looseness=1) from P0 and P3
+ * respectively, rotated by ±angle from the chord direction.
+ *
+ * In SVG y-down coords (where "left" = CW rotation = dir=1):
+ *   c1 = P0 + d * ( ux*cos(X) + dir*uy*sin(X),  uy*cos(X) - dir*ux*sin(X) )
+ *   c2 = P3 + d * (-ux*cos(X) + dir*uy*sin(X), -uy*cos(X) - dir*ux*sin(X) )
+ */
+function computeCubicBendControls(
   from: AbsoluteCoordinate,
   to: AbsoluteCoordinate,
   angle: number,
   dir: number
-): { cx: number; cy: number } {
-  const mx = (from.x + to.x) / 2
-  const my = (from.y + to.y) / 2
+): { c1: AbsoluteCoordinate; c2: AbsoluteCoordinate } {
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
-  if (len < 1e-9) return { cx: mx, cy: my }
-  // CW rotation in SVG (y-down) = CCW in TikZ (y-up) = "left" side of travel direction.
-  // For a rightward arrow (dx>0, dy=0): perpX=0, perpY=-1 = UP in SVG = above = left ✓
-  const perpX = dy / len
-  const perpY = -dx / len
-  const d = (len / 2) * Math.tan((angle * Math.PI) / 180)
-  return { cx: mx + dir * perpX * d, cy: my + dir * perpY * d }
+  if (len < 1e-9) return { c1: { x: from.x, y: from.y }, c2: { x: to.x, y: to.y } }
+  const ux = dx / len
+  const uy = dy / len
+  const d = 0.3915 * len
+  const rad = (angle * Math.PI) / 180
+  const cosA = Math.cos(rad)
+  const sinA = Math.sin(rad)
+  return {
+    c1: {
+      x: from.x + d * (ux * cosA + dir * uy * sinA),
+      y: from.y + d * (uy * cosA - dir * ux * sinA),
+    },
+    c2: {
+      x: to.x + d * (-ux * cosA + dir * uy * sinA),
+      y: to.y + d * (-uy * cosA - dir * ux * sinA),
+    },
+  }
 }
 
 function buildLoopPath(

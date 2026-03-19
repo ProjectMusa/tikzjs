@@ -43,7 +43,9 @@
       "Bash(make -n cdiff-extra BATCH=2)",
       "Bash(grep -n \"foreach\\\\|preprocessor\\\\|expand\" src/preprocessor/*.ts)",
       "Bash(grep -v \"^>\\\\|^$\")",
-      "Bash(grep -v \"^$\")"
+      "Bash(grep -v \"^$\")",
+      "Bash(for b:*)",
+      "Bash(do echo:*)"
     ]
   },
   "defaultMode": "bypassPermissions"
