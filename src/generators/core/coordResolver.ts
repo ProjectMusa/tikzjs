@@ -317,6 +317,9 @@ export class CoordResolver {
     this._currentY = y
   }
 
+  /** The coordinate scale factor (from tikzpicture-level scale=...). */
+  get coordScale(): number { return this._coordScale }
+
   /** Create a clone for sub-path processing. */
   clone(): CoordResolver {
     const c = new CoordResolver(this._nodeRegistry, this._coordScale, this._nodeDistancePt)

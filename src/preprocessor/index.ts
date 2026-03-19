@@ -68,7 +68,10 @@ export function preprocess(rawSource: string): ExpandedDoc {
     src = expandMacros(src, macroTable)
   }
 
-  // Pass 5: Extract tikzcd environments
+  // Pass 5: Flatten \begin{knot}...\end{knot} environments
+  src = flattenKnotEnvironments(src)
+
+  // Pass 6: Extract tikzcd environments
   const { expandedSource, grids: tikzcdGrids } = extractTikzcdEnvironments(src)
   src = expandedSource
 
@@ -184,6 +187,27 @@ function collectAndStripStyles(src: string, registry: StyleRegistry): string {
   }
 
   return result
+}
+
+/**
+ * Flatten \begin{knot}[opts]...\end{knot} environments.
+ *
+ * The `knots` TikZ library draws strands with over/under crossing effects that
+ * tikzjs cannot reproduce. We approximate by:
+ *   - Replacing \begin{knot}[opts] with \begin{scope}[opts]
+ *   - Replacing \strand with \draw
+ *   - Replacing \end{knot} with \end{scope}
+ *
+ * Crossing options (clip width, end tolerance, flip crossing) are silently dropped.
+ */
+function flattenKnotEnvironments(src: string): string {
+  // Replace \begin{knot}[...] with \begin{scope}[...]
+  src = src.replace(/\\begin\s*\{\s*knot\s*\}/g, '\\begin{scope}')
+  // Replace \end{knot} with \end{scope}
+  src = src.replace(/\\end\s*\{\s*knot\s*\}/g, '\\end{scope}')
+  // Replace \strand with \draw
+  src = src.replace(/\\strand\b/g, '\\draw')
+  return src
 }
 
 /**

@@ -1,0 +1,52 @@
+\begin{tikzpicture}[scale=0.82]
+
+%% ── positive crossing τ₊ ────────────────────────────────────────────
+\begin{scope}[xshift=0cm]
+\draw[rounded corners=2pt, thick] (0,0) rectangle (1.6,2);
+\node[font=\small] at (0.8,-0.35) {$\tau_+$};
+% boundary dots top
+\fill (0.5,2) circle (2pt);
+\fill (1.1,2) circle (2pt);
+% boundary dots bottom
+\fill (0.5,0) circle (2pt);
+\fill (1.1,0) circle (2pt);
+\begin{knot}[
+  clip width   = 5,
+  end tolerance= 1pt,
+]
+  \strand[thick] (0.5,2) .. controls (0.5,1.4) and (1.1,0.6) .. (1.1,0);
+  \strand[thick] (1.1,2) .. controls (1.1,1.4) and (0.5,0.6) .. (0.5,0);
+\end{knot}
+\end{scope}
+
+%% ── negative crossing τ₋ ────────────────────────────────────────────
+\begin{scope}[xshift=2.4cm]
+\draw[rounded corners=2pt, thick] (0,0) rectangle (1.6,2);
+\node[font=\small] at (0.8,-0.35) {$\tau_-$};
+\fill (0.5,2) circle (2pt);
+\fill (1.1,2) circle (2pt);
+\fill (0.5,0) circle (2pt);
+\fill (1.1,0) circle (2pt);
+\begin{knot}[
+  clip width   = 5,
+  end tolerance= 1pt,
+  flip crossing = 1,
+]
+  \strand[thick] (0.5,2) .. controls (0.5,1.4) and (1.1,0.6) .. (1.1,0);
+  \strand[thick] (1.1,2) .. controls (1.1,1.4) and (0.5,0.6) .. (0.5,0);
+\end{knot}
+\end{scope}
+
+%% ── identity (parallel strands) ─────────────────────────────────────
+\begin{scope}[xshift=4.8cm]
+\draw[rounded corners=2pt, thick] (0,0) rectangle (1.6,2);
+\node[font=\small] at (0.8,-0.35) {$\mathrm{id}$};
+\fill (0.5,2) circle (2pt);
+\fill (1.1,2) circle (2pt);
+\fill (0.5,0) circle (2pt);
+\fill (1.1,0) circle (2pt);
+\draw[thick] (0.5,2) -- (0.5,0);
+\draw[thick] (1.1,2) -- (1.1,0);
+\end{scope}
+
+\end{tikzpicture}

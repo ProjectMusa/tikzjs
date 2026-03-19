@@ -209,7 +209,22 @@ export function emitPath(
       case 'rectangle': {
         if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         const to = resolver.resolve((seg as any).to)
-        d += `L ${to.x} ${lastPos.y} L ${to.x} ${to.y} L ${lastPos.x} ${to.y} L ${lastPos.x} ${lastPos.y} Z `
+        const rc = path.style.roundedCorners
+        if (rc && rc > 0) {
+          const r = Math.min(ptToPx(rc), Math.abs(to.x - lastPos.x) / 2, Math.abs(to.y - lastPos.y) / 2)
+          const x0 = lastPos.x, y0 = lastPos.y, x1 = to.x, y1 = to.y
+          // Signed offsets so arcs curve into the rectangle interior in both orientations.
+          // SVG y-axis is inverted vs TikZ, so y1 < y0 when the rect extends "upward" in TikZ.
+          const rx = x1 > x0 ? r : -r
+          const ry = y1 > y0 ? r : -r
+          d += `M ${x0 + rx} ${y0} `
+          d += `L ${x1 - rx} ${y0} Q ${x1} ${y0} ${x1} ${y0 + ry} `
+          d += `L ${x1} ${y1 - ry} Q ${x1} ${y1} ${x1 - rx} ${y1} `
+          d += `L ${x0 + rx} ${y1} Q ${x0} ${y1} ${x0} ${y1 - ry} `
+          d += `L ${x0} ${y0 + ry} Q ${x0} ${y0} ${x0 + rx} ${y0} Z `
+        } else {
+          d += `L ${to.x} ${lastPos.y} L ${to.x} ${to.y} L ${lastPos.x} ${to.y} L ${lastPos.x} ${lastPos.y} Z `
+        }
         bboxes.push(fromCorners(
           Math.min(lastPos.x, to.x), Math.min(lastPos.y, to.y),
           Math.max(lastPos.x, to.x), Math.max(lastPos.y, to.y)
@@ -378,14 +393,14 @@ export function emitPath(
 
     applyAttrs(pathEl, buildPathAttrs(path.style, markerIds))
 
-    const transform = buildTransform(path.style)
+    const transform = buildTransform(path.style, 0, 0, resolver.coordScale)
     if (transform) pathEl.setAttribute('transform', transform)
 
     elements.push(pathEl)
   }
 
   const rawBBox = mergeBBoxes(bboxes)
-  const transform = buildTransform(path.style)
+  const transform = buildTransform(path.style, 0, 0, resolver.coordScale)
 
   // Expand bbox by half the stroke width so thick lines don't clip the viewBox.
   const strokeHalfPx = ptToPx(

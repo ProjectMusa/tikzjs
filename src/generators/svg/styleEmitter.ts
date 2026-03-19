@@ -128,12 +128,12 @@ export function applyAttrs(el: Element, attrs: Record<string, string | undefined
 /**
  * Build a transform attribute string from ResolvedStyle.
  */
-export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0): string | undefined {
+export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale = 1): string | undefined {
   const parts: string[] = []
 
   if (style.xshift || style.yshift) {
-    const tx = ptToPx(style.xshift ?? 0)
-    const ty = ptToPx(style.yshift ?? 0)
+    const tx = ptToPx((style.xshift ?? 0) * coordScale)
+    const ty = ptToPx((style.yshift ?? 0) * coordScale)
     parts.push(`translate(${tx},${-ty})`)
   }
 

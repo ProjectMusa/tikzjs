@@ -201,7 +201,7 @@ export function emitNode(
   }
 
   // Apply transform from style (rotate, shift, scale)
-  const transform = buildTransform(node.style, centerX, centerY)
+  const transform = buildTransform(node.style, centerX, centerY, resolver.coordScale)
   if (transform) {
     const existing = g.getAttribute('transform') ?? ''
     g.setAttribute('transform', existing ? existing + ' ' + transform : transform)

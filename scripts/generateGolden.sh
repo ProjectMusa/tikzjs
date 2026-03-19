@@ -52,13 +52,20 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
   # Create a minimal LaTeX document wrapping the fixture
   FIXTURE_CONTENT="$(cat "$tikz_file")"
 
-  # Detect environment type
+  # Detect environment type and required libraries
+  TIKZ_LIBRARIES=""
+  if echo "$FIXTURE_CONTENT" | grep -q '\\begin{knot}'; then
+    TIKZ_LIBRARIES="knots"
+  fi
+
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{tikzcd}'; then
     USE_PACKAGES="\\usepackage{tikz}\\usepackage{tikz-cd}"
-  elif echo "$FIXTURE_CONTENT" | grep -q '\\foreach'; then
-    USE_PACKAGES="\\usepackage{tikz}"
   else
     USE_PACKAGES="\\usepackage{tikz}"
+  fi
+
+  if [[ -n "$TIKZ_LIBRARIES" ]]; then
+    USE_PACKAGES="${USE_PACKAGES}\\usetikzlibrary{${TIKZ_LIBRARIES}}"
   fi
 
   cat > "$tmpdir/doc.tex" << LATEX_EOF
