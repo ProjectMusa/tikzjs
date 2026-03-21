@@ -652,7 +652,13 @@ path_coordinate "coordinate"
   / '(' ws ')'               { return { kind: 'op-coord', coord: ft.coordRef(0, 0) }; }
 
 raw_coordinate "raw coordinate"
-  = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
+  = '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ',' ws z:coord_num u3:dim_unit ws ')'
+    {
+      // TikZ 3D: project using default z-vector (-3.85mm, -3.85mm) = (-10.913pt, -10.913pt)
+      var zFactor = z * u3 / 28.4528; // normalize to cm-equivalent units
+      return { mode: 'absolute', coord: { cs: 'xy', x: x * u1 + zFactor * (-10.913), y: y * u2 + zFactor * (-10.913) } };
+    }
+  / '(' ws x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
   / '(' ws 'canvas' ws 'cs' ws ':' ws 'x' ws '=' ws x:coord_num u1:dim_unit ws ',' ws 'y' ws '=' ws y:coord_num u2:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } }; }
