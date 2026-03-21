@@ -33,7 +33,7 @@ jobs:
           python-version: '3.12'
 
       - name: Install Python comparison tool
-        run: pip install --quiet python/
+        run: pip install --quiet -e python/
 
       - name: Install cairosvg system deps
         run: sudo apt-get install -y --no-install-recommends libcairo2 libpango-1.0-0 libpangocairo-1.0-0

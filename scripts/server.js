@@ -212,7 +212,7 @@ const DIFF_DIR = process.env.TIKZJS_DIFF_DIR || '/tmp/tikzjs-golden'
 const MIME = { '.html': 'text/html', '.png': 'image/png', '.svg': 'image/svg+xml', '.css': 'text/css' }
 
 function handleDiff(url, res) {
-  const rel  = url === '/diff' || url === '/diff/' ? '/report.html' : url.slice('/diff'.length)
+  const rel  = url === '/diff' || url === '/diff/' ? '/index.html' : url.slice('/diff'.length)
   const file = path.join(DIFF_DIR, rel)
   if (!fs.existsSync(file)) {
     res.writeHead(404, { 'Content-Type': 'text/plain' })

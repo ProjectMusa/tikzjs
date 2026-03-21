@@ -203,8 +203,8 @@ def _detail_panel(result: CompareResult) -> str:
 
 
 def _is_perfect(r: CompareResult) -> bool:
-    """True for fixtures that pass cleanly with no warnings — hidden from the diff table."""
-    return r.passed and not r.warnings and r.stats.get('ref') != 'missing'
+    """True only when struct_diff is exactly zero — hidden from the diff table."""
+    return r.passed and r.struct_diff == 0.0 and r.stats.get('ref') != 'missing'
 
 
 # ── main entry ────────────────────────────────────────────────────────────────
