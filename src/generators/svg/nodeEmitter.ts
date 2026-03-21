@@ -39,8 +39,21 @@ export function emitNode(
   constants: SVGRenderingConstants = DEFAULT_CONSTANTS
 ): NodeRenderResult {
   const MIN_HALF_SIZE = constants.MIN_HALF_SIZE_PX
-  // Render the label
-  const labelSource = node.label || ''
+  // Render the label — strip LaTeX font size commands that MathJax doesn't handle
+  let labelSource = (node.label || '')
+    .replace(/\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b\s*/g, '')
+    .replace(/\\(?:textrm|textit|textbf|texttt|textsf|textsc|emph)\{([^}]*)\}/g, '$1')
+  // Strip outer TeX grouping braces: {content} → content
+  if (labelSource.startsWith('{') && labelSource.endsWith('}')) {
+    const inner = labelSource.slice(1, -1)
+    // Only strip if braces are balanced (not nested unmatched)
+    let depth = 0, balanced = true
+    for (const ch of inner) {
+      if (ch === '{') depth++
+      else if (ch === '}') { depth--; if (depth < 0) { balanced = false; break } }
+    }
+    if (balanced && depth === 0) labelSource = inner
+  }
   let svgContent = ''
   let labelWidth = 0
   let labelHeight = 0
