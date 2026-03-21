@@ -40,9 +40,14 @@ export function emitNode(
 ): NodeRenderResult {
   const MIN_HALF_SIZE = constants.MIN_HALF_SIZE_PX
   // Render the label — strip LaTeX font size commands that MathJax doesn't handle
-  let labelSource = (node.label || '')
+  const rawLabel = (node.label || '')
+  const labelHasMath = /\$|\\\(|\\\[|\\begin\{/.test(rawLabel)
+  let labelSource = rawLabel
     .replace(/\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b\s*/g, '')
-    .replace(/\\(?:textrm|textit|textbf|texttt|textsf|textsc|emph)\{([^}]*)\}/g, '$1')
+  // Only strip \textXX font commands in text-mode labels. Inside $...$, MathJax handles them natively.
+  if (!labelHasMath) {
+    labelSource = labelSource.replace(/\\(?:textrm|textit|textbf|texttt|textsf|textsc|emph)\{([^}]*)\}/g, '$1')
+  }
   // Strip outer TeX grouping braces: {content} → content
   if (labelSource.startsWith('{') && labelSource.endsWith('}')) {
     const inner = labelSource.slice(1, -1)
