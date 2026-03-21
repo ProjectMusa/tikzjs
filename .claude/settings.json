@@ -45,7 +45,18 @@
       "Bash(grep -v \"^>\\\\|^$\")",
       "Bash(grep -v \"^$\")",
       "Bash(for b:*)",
-      "Bash(do echo:*)"
+      "Bash(do echo:*)",
+      "Bash(grep -A 10 \"● empty_tikz_test$\")",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(for f:*)",
+      "Read(//home/lind/gits/tikzjs/test/extra/fixtures/**)",
+      "Bash(done)",
+      "Bash(ls /tmp/tmp.*)",
+      "Bash(ls /tmp/tikzjs*)",
+      "Bash(node -e \":*)",
+      "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/1 TIKZJS_REFS_DIR=test/extra/refs/1 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/1 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 004)",
+      "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/1 TIKZJS_REFS_DIR=test/extra/refs/1 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/1 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 009)"
     ]
   },
   "defaultMode": "bypassPermissions"

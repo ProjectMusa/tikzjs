@@ -19,6 +19,7 @@ npm test 2>&1 | tail -40
 #### If ALL tests pass → choose between: add fixture OR refactor
 
 Use this heuristic:
+
 - Count fixtures: `ls test/golden/fixtures/ | wc -l`
 - Count cycles since last refactor: check recent git log for "refactor" commits
   ```bash
@@ -35,19 +36,24 @@ Use this heuristic:
 over writing from scratch — they give more realistic coverage.
 
 1. Scan a few extra fixtures and pick one that exercises a feature NOT already in `test/golden/fixtures/`:
+
    ```bash
    ls test/extra/fixtures/ | head -20
    cat test/extra/fixtures/NNN.tikz
    ```
+
    Skip fixtures that use `\includegraphics`, unsupported libraries, or are >30 lines (too complex).
    Good candidates: ones using `path` options, node shapes, arrows, coordinates, transforms, loops.
 
 2. Run the visual diff on the candidate to see how well tikzjs handles it:
+
    ```bash
    make cdiff-one-extra NAME=NNN
    ```
+
+   - Use model to visually compare the generated image and reference image, rather than only rely on the make cdiff python cv algorithms.
    - If diff ≤ 5%: promote it — copy to `test/golden/fixtures/NN-<description>.tikz` and run `npm run golden`
-   - If diff > 5% but the feature is important: note the gap and fall back to 3b (write from scratch)
+   - If diff > 5% but the feature is important: Run `/fix-fixture extra/fixtures/NNN` to diagnose and fix it.
    - If it uses unsupported features (clip, patterns, shadings): skip and try the next one
 
 3. When promoting, strip any `%!preamble`/`%!end-preamble` block — golden fixtures must be bare `\begin{tikzpicture}...\end{tikzpicture}`.
@@ -57,9 +63,11 @@ over writing from scratch — they give more realistic coverage.
 If no `test/extra` fixture is suitable:
 
 1. **Identify a gap** — look at existing fixtures to find uncovered TikZ features:
+
    ```bash
    ls test/golden/fixtures/
    ```
+
    Common areas to expand: path options (`dashed`, `dotted`, `line cap`, `line join`),
    node shapes (`rectangle`, `circle`, `ellipse`, named anchors), coordinate systems
    (`polar`, `barycentric`, `intersection`), transformations (`rotate`, `scale`, `shift`),
@@ -79,6 +87,7 @@ git status
 ```
 
 Only commit if there are meaningful changes (new fixture + ref, or a code fix):
+
 ```bash
 git commit -m "feat: <short description of what was added/fixed>"
 ```
@@ -95,6 +104,7 @@ git commit -m "feat: <short description of what was added/fixed>"
 ## End of cycle
 
 Report what was done in one sentence:
+
 - "Fixed fixture `X`: <root cause in 5 words>"
 - "Added fixture `X`: <what it tests>"
 - "Ran refactor: <what changed>"
