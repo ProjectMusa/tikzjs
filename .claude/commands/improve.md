@@ -1,111 +1,159 @@
 Run one cycle of the continuous tikzjs improvement loop.
 
-## Cycle logic
+## Priority order
 
-### Step 1 — Check current test status
+Each cycle must follow this strict priority:
+
+1. **Fix a failing golden test** (highest priority)
+2. **Fix a failing extra fixture** that exercises an important/unimplemented feature
+3. **Add a new fixture** that exposes a gap — prefer ones that currently fail and require a fix
+4. **Promote an easy extra fixture** only if nothing above applies
+
+Never cherry-pick easy passes just to boost fixture count. The goal is to improve rendering quality, not fixture quantity.
+
+---
+
+## Step 1 — Check current test status
 
 ```bash
 npm test 2>&1 | tail -40
 ```
 
-### Step 2 — Branch on result
+### If there are FAILING golden tests → fix one
 
-#### If there are FAILING golden tests → fix one
-
-1. Identify the first failing fixture name (e.g. `14-rounded-corners`).
+1. Identify the first failing fixture name.
 2. Run `/fix-fixture <name>` to diagnose and fix it.
 3. Verify with `npm test` before moving on.
 
-#### If ALL tests pass → choose between: add fixture OR refactor
+---
 
-Use this heuristic:
+## Step 2 — If all tests pass: scan ALL extra fixtures for failures or feature gaps
 
-- Count fixtures: `ls test/golden/fixtures/ | wc -l`
-- Count cycles since last refactor: check recent git log for "refactor" commits
-  ```bash
-  git log --oneline -20
-  ```
-- **If fewer than 3 refactor commits in the last 20 commits AND there is structural debt** → run `/refactor`
-- **Otherwise** → add a new fixture (see below)
+The extra fixture library has two layers:
+- **Root batch** (`test/extra/fixtures/001-080.tikz`) — use `make cdiff-extra BATCH=`
+- **Numbered batches** (`test/extra/fixtures/0/` through `test/extra/fixtures/4/`) — use `make cdiff-extra BATCH=N`
 
-### Step 3 — Adding a new fixture
-
-#### 3a. First: check `test/extra` for a promotable fixture
-
-`test/extra/fixtures/` contains 85 real-world TikZ examples. Prefer promoting one of these
-over writing from scratch — they give more realistic coverage.
-
-1. Scan a few extra fixtures and pick one that exercises a feature NOT already in `test/golden/fixtures/`:
-
-   ```bash
-   ls test/extra/fixtures/ | head -20
-   cat test/extra/fixtures/NNN.tikz
-   ```
-
-   Skip fixtures that use `\includegraphics`, unsupported libraries, or are >30 lines (too complex).
-   Good candidates: ones using `path` options, node shapes, arrows, coordinates, transforms, loops.
-
-2. Run the visual diff on the candidate to see how well tikzjs handles it:
-
-   ```bash
-   make cdiff-one-extra NAME=NNN
-   ```
-
-   - Use model to visually compare the generated image and reference image, rather than only rely on the make cdiff python cv algorithms.
-   - If diff ≤ 5%: promote it — copy to `test/golden/fixtures/NN-<description>.tikz` and run `npm run golden`
-   - If diff > 5% but the feature is important: Run `/fix-fixture extra/fixtures/NNN` to diagnose and fix it.
-   - If it uses unsupported features (clip, patterns, shadings): skip and try the next one
-
-3. When promoting, strip any `%!preamble`/`%!end-preamble` block — golden fixtures must be bare `\begin{tikzpicture}...\end{tikzpicture}`.
-
-#### 3b. Fallback: write a focused fixture from scratch
-
-If no `test/extra` fixture is suitable:
-
-1. **Identify a gap** — look at existing fixtures to find uncovered TikZ features:
-
-   ```bash
-   ls test/golden/fixtures/
-   ```
-
-   Common areas to expand: path options (`dashed`, `dotted`, `line cap`, `line join`),
-   node shapes (`rectangle`, `circle`, `ellipse`, named anchors), coordinate systems
-   (`polar`, `barycentric`, `intersection`), transformations (`rotate`, `scale`, `shift`),
-   arrows (tip styles, `stealth`, `latex`, `to`), colors and opacity,
-   `foreach` loops, matrix layouts.
-
-2. **Look up the feature** using `/tikz-ref <feature>` before writing the fixture.
-   This ensures the fixture uses correct TikZ syntax and exercises the right behavior.
-
-3. **Write and register the fixture** using `/new-fixture <kebab-case-name>`.
-
-### Step 4 — Commit if changes were made
+Scan all of them to find fixtures that are **failing or have high structural diff**:
 
 ```bash
-git add -A
-git status
+# Root fixtures (001–080)
+make cdiff-extra BATCH= 2>&1 | grep -E "FAIL|diff=[1-9][0-9]" | head -10
+
+# Numbered batches
+for BATCH in 0 1 2 3 4; do
+  echo "=== BATCH $BATCH ===" && \
+  make cdiff-extra BATCH=$BATCH 2>&1 | grep -E "FAIL|diff=[1-9][0-9]" | head -10
+done
 ```
 
-Only commit if there are meaningful changes (new fixture + ref, or a code fix):
+This gives a full picture of where tikzjs is weakest across all ~500 extra fixtures.
+
+### Pick the most impactful failing extra fixture
+
+From the failing fixtures across all batches, pick one that:
+- Has a clear, identifiable root cause (not just unsupported library)
+- Exercises a **feature gap** — something tikzjs should support but doesn't yet:
+  - Named node edges not connecting properly
+  - Missing path operations
+  - Wrong coordinate resolution
+  - Arrow tips not rendering
+  - Node shapes (diamond, ellipse) missing
+  - `right of=`, `below of=` positioning broken
+  - Colors not propagating
+  - Self-loops, bend angles wrong
+  - etc.
+
+**Skip** fixtures that fail because of fundamentally unsupported features (e.g. `\includegraphics`, shadings, `yscale=-1` auto-generated code, `decoration={markings}`).
+
+For the chosen fixture, run the visual diff and then fix the root cause:
+```bash
+make cdiff-one-extra NAME=NNN BATCH=B   # use BATCH= (empty) for root fixtures
+```
+Then use `/fix-fixture extra/fixtures/BATCH/NNN` (or just the fixture path) to diagnose and implement the fix.
+
+---
+
+## Step 3 — If no fixable failing extra fixture exists: add a new fixture
+
+### 3a. Scan extra fixtures for near-passes that reveal real gaps
+
+Extra fixtures span the root batch (001–080) and numbered batches (0–4). Always check across all layers:
 
 ```bash
-git commit -m "feat: <short description of what was added/fixed>"
+# Root fixtures
+make cdiff-extra BATCH= 2>&1 | grep -E "diff=[1-4]\." | head -10
+
+# Numbered batches
+for BATCH in 0 1 2 3 4; do
+  make cdiff-extra BATCH=$BATCH 2>&1 | grep -E "diff=[1-4]\." | head -10
+done
 ```
+
+For a specific candidate:
+```bash
+make cdiff-one-extra NAME=NNN BATCH=B   # BATCH= (empty) for root
+```
+
+Read both PNGs and apply the **visual checklist** (be strict — reject if any fail):
+
+- [ ] **Node sizes**: circles/rectangles same size as ref?
+- [ ] **Arrowhead sizes**: proportional, not too large/small?
+- [ ] **Edge connections**: edges touch node borders (not overshooting/falling short)?
+- [ ] **Double arrowheads**: stacked tips rendered correctly?
+- [ ] **Label positions**: at correct positions (above/below/midway/near start)?
+- [ ] **Colors and fill**: correct colors and opacity?
+- [ ] **Line styles**: dashed/dotted patterns match?
+- [ ] **Overall layout**: positions and spacing equivalent?
+
+Decision:
+- diff ≤ 5% AND all checklist items pass → promote it
+- diff 5–8% AND only font rendering differs → promote it (font gap is acceptable)
+- diff > 8% OR any checklist item fails → diagnose the root cause and fix it (don't just skip)
+- Unsupported feature (clip, patterns, shadings, `yscale=-1`, `decoration={markings}`) → skip
+
+### 3b. Fallback: write a focused fixture from scratch
+
+Identify a gap in existing golden fixtures:
+
+```bash
+ls test/golden/fixtures/
+```
+
+Use `/tikz-ref <feature>` to look up correct syntax, then `/new-fixture <name>`.
+
+---
+
+## Step 4 — Commit
+
+```bash
+git add -A && git status
+```
+
+Only commit if there are meaningful changes:
+
+```bash
+git commit -m "fix: ..." # or "feat: ..."
+```
+
+---
 
 ## Guardrails
 
-- Fix at most ONE failing test per cycle (to keep diffs reviewable).
+- Fix at most ONE failing test or feature per cycle (keep diffs reviewable).
 - Add at most ONE new fixture per cycle.
-- Do NOT refactor more than once every 5 cycles (check git log to enforce this).
+- Do NOT refactor more than once every 5 cycles (check git log).
 - Do NOT edit files in `/manuals/`.
-- If `npm run golden` fails (no TeX Live), skip the golden generation step and note it.
-- If a fix attempt fails after 3 tries, skip that fixture and move to the next one.
+- If `npm run golden` fails (no TeX Live), skip golden generation and note it.
+- If a fix attempt fails after 3 tries, document why and move on.
+
+---
 
 ## End of cycle
 
-Report what was done in one sentence:
+Report what was done:
 
 - "Fixed fixture `X`: <root cause in 5 words>"
-- "Added fixture `X`: <what it tests>"
-- "Ran refactor: <what changed>"
-- "No action: all tests pass, refactor not needed yet"
+- "Fixed extra fixture `X`: implemented <feature>"
+- "Added fixture `X`: <what it tests and why it was chosen>"
+- "No fixable failures found, promoted easy fixture `X`"
+- "No action: <reason>"
