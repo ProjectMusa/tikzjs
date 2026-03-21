@@ -1,0 +1,12 @@
+\begin{tikzpicture}[scale = .2, baseline=(current  bounding  box.center)]
+  \draw[-latex] (0, 0) node [below left] {$0$} -- (23, 0) node [below] {$r$};
+  \draw (0, 6) node [left] {$p$} -- (20, 6);
+  \draw (0, 12) node [left] {$2p$} -- (20, 12);
+  \node at (5, 3) {$0$};
+  \node at (15, 9) {$0$};
+  \node at (5, 9) {$2$};
+  \node at (15, 3) {$2$};
+  \draw[-latex] (0, 0) -- (0, 15) node [left] {$s$};
+  \draw (10, 0) node [below] {$q$} -- (10, 12);
+  \draw (20, 0) node [below] {$2q$} -- (20, 12);
+ \end{tikzpicture}
