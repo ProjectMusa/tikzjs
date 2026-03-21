@@ -201,6 +201,7 @@ export function renderMarkerDefs(document: Document, registry: MarkerRegistry): 
     marker.setAttribute('markerWidth', String(spec.markerWidth))
     marker.setAttribute('markerHeight', String(spec.markerHeight))
     marker.setAttribute('orient', spec.orient)
+    marker.setAttribute('markerUnits', 'userSpaceOnUse')
     marker.innerHTML = spec.pathData
     defs.appendChild(marker)
   }
