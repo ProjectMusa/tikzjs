@@ -127,8 +127,8 @@
               var inOpt  = edgeOpts.find(function(o) { return o.key === 'in'; });
               var outOpt = edgeOpts.find(function(o) { return o.key === 'out'; });
               var routing = { kind: 'straight' };
-              if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: Math.abs(parseFloat(bendLeft.value  || '30')) };
-              else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: Math.abs(parseFloat(bendRight.value || '30')) };
+              if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
+              else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
               else if (inOpt && outOpt) routing = { kind: 'in-out', inAngle: parseFloat(inOpt.value || '0'), outAngle: parseFloat(outOpt.value || '0') };
               edges.push(ft.makeEdge(fromId, toId, routing, edgeStyle, allEdgeOpts, { labels: edgeLabels }));
             }
