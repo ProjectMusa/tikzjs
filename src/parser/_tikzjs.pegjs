@@ -748,6 +748,7 @@ dim_unit
 
 node_alias "node alias"
   = '(' ws name:node_name ws ')' { return name; }
+  / '(' ws ')' { return ''; }
 
 node_alias_anchor "node alias with anchor"
   = '(' ws name:node_name ws '.' ws anchor:anchor_name ws ')' { return [name, anchor]; }

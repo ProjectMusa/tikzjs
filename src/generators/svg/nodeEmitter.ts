@@ -80,13 +80,10 @@ export function emitNode(
   }
 
   // Compute node geometry.
-  // TikZ node `scale` applies to the text CONTENT only — inner sep is added in
-  // outer coordinates afterward. So the shape size = scaled_content + 2×inner_sep.
-  // For empty nodes, scale has no effect on shape size.
-  const nodeContentScale = (node.style.scale ?? 1) * (node.style.xscale ?? 1)
-  const nodeContentScaleY = (node.style.scale ?? 1) * (node.style.yscale ?? 1)
-  const scaledLabelWidth  = labelWidth  * nodeContentScale
-  const scaledLabelHeight = labelHeight * nodeContentScaleY
+  // TikZ `scale` on a node applies a transform to the entire node (text + shape + sep).
+  // We compute the unscaled size first, then multiply by scale.
+  const nodeScale  = (node.style.scale ?? 1) * (node.style.xscale ?? 1)
+  const nodeScaleY = (node.style.scale ?? 1) * (node.style.yscale ?? 1)
 
   const innerSep = node.style.innerSep !== undefined
     ? ptToPx(node.style.innerSep)
@@ -94,12 +91,12 @@ export function emitNode(
 
   let halfWidth = Math.max(
     MIN_HALF_SIZE,
-    scaledLabelWidth / 2 + innerSep,
+    labelWidth / 2 + innerSep,
     node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
   )
   let halfHeight = Math.max(
     MIN_HALF_SIZE,
-    scaledLabelHeight / 2 + innerSep,
+    labelHeight / 2 + innerSep,
     node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
   )
   // TikZ circle shape: force equal half-dimensions (largest wins)
@@ -108,6 +105,10 @@ export function emitNode(
     halfWidth = r
     halfHeight = r
   }
+
+  // Apply node-level scale (TikZ `scale` on a node scales the entire shape)
+  if (nodeScale !== 1)  halfWidth  *= nodeScale
+  if (nodeScaleY !== 1) halfHeight *= nodeScaleY
 
   // `transform shape` makes node shapes scale with the tikzpicture coordinate transform
   if (node.style.transformShape && resolver.coordScale !== 1) {
@@ -171,10 +172,19 @@ export function emitNode(
   // Label content
   if (svgContent.trim()) {
     const foreignG = document.createElementNS('http://www.w3.org/2000/svg', 'g')
-    // Position the label so its center aligns with the node center
-    const tx = centerX - labelWidth / 2
-    const ty = centerY - labelHeight / 2
-    foreignG.setAttribute('transform', `translate(${tx},${ty})`)
+    // Position the label so its center aligns with the node center.
+    // If node has scale, apply it to the text content as well.
+    const textScaleX = nodeScale
+    const textScaleY = nodeScaleY
+    const scaledW = labelWidth * textScaleX
+    const scaledH = labelHeight * textScaleY
+    const tx = centerX - scaledW / 2
+    const ty = centerY - scaledH / 2
+    if (textScaleX !== 1 || textScaleY !== 1) {
+      foreignG.setAttribute('transform', `translate(${tx},${ty}) scale(${textScaleX},${textScaleY})`)
+    } else {
+      foreignG.setAttribute('transform', `translate(${tx},${ty})`)
+    }
     foreignG.innerHTML = svgContent
     g.appendChild(foreignG)
   }
