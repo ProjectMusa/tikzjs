@@ -1,0 +1,7 @@
+\begin{tikzpicture}[
+box/.style={draw, rounded corners, minimum width=7cm, font=\sffamily},
+]
+    \node[box, inner sep=4pt, minimum height=0pt, minimum width=0pt] {
+        $S := \texttt{BC} \mid \texttt{BC}S$
+    };
+\end{tikzpicture}
