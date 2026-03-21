@@ -1,0 +1,24 @@
+\begin{tikzpicture}
+		\draw (0,0) rectangle (3,3);
+		\node at (1.5,1.5) {Redundant};
+		\draw (3.4,3.4) rectangle (6.4,6.4);
+		\node at (4.9,4.9) {$A$ (qubits)};
+		\draw (3.4,0) rectangle (6.4,3);
+		\node at (4.9,1.5) {$X$ stabilizers};
+		\draw (3.4,6.8) rectangle (6.4,9.8);
+		\node at (4.9,8.3) {$Z$ stabilizers};
+		\draw (0,3.4) rectangle (3,6.4);
+		\node at (1.5,4.9) {$X$ stabilizers};
+		\draw (0,6.8) rectangle (3,9.8);
+		\node at (1.5,8.3) {$B$ (qubits)};
+		\draw (-0.5,0) edge[-] (-0.5,3);
+		\node at (-0.8,1.5) {$n_X$};
+		\draw (-0.5,3.4) edge[-] (-0.5,6.4);
+		\node at (-0.8,4.9) {$n$};
+		\draw (-0.5,6.8) edge[-] (-0.5,9.8);
+		\node at (-0.8,8.3) {$n_Z$};
+		\draw (0,-0.5) edge[-] (3,-0.5);
+		\node at (1.5,-0.75) {$n_c$};
+		\draw (3.4,-0.5) edge[-] (6.4,-0.5);
+		\node at (4.9,-0.75) {$n_c - k_c$};
+	\end{tikzpicture}
