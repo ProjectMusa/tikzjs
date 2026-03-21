@@ -63,16 +63,16 @@ function extractPreambleBlocks(source: string): string {
   const preambleRe = /^%!preamble\r?\n([\s\S]*?)^%!end-preamble\r?\n?/m
   const m = preambleRe.exec(source)
   if (!m) return source
-  const injected = m[1]
+  const lines = m[1]
     .split('\n')
-    .map(line => {
-      const stripped = line.replace(/^%  /, '')
-      // Balance braces: some fixture preambles have missing closing `}` for \tikzset{...}
-      let depth = 0
-      for (const ch of stripped) { if (ch === '{') depth++; else if (ch === '}') depth-- }
-      return depth > 0 ? stripped + '}'.repeat(depth) : stripped
-    })
-    .join('\n')
+    .map(line => line.replace(/^%  /, ''))
+  // Balance braces across the entire preamble (not per-line) to handle
+  // multi-line \tikzset{...} and style definitions
+  let depth = 0
+  for (const line of lines) {
+    for (const ch of line) { if (ch === '{') depth++; else if (ch === '}') depth-- }
+  }
+  const injected = lines.join('\n') + (depth > 0 ? '}'.repeat(depth) : '')
   // Strip the preamble block and prepend the extracted definitions
   return injected + '\n' + source.replace(preambleRe, '')
 }
