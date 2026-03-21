@@ -143,7 +143,7 @@ export function emitNode(
     if (node.style.double) {
       // TikZ `double` border: outer ring + white gap + inner border (with fill).
       // Default double distance = 0.6pt. The outer ring is at halfWidth + gap + lineWidth.
-      const lineWidthPx = node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : 0.8
+      const lineWidthPx = node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
       const gapPx = ptToPx(node.style.doubleDistance ?? 0.6)
       const outerHW = halfWidth  + gapPx + lineWidthPx
       const outerHH = halfHeight + gapPx + lineWidthPx
@@ -285,7 +285,7 @@ function buildBorderElement(
 ): Element {
   const stroke = style.draw && style.draw !== 'none' ? style.draw : 'none'
   const fill = style.fill && style.fill !== 'none' ? style.fill : 'none'
-  const strokeWidth = style.drawWidth !== undefined ? ptToPx(style.drawWidth) : 0.8
+  const strokeWidth = style.drawWidth !== undefined ? ptToPx(style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
 
   if (shape === 'circle' || shape === 'ellipse') {
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse')

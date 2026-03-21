@@ -230,8 +230,8 @@ export class CoordResolver {
       case 'polar': {
         const rad = (coord.angle * Math.PI) / 180
         return {
-          x: ptToPx(coord.radius) * Math.cos(rad),
-          y: -ptToPx(coord.radius) * Math.sin(rad),
+          x: ptToPx(coord.radius * this._coordScale) * Math.cos(rad),
+          y: -ptToPx(coord.radius * this._coordScale) * Math.sin(rad),
         }
       }
 
