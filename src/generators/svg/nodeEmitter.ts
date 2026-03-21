@@ -134,8 +134,28 @@ export function emitNode(
   // Optional: draw node border
   if (node.style.draw !== undefined && node.style.draw !== 'none') {
     const shape = node.style.shape ?? 'rectangle'
-    const border = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)
-    g.appendChild(border)
+    if (node.style.double) {
+      // TikZ `double` border: outer ring + white gap + inner border (with fill).
+      // Default double distance = 0.6pt. The outer ring is at halfWidth + gap + lineWidth.
+      const lineWidthPx = node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : 0.8
+      const gapPx = ptToPx(node.style.doubleDistance ?? 0.6)
+      const outerHW = halfWidth  + gapPx + lineWidthPx
+      const outerHH = halfHeight + gapPx + lineWidthPx
+      // Outer ring (stroke only, no fill)
+      const outerStyle = { ...node.style, fill: 'none' }
+      const outer = buildBorderElement(document, shape, centerX, centerY, outerHW, outerHH, outerStyle)
+      g.appendChild(outer)
+      // White gap filler (filled white, no stroke, sized to cover gap)
+      const gapStyle: ResolvedStyle = { fill: '#ffffff', draw: 'none' }
+      const gapEl = buildBorderElement(document, shape, centerX, centerY, outerHW - lineWidthPx / 2, outerHH - lineWidthPx / 2, gapStyle)
+      g.appendChild(gapEl)
+      // Inner border (with fill)
+      const border = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)
+      g.appendChild(border)
+    } else {
+      const border = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)
+      g.appendChild(border)
+    }
   } else if (node.style.fill !== undefined && node.style.fill !== 'none') {
     const shape = node.style.shape ?? 'rectangle'
     const bg = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)

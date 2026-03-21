@@ -157,6 +157,8 @@ export interface ResolvedStyle {
   fillOpacity?: number
   drawOpacity?: number
   roundedCorners?: number // pt, or 0 for sharp
+  double?: boolean // TikZ `double` — draw a second concentric border ring
+  doubleDistance?: number // pt — gap between the two borders (default 0.6pt)
 
   // Edge routing
   bend?: number // degrees, positive = bend left, negative = bend right

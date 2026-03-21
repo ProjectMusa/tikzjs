@@ -343,6 +343,13 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'sharp corners':
       style.roundedCorners = 0
       break
+    case 'double':
+      style.double = true
+      if (value) style.doubleDistance = parseDimension(value as string)
+      break
+    case 'double distance':
+      style.doubleDistance = value ? parseDimension(value as string) : 0.6
+      break
 
     // ── Edge routing ──────────────────────────────────────────
     case 'bend left':
