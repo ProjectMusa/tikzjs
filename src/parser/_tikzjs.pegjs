@@ -431,7 +431,7 @@ tikzcd_root
     }
 
 tikz
-  = tikzhead_open opt:option_block cnt:tikzcontent '}'
+  = tikzhead_open opt:option_block '{' cnt:tikzcontent '}'
     {
       const rawOpts = parseRaw(opt);
       return ft.makeDiagram('tikz-inline', cnt, resolveOpts(rawOpts), rawOpts,
