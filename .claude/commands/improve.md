@@ -71,6 +71,40 @@ make cdiff-one-extra NAME=NNN BATCH=B   # use BATCH= (empty) for root fixtures
 ```
 Then use `/fix-fixture extra/fixtures/BATCH/NNN` (or just the fixture path) to diagnose and implement the fix.
 
+### After fixing — verify and promote
+
+Once the code fix is in, re-run the diff and apply the full visual checklist:
+
+```bash
+make cdiff-one-extra NAME=NNN BATCH=B
+```
+
+Read both PNGs and check visually:
+- [ ] **Node sizes**: circles/rectangles same size as ref?
+- [ ] **Arrowhead sizes**: proportional, not too large/small?
+- [ ] **Edge connections**: edges touch node borders correctly?
+- [ ] **Double arrowheads**: stacked tips match?
+- [ ] **Label positions**: correct positions (above/below/midway)?
+- [ ] **Colors and fill**: correct?
+- [ ] **Line styles**: dashed/dotted match?
+- [ ] **Overall layout**: positions and spacing equivalent?
+
+**If the fixture now passes both criteria** (diff ≤ 5%, or 5–8% with font-only gap, AND visual checklist passes):
+→ **Promote it as a new golden fixture**:
+
+```bash
+# Copy the fixture (strip any %!preamble blocks first)
+cp test/extra/fixtures/BATCH/NNN.tikz test/golden/fixtures/NN-<description>.tikz
+
+# Generate the golden reference
+npm run golden
+
+# Run all tests to confirm
+npm test
+```
+
+If it still fails visually or diff > 8%: commit the code fix alone (it still improves overall rendering), and note the remaining gap.
+
 ---
 
 ## Step 3 — If no fixable failing extra fixture exists: add a new fixture
