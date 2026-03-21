@@ -1,0 +1,12 @@
+\begin{tikzpicture}
+    \draw (0,0) rectangle (2, 1);
+    \node at (1, 0.5) {$\mathcal S_1$};
+    \draw[->] (2.2, .5) -- (2.8, .5);
+    \draw (3,0) rectangle (5, 1);
+    \node at (4, 0.5) {$\mathcal S_2$};
+    \draw[->] (5.2, .5) -- (5.8, .5);
+    \node at (6.5, .5) {$\cdots$};
+    \draw[->] (7.2, .5) -- (7.8, .5);
+    \draw (8,0) rectangle (10, 1);
+    \node at (9, 0.5) {$\mathcal S_d$};
+\end{tikzpicture}
