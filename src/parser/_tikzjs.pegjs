@@ -578,12 +578,12 @@ path_head "path command"
   / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
 standalone_node_statement
-  = '\\node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opts2:(ws '[' o:option_content ']' { return o; })* cnt:node_content edges:standalone_node_edges ';'
+  = '\\node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opts2:(ws '[' o:option_content ']' { return o; })* at_coord2:node_at al3:(ws a:node_alias { return a; })? cnt:node_content edges:standalone_node_edges ';'
     {
       const merged  = [opt, ...opts2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
-      const pos     = at_coord || ft.extractPlacementRef(rawOpts) || ft.coordRef(0, 0);
-      const name    = al || al2 || undefined;
+      const pos     = at_coord || at_coord2 || ft.extractPlacementRef(rawOpts) || ft.coordRef(0, 0);
+      const name    = al || al2 || al3 || undefined;
       const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
         { name, anchor: anchorFor(rawOpts) });
       registerNode(node);

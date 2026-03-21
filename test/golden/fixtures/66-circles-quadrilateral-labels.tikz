@@ -1,0 +1,17 @@
+\begin{tikzpicture}
+    \node[inner sep=0pt] (A)  [label=below: {$(0,0)$}] at (0,0) {$\bullet$};
+    \node[inner sep=0pt] (B) [label=below: {$(2,0)$}] at (2,0) {$\bullet$};
+    \node[inner sep=0pt] (C) [label=above: {$(0,2)$}] at (0,2) {$\bullet$};
+    \node[inner sep=0pt] (D) [label=above: {$(2,2.6)$}]at (2,2.6) {$\bullet$};
+    \coordinate (a) at (0,0);
+    \coordinate (b) at (2,0);
+    \coordinate (c) at (0,2);
+    \coordinate (d) at (2,2.6);
+    \filldraw[fill=black!5] (a) -- (b) -- (d) -- (c) -- cycle;
+    \draw (B) -- (C);
+    \draw[dotted] (A) -- (D);
+    \draw[red] (A) circle (1.415);
+    \draw[red] (B) circle (1.415);
+    \draw[red] (C) circle (1.415);
+    \draw[red] (D) circle (1.415);
+\end{tikzpicture}
