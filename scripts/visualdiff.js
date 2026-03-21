@@ -8,7 +8,7 @@
  *   node scripts/visualdiff.js 01 05        # diff specific fixtures by prefix
  *   node scripts/visualdiff.js --open       # open HTML report after run
  *
- * Output: /tmp/tikzjs-diff/ contains per-fixture diff PNGs + summary HTML report
+ * Output: $DIFF_OUT_DIR (default /tmp/tikzjs-diff) — per-fixture PNGs + report.html
  *
  * Requires the dev server to NOT be running (this script starts its own).
  */
@@ -24,10 +24,10 @@ const { execSync } = require('child_process')
 const ROOT = path.join(__dirname, '..')
 const FIXTURES_DIR = path.join(ROOT, 'test/golden/fixtures')
 const REFS_DIR = path.join(ROOT, 'test/golden/refs')
-const OUT_DIR = '/tmp/tikzjs-diff'
+const OUT_DIR = process.env.DIFF_OUT_DIR || '/tmp/tikzjs-diff'
 const PORT = 3738  // separate port to avoid collision with serve
 
-// ── Inline server (same as server.js but minimal) ─────────────────────────────
+// ── Inline server ─────────────────────────────────────────────────────────────
 
 function startServer() {
   Object.keys(require.cache).forEach(k => {
@@ -72,13 +72,10 @@ function startServer() {
 
 async function svgToPng(page, url, size = 600) {
   await page.goto(url, { waitUntil: 'networkidle' })
-  // Get the SVG element bounds
   const svgEl = await page.$('svg')
   if (!svgEl) {
-    // Render error page — screenshot it as-is
     return page.screenshot({ clip: { x: 0, y: 0, width: size, height: size } })
   }
-  // Fit SVG into fixed canvas for fair comparison
   await page.setViewportSize({ width: size, height: size })
   await page.evaluate((sz) => {
     const svg = document.querySelector('svg')
@@ -87,7 +84,6 @@ async function svgToPng(page, url, size = 600) {
       svg.style.height = sz + 'px'
       svg.style.display = 'block'
       svg.style.margin = 'auto'
-      // Center in body
       document.body.style.display = 'flex'
       document.body.style.alignItems = 'center'
       document.body.style.justifyContent = 'center'
@@ -101,6 +97,101 @@ function parsePng(buf) {
   return new Promise((resolve, reject) => {
     new PNG().parse(buf, (err, data) => err ? reject(err) : resolve(data))
   })
+}
+
+function escapeHtml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+// ── HTML report ────────────────────────────────────────────────────────────────
+
+function buildReport(results, generatedAt) {
+  const diffResults = results.filter(r => r.status !== 'perfect')
+  const perfectCount = results.filter(r => r.status === 'perfect').length
+  const counts = {
+    good: results.filter(r => r.status === 'good').length,
+    warn: results.filter(r => r.status === 'warn').length,
+    fail: results.filter(r => r.status === 'fail').length,
+    'no-ref': results.filter(r => r.status === 'no-ref').length,
+    error: results.filter(r => r.status === 'error').length,
+  }
+
+  const statusColors = { good: '#2d8a4e', warn: '#b8860b', fail: '#c0392b', 'no-ref': '#666', error: '#c0392b' }
+  const statusBg    = { good: '#d4f5e2', warn: '#fff8d6', fail: '#fde8e8', 'no-ref': '#f0f0f0', error: '#fde8e8' }
+
+  const cards = diffResults.map(r => {
+    const bg = statusBg[r.status] || '#fff'
+    const fg = statusColors[r.status] || '#333'
+    const tikzSrc = r.tikzSource ? escapeHtml(r.tikzSource) : ''
+    const imagesHtml = (r.status !== 'no-ref' && r.status !== 'error')
+      ? `<div class="images">
+          <figure><figcaption>tikzjs</figcaption><img src="${r.name}-ours.png" loading="lazy"></figure>
+          <figure><figcaption>reference</figcaption><img src="${r.name}-ref.png" loading="lazy"></figure>
+          <figure><figcaption>diff (2× contrast)</figcaption><img src="${r.name}-diff.png" loading="lazy" class="diff-img"></figure>
+        </div>`
+      : `<p class="error-msg">${r.error || 'no reference SVG available'}</p>`
+
+    return `<article class="card" style="background:${bg}">
+  <header>
+    <h2>${r.name}</h2>
+    <span class="badge" style="color:${fg}">${r.status}${r.diffPct !== null ? ' — ' + r.diffPct + '%' : ''}</span>
+  </header>
+  ${imagesHtml}
+  ${tikzSrc ? `<details class="source"><summary>TikZ source</summary><pre><code>${tikzSrc}</code></pre></details>` : ''}
+</article>`
+  }).join('\n')
+
+  const summaryItems = Object.entries(counts)
+    .filter(([, v]) => v > 0)
+    .map(([k, v]) => `<span class="pill" style="background:${statusBg[k]};color:${statusColors[k]}">${v} ${k}</span>`)
+    .join(' ')
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tikzjs golden diff</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: ui-monospace, 'Cascadia Code', monospace; background: #f8f8f8; color: #1a1a1a; padding: 24px; }
+    h1 { font-size: 1.2rem; font-weight: 700; margin-bottom: 4px; }
+    .meta { font-size: 0.8rem; color: #666; margin-bottom: 20px; }
+    .summary { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 28px; align-items: center; }
+    .summary strong { font-size: 0.85rem; }
+    .pill { font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; }
+    .perfect-note { font-size: 0.8rem; color: #2d8a4e; background: #d4f5e2; padding: 3px 10px; border-radius: 999px; }
+    .cards { display: flex; flex-direction: column; gap: 20px; }
+    .card { border-radius: 8px; padding: 16px; border: 1px solid rgba(0,0,0,0.08); }
+    .card header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 14px; }
+    .card h2 { font-size: 0.95rem; font-weight: 600; }
+    .badge { font-size: 0.8rem; font-weight: 700; }
+    .images { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+    figure { display: flex; flex-direction: column; gap: 4px; }
+    figcaption { font-size: 0.7rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; }
+    img { display: block; width: 200px; border: 1px solid rgba(0,0,0,0.12); border-radius: 4px; background: white; }
+    .diff-img { filter: contrast(2); }
+    .source summary { font-size: 0.78rem; cursor: pointer; color: #555; margin-bottom: 8px; user-select: none; }
+    .source pre { background: #1e1e1e; color: #d4d4d4; padding: 12px 14px; border-radius: 6px; font-size: 0.78rem; line-height: 1.5; overflow-x: auto; white-space: pre; }
+    .error-msg { font-size: 0.82rem; color: #888; margin: 8px 0; }
+    .no-diffs { text-align: center; padding: 60px 20px; color: #2d8a4e; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>tikzjs golden diff</h1>
+  <p class="meta">Generated ${generatedAt}</p>
+  <div class="summary">
+    <strong>${results.length} fixtures</strong>
+    ${perfectCount > 0 ? `<span class="perfect-note">${perfectCount} perfect</span>` : ''}
+    ${summaryItems}
+  </div>
+  <div class="cards">
+    ${diffResults.length === 0
+      ? '<div class="no-diffs">All fixtures match perfectly.</div>'
+      : cards}
+  </div>
+</body>
+</html>`
 }
 
 // ── Main ──────────────────────────────────────────────────────────────────────
@@ -137,12 +228,14 @@ async function run() {
 
     const ourUrl = `http://localhost:${PORT}/render/${name}`
     const refUrl = `http://localhost:${PORT}/ref/${name}`
+    const tikzPath = path.join(FIXTURES_DIR, name + '.tikz')
+    const tikzSource = fs.existsSync(tikzPath) ? fs.readFileSync(tikzPath, 'utf8') : null
 
     const hasRef = fs.existsSync(path.join(REFS_DIR, name + '.svg'))
 
     if (!hasRef) {
       console.log('(no ref)')
-      results.push({ name, status: 'no-ref', diffPct: null })
+      results.push({ name, status: 'no-ref', diffPct: null, tikzSource })
       continue
     }
 
@@ -162,7 +255,6 @@ async function run() {
       )
       const diffPct = (numDiff / (SIZE * SIZE) * 100).toFixed(1)
 
-      // Save individual images
       const base = path.join(OUT_DIR, name)
       fs.writeFileSync(base + '-ours.png', ourBuf)
       fs.writeFileSync(base + '-ref.png', refBuf)
@@ -170,62 +262,18 @@ async function run() {
 
       const status = numDiff === 0 ? 'perfect' : parseFloat(diffPct) < 5 ? 'good' : parseFloat(diffPct) < 20 ? 'warn' : 'fail'
       console.log(`${diffPct}% diff [${status}]`)
-      results.push({ name, status, diffPct: parseFloat(diffPct), numDiff })
+      results.push({ name, status, diffPct: parseFloat(diffPct), numDiff, tikzSource })
     } catch (err) {
       console.log(`ERROR: ${err.message}`)
-      results.push({ name, status: 'error', diffPct: null, error: err.message })
+      results.push({ name, status: 'error', diffPct: null, error: err.message, tikzSource })
     }
   }
 
   await browser.close()
   server.close()
 
-  // ── HTML report ────────────────────────────────────────────────────────────
-  const rows = results.map(r => {
-    const color = { perfect: '#d4edda', good: '#fff3cd', warn: '#ffeaa7', fail: '#f8d7da', 'no-ref': '#e9ecef', error: '#f8d7da' }[r.status] || '#fff'
-    const imgs = r.status !== 'no-ref' && r.status !== 'error'
-      ? `<td><img src="${r.name}-ours.png" width="200"></td>
-         <td><img src="${r.name}-ref.png" width="200"></td>
-         <td><img src="${r.name}-diff.png" width="200" style="filter:contrast(2)"></td>`
-      : `<td colspan="3" style="color:#999">${r.error || 'no ref available'}</td>`
-    return `<tr style="background:${color}">
-      <td><b>${r.name}</b></td>
-      <td>${r.diffPct !== null ? r.diffPct + '%' : '—'}</td>
-      <td>${r.status}</td>
-      ${imgs}
-    </tr>`
-  }).join('')
-
-  const html = `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <title>tikzjs visual diff</title>
-  <style>
-    body { font-family: monospace; padding: 20px; background: #f5f5f5; }
-    h1 { font-size: 18px; }
-    table { border-collapse: collapse; background: white; }
-    td, th { padding: 8px 12px; border: 1px solid #ddd; vertical-align: top; }
-    th { background: #333; color: white; }
-    img { display: block; border: 1px solid #ccc; }
-  </style>
-</head>
-<body>
-  <h1>tikzjs visual diff — ${new Date().toISOString()}</h1>
-  <p>${results.filter(r => r.status === 'perfect').length} perfect &nbsp;
-     ${results.filter(r => r.status === 'good').length} good (&lt;5%) &nbsp;
-     ${results.filter(r => r.status === 'warn').length} warn &nbsp;
-     ${results.filter(r => r.status === 'fail').length} fail &nbsp;
-     ${results.filter(r => r.status === 'no-ref').length} no-ref</p>
-  <table>
-    <tr><th>fixture</th><th>diff%</th><th>status</th><th>ours</th><th>ref</th><th>diff</th></tr>
-    ${rows}
-  </table>
-</body>
-</html>`
-
-  const reportPath = path.join(OUT_DIR, 'report.html')
-  fs.writeFileSync(reportPath, html)
+  const reportPath = path.join(OUT_DIR, 'index.html')
+  fs.writeFileSync(reportPath, buildReport(results, new Date().toISOString()))
   console.log(`\nReport: ${reportPath}`)
 
   if (openReport) {
