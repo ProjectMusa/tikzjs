@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \node[draw,minimum width=2cm,minimum height=1cm] at (0,0) {fixed};
+  \node[draw,circle,minimum size=1.5cm] at (3,0) {big};
+  \node[draw,minimum width=3cm] at (1.5,1.5) {wide};
+\end{tikzpicture}
