@@ -578,13 +578,14 @@ path_head "path command"
   / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
 standalone_node_statement
-  = '\\node' opt:option_block al:node_alias? at_coord:node_at opts2:(ws '[' o:option_content ']' { return o; })* cnt:node_content ';'
+  = '\\node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opts2:(ws '[' o:option_content ']' { return o; })* cnt:node_content ';'
     {
       const merged  = [opt, ...opts2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
       const pos     = at_coord || ft.extractPlacementRef(rawOpts) || ft.coordRef(0, 0);
+      const name    = al || al2 || undefined;
       const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
-        { name: al || undefined, anchor: anchorFor(rawOpts) });
+        { name, anchor: anchorFor(rawOpts) });
       registerNode(node);
       return ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
     }
@@ -801,12 +802,13 @@ plot_inner_char
   / c:[^{}()] { return null; }
 
 node_op "node"
-  = ws 'node' opt:option_block al:node_alias? at_coord:node_at opt2:option_block cnt:node_content ws
+  = ws 'node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opt2:option_block cnt:node_content ws
     {
       const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
+      const name    = al || al2 || undefined;
       const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
-        { name: al || undefined, anchor: anchorFor(rawOpts) });
+        { name, anchor: anchorFor(rawOpts) });
       if (at_coord) node.pos = at_coord;
       registerNode(node);
       return { kind: 'op-node', node };
