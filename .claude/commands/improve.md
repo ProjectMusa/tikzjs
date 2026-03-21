@@ -29,6 +29,33 @@ Use this heuristic:
 
 ### Step 3 — Adding a new fixture
 
+#### 3a. First: check `test/extra` for a promotable fixture
+
+`test/extra/fixtures/` contains 85 real-world TikZ examples. Prefer promoting one of these
+over writing from scratch — they give more realistic coverage.
+
+1. Scan a few extra fixtures and pick one that exercises a feature NOT already in `test/golden/fixtures/`:
+   ```bash
+   ls test/extra/fixtures/ | head -20
+   cat test/extra/fixtures/NNN.tikz
+   ```
+   Skip fixtures that use `\includegraphics`, unsupported libraries, or are >30 lines (too complex).
+   Good candidates: ones using `path` options, node shapes, arrows, coordinates, transforms, loops.
+
+2. Run the visual diff on the candidate to see how well tikzjs handles it:
+   ```bash
+   make cdiff-one-extra NAME=NNN
+   ```
+   - If diff ≤ 5%: promote it — copy to `test/golden/fixtures/NN-<description>.tikz` and run `npm run golden`
+   - If diff > 5% but the feature is important: note the gap and fall back to 3b (write from scratch)
+   - If it uses unsupported features (clip, patterns, shadings): skip and try the next one
+
+3. When promoting, strip any `%!preamble`/`%!end-preamble` block — golden fixtures must be bare `\begin{tikzpicture}...\end{tikzpicture}`.
+
+#### 3b. Fallback: write a focused fixture from scratch
+
+If no `test/extra` fixture is suitable:
+
 1. **Identify a gap** — look at existing fixtures to find uncovered TikZ features:
    ```bash
    ls test/golden/fixtures/
