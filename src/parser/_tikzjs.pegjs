@@ -578,7 +578,7 @@ path_head "path command"
   / '\\shade'    { return { cmd: '\\shade',    impliedOpts: '' }; }
 
 standalone_node_statement
-  = '\\node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opts2:(ws '[' o:option_content ']' { return o; })* cnt:node_content ';'
+  = '\\node' opt:option_block al:node_alias? at_coord:node_at al2:(ws a:node_alias { return a; })? opts2:(ws '[' o:option_content ']' { return o; })* cnt:node_content edges:standalone_node_edges ';'
     {
       const merged  = [opt, ...opts2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
@@ -587,8 +587,37 @@ standalone_node_statement
       const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
         { name, anchor: anchorFor(rawOpts) });
       registerNode(node);
-      return ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
+      var nodePath = ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
+      if (!edges || edges.length === 0) return nodePath;
+      // Build edge paths from trailing edge ops
+      var items = [nodePath];
+      var srcId = node.id; // use node.id directly since registerNode just ran
+      for (var i = 0; i < edges.length; i++) {
+        var e = edges[i];
+        var edgeStyle = resolveOpts(e.rawOpts);
+        if (!edgeStyle.draw) edgeStyle = Object.assign({}, edgeStyle, { draw: 'currentColor' });
+        // Resolve target node
+        var tgtCoord = e.target;
+        var tgtId = null;
+        if (tgtCoord && tgtCoord.coord && tgtCoord.coord.cs === 'node-anchor') {
+          tgtId = nodeRegistry[tgtCoord.coord.nodeName] || null;
+        }
+        if (srcId && tgtId) {
+          // Determine routing from edge options
+          var routing = { kind: 'straight' };
+          var bendLeft  = e.rawOpts.find(function(o) { return o.key === 'bend left'; });
+          var bendRight = e.rawOpts.find(function(o) { return o.key === 'bend right'; });
+          if (bendLeft)  routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
+          if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
+          items.push(ft.makeEdge(srcId, tgtId, routing, edgeStyle, e.rawOpts, {}));
+        }
+      }
+      return ft.makeScope(items, {}, []);
     }
+
+standalone_node_edges
+  = edges:(ws 'edge' eopt:option_block t:path_coordinate { return { rawOpts: parseRaw(eopt), target: t.coord }; })*
+    { return edges; }
 
 standalone_coordinate_statement
   = '\\coordinate' opt:option_block al:node_alias? at_coord:node_at ';'
