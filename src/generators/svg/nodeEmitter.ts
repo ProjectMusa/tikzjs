@@ -79,19 +79,27 @@ export function emitNode(
     }
   }
 
-  // Compute node geometry
+  // Compute node geometry.
+  // TikZ node `scale` applies to the text CONTENT only — inner sep is added in
+  // outer coordinates afterward. So the shape size = scaled_content + 2×inner_sep.
+  // For empty nodes, scale has no effect on shape size.
+  const nodeContentScale = (node.style.scale ?? 1) * (node.style.xscale ?? 1)
+  const nodeContentScaleY = (node.style.scale ?? 1) * (node.style.yscale ?? 1)
+  const scaledLabelWidth  = labelWidth  * nodeContentScale
+  const scaledLabelHeight = labelHeight * nodeContentScaleY
+
   const innerSep = node.style.innerSep !== undefined
     ? ptToPx(node.style.innerSep)
     : DEFAULT_INNER_SEP_PX
 
   let halfWidth = Math.max(
     MIN_HALF_SIZE,
-    labelWidth / 2 + innerSep,
+    scaledLabelWidth / 2 + innerSep,
     node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
   )
   let halfHeight = Math.max(
     MIN_HALF_SIZE,
-    labelHeight / 2 + innerSep,
+    scaledLabelHeight / 2 + innerSep,
     node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
   )
   // TikZ circle shape: force equal half-dimensions (largest wins)
@@ -200,8 +208,13 @@ export function emitNode(
     extraBBoxes.push(fromCorners(tx, ty, tx + lblResult.widthPx, ty + lblResult.heightPx))
   }
 
-  // Apply transform from style (rotate, shift, scale)
-  const transform = buildTransform(node.style, centerX, centerY, resolver.coordScale)
+  // Apply transform from style (rotate, shift) — but NOT scale/xscale/yscale.
+  // Node scale only affects content size (already factored into halfWidth/halfHeight above).
+  // Applying scale as an SVG transform would incorrectly shrink the drawn shape.
+  const styleWithoutScale: ResolvedStyle = node.style.scale !== undefined || node.style.xscale !== undefined || node.style.yscale !== undefined
+    ? { ...node.style, scale: undefined, xscale: undefined, yscale: undefined }
+    : node.style
+  const transform = buildTransform(styleWithoutScale, centerX, centerY, resolver.coordScale)
   if (transform) {
     const existing = g.getAttribute('transform') ?? ''
     g.setAttribute('transform', existing ? existing + ' ' + transform : transform)

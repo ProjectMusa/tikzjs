@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+	[baseline={([yshift=-.5ex]current bounding box.center)},scale=0.9,auto=left,black_vertex/.style={circle,draw,fill,scale=0.75},square_vertex/.style={rectangle,scale=0.8,draw}]
+	\node (a) at (0,0) [black_vertex][label=above:${(1,0)}$]{};
+	\node (t1) at (0,-1) [square_vertex][label=right:$1$]{};
+	\node (ap) at (0,-2) [black_vertex][label=below:${(1,1)}$]{};
+	\node (bp) at (1,-2) [black_vertex][label=below:${(2,1)}$]{};
+	\node (b) at (1,0) [black_vertex][label=above:${(2,0)}$]{}; 
+	\draw [dashed] (a)--(t1);
+	\draw [dashed] (t1)--(ap);
+	\draw[arrows={-Stealth[scale=1.2]}] (b)--(t1);
+	\end{tikzpicture}
