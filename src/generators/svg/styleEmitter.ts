@@ -99,8 +99,24 @@ export function buildPathAttrs(style: ResolvedStyle, markerId?: {start?: string,
   return attrs
 }
 
+/** Convert a TikZ dimension string (e.g. "2pt", "0.5cm") to TeX points. */
+function dimToPt(dim: string): number {
+  const m = dim.trim().match(/^([+-]?[\d.]+)(pt|bp|cm|mm|in)?$/)
+  if (!m) return 0
+  const val = parseFloat(m[1])
+  switch (m[2] ?? 'pt') {
+    case 'pt': return val
+    case 'bp': return val * (72.27 / 72)
+    case 'cm': return val * 28.4528
+    case 'mm': return val * 2.84528
+    case 'in': return val * 72.27
+    default:   return val
+  }
+}
+
 /** Convert style dash pattern to SVG stroke-dasharray.
- * Values from TikZ pgf source (pgfcorearrows.code.tex), converted to px. */
+ * Named patterns from TikZ pgf source (pgfcorearrows.code.tex), converted to px.
+ * Custom `dash pattern=on X off Y ...` strings are parsed and converted. */
 function dashPattern(dash: string): string {
   const p = (pt: number) => ptToPx(pt)
   switch (dash) {
@@ -110,7 +126,14 @@ function dashPattern(dash: string): string {
     case 'dotted':          return `${p(0.4)},${p(3)}`
     case 'densely dotted':  return `${p(0.4)},${p(1.5)}`
     case 'loosely dotted':  return `${p(0.4)},${p(6)}`
-    default:                return dash // pass-through for custom patterns
+    default: {
+      // Parse TikZ "on <dim> off <dim> ..." format → SVG stroke-dasharray numbers
+      const tokens = [...dash.matchAll(/\b(?:on|off)\s+([\d.]+\w*)/g)]
+      if (tokens.length > 0) {
+        return tokens.map(m => String(p(dimToPt(m[1])))).join(',')
+      }
+      return dash
+    }
   }
 }
 
