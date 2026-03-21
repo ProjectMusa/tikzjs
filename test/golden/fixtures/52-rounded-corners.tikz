@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+  \draw[rounded corners] (0,0) rectangle (2,1);
+  \draw[rounded corners=10pt,yshift=1.5cm] (0,0) rectangle (2,1);
+  \draw[rounded corners=4pt,fill=blue!20] (0,3) -- (2,3) -- (2,4) -- (0,4) -- cycle;
+\end{tikzpicture}
