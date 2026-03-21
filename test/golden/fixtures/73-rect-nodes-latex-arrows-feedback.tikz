@@ -1,0 +1,16 @@
+\begin{tikzpicture}[
+    triangle/.style = {draw, line width = 0.3mm, regular polygon, regular polygon sides=3, minimum size=2cm},
+    node rotated/.style = {rotate=180},
+    border rotated/.style = {shape border rotate=180},
+  ]
+	\node (rect2) at (2,1.5) [draw,line width = 0.3mm,minimum width=1.3cm,minimum height=1.1cm]  {$\bullet/M_n/1/S_i$};
+	\node (rect1) at (5,1.5) [draw,line width = 0.3mm,minimum width=1.3cm,minimum height=1.1cm] {$\bullet/M_n/K$};
+	\node [text width=3cm, align=center, inner sep=0pt] at (2,0.5) {Capital good};
+	\node [text width=3cm, align=center, inner sep=0pt] at (5,0.5) {Repair shop};
+	\draw [-Latex, line width = 0.3mm] (0,1.5) -- (rect2.west);
+	\draw [-Latex, line width = 0.3mm] (rect2.east) -- (rect1.west);
+	\filldraw [ line width = 0.3mm] (rect1.east) -- (7,1.5);
+	\draw [ line width = 0.3mm] (7,1.5) to (7,0);
+	\draw [ line width = 0.3mm] (7,0) -- (0,0);
+	\draw [ line width = 0.3mm] (0,0) -- (0,1.5);
+\end{tikzpicture}
