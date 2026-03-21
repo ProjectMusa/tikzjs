@@ -82,7 +82,7 @@
   // `edge` semantics: source is the last explicit coord BEFORE the edge op; the
   // destination coord does NOT update the "current source" (enabling same-source
   // chaining: `(A) edge (B) edge (C)` → A→B and A→C).
-  function tryBuildMultiEdgesFromOps(ops, outerStyle, outerRawOpts, nodeReg) {
+  function tryBuildMultiEdgesFromOps(ops, outerStyle, outerRawOpts, nodeReg, resolveOptsFn) {
     const items = ops.filter(Boolean);
     if (!items.some(function(i) { return i.kind === 'op-edge'; })) return null;
 
@@ -105,11 +105,15 @@
           // Detect loop option — self-loop edge regardless of destination
           var loopOpt = edgeOpts.find(function(o) { return o.key === 'loop' || o.key === 'loop above' || o.key === 'loop below' || o.key === 'loop left' || o.key === 'loop right'; })
                      || outerRawOpts.find(function(o) { return o.key === 'loop' || o.key === 'loop above' || o.key === 'loop below' || o.key === 'loop left' || o.key === 'loop right'; });
+          // Merge outer style with edge-specific options for per-edge style
+          var edgeStyle = (edgeOpts.length > 0 && resolveOptsFn)
+            ? Object.assign({}, outerStyle, resolveOptsFn(edgeOpts))
+            : outerStyle;
           if (loopOpt && edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor') {
             var selfId = nodeReg[edgeSourceItem.coord.coord.nodeName];
             if (selfId) {
               var loopDir = loopOpt.key.replace('loop', '').trim() || 'right';
-              edges.push(ft.makeEdge(selfId, selfId, { kind: 'loop', direction: loopDir }, outerStyle, allEdgeOpts, { labels: edgeLabels }));
+              edges.push(ft.makeEdge(selfId, selfId, { kind: 'loop', direction: loopDir }, edgeStyle, allEdgeOpts, { labels: edgeLabels }));
             }
           } else if (edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor' &&
               dst.coord.coord.cs === 'node-anchor') {
@@ -126,7 +130,7 @@
               if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: Math.abs(parseFloat(bendLeft.value  || '30')) };
               else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: Math.abs(parseFloat(bendRight.value || '30')) };
               else if (inOpt && outOpt) routing = { kind: 'in-out', inAngle: parseFloat(inOpt.value || '0'), outAngle: parseFloat(outOpt.value || '0') };
-              edges.push(ft.makeEdge(fromId, toId, routing, outerStyle, allEdgeOpts, { labels: edgeLabels }));
+              edges.push(ft.makeEdge(fromId, toId, routing, edgeStyle, allEdgeOpts, { labels: edgeLabels }));
             }
           }
           inEdge = false;
@@ -890,7 +894,7 @@ function peg$parse(input, options) {
       const style        = resolveOpts(rawOpts);
       const edge = tryBuildEdgeFromOps(ops, style, rawOpts, nodeRegistry);
       if (edge) return edge;
-      const multiEdges = tryBuildMultiEdgesFromOps(ops, style, rawOpts, nodeRegistry);
+      const multiEdges = tryBuildMultiEdgesFromOps(ops, style, rawOpts, nodeRegistry, resolveOpts);
       if (multiEdges) {
         if (multiEdges.length === 1) return multiEdges[0];
         return ft.makeScope(multiEdges, {}, []);
