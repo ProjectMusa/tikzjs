@@ -146,15 +146,18 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
     }
 
     case 'Latex':
+      // TikZ Latex arrow: filled kite-like shape with slightly concave sides.
+      // Based on pgflibraryarrows.meta.code.tex: length ~4.8pt, width ~3.6pt at default line width.
+      // viewBox 0 0 10 10: tip at (10,5), back at (0,5), width spans (0→10 on y-axis mapped to ±half-width)
       return {
         id,
         pathData: spec.reversed
-          ? `<path d="M 12 5 C 6 5, 2 3, 0 0 C 2 7, 2 3, 0 10 C 2 7, 6 5, 12 5 Z" fill="${color}"/>`
-          : `<path d="M 0 5 C 6 5, 10 3, 12 0 C 10 7, 10 3, 12 10 C 10 7, 6 5, 0 5 Z" fill="${color}"/>`,
-        viewBox: '0 0 12 10',
-        refX: spec.reversed ? 0 : 12,
+          ? `<path d="M 10 5 C 7 5, 3.5 3.5, 0 0 L 2 5 L 0 10 C 3.5 6.5, 7 5, 10 5 Z" fill="${color}"/>`
+          : `<path d="M 0 5 C 3 5, 6.5 3.5, 10 0 L 8 5 L 10 10 C 6.5 6.5, 3 5, 0 5 Z" fill="${color}"/>`,
+        viewBox: '0 0 10 10',
+        refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 7,
+        markerWidth: 9,
         markerHeight: 7,
         orient: 'auto-start-reverse',
         color,

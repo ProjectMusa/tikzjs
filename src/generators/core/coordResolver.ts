@@ -52,6 +52,8 @@ export interface NodeGeometry {
   halfHeight: number
   /** Full bounding box in SVG pixels. */
   bbox: BoundingBox
+  /** Node shape for boundary clipping. */
+  shape?: 'circle' | 'ellipse' | 'rectangle'
 }
 
 /**
@@ -119,6 +121,13 @@ export function clipToNodeBoundary(
   geo: NodeGeometry
 ): AbsoluteCoordinate {
   const { centerX, centerY, halfWidth, halfHeight } = geo
+
+  // For circle/ellipse shapes, clip to the ellipse boundary
+  if (geo.shape === 'circle' || geo.shape === 'ellipse') {
+    return clipToEllipse(from, to, centerX, centerY, halfWidth, halfHeight)
+  }
+
+  // Rectangle clipping
   const dx = to.x - from.x
   const dy = to.y - from.y
   const len = Math.sqrt(dx * dx + dy * dy)
@@ -162,6 +171,47 @@ export function clipToNodeBoundary(
     const dC    = (c.x - from.x) ** 2 + (c.y - from.y) ** 2
     return dC < dBest ? c : best
   })
+}
+
+/** Clip a line from→to to the boundary of an ellipse centered at (cx,cy). */
+function clipToEllipse(
+  from: AbsoluteCoordinate,
+  to: AbsoluteCoordinate,
+  cx: number, cy: number,
+  rx: number, ry: number,
+): AbsoluteCoordinate {
+  // Direction from 'from' toward 'to'
+  const dx = to.x - from.x
+  const dy = to.y - from.y
+  const len = Math.sqrt(dx * dx + dy * dy)
+  if (len < 1e-9) return to
+
+  // Parametric line: P(t) = from + t*(to - from)
+  // Ellipse: ((x-cx)/rx)^2 + ((y-cy)/ry)^2 = 1
+  // Substitute: ((from.x + t*dx - cx)/rx)^2 + ((from.y + t*dy - cy)/ry)^2 = 1
+  const fx = from.x - cx
+  const fy = from.y - cy
+  const a = (dx / rx) ** 2 + (dy / ry) ** 2
+  const b = 2 * (fx * dx / (rx * rx) + fy * dy / (ry * ry))
+  const c = (fx / rx) ** 2 + (fy / ry) ** 2 - 1
+
+  const disc = b * b - 4 * a * c
+  if (disc < 0) return to
+
+  const sqrtDisc = Math.sqrt(disc)
+  const t1 = (-b - sqrtDisc) / (2 * a)
+  const t2 = (-b + sqrtDisc) / (2 * a)
+
+  // Pick the intersection closest to 'to' (the node center side)
+  // Both t values represent where the line crosses the ellipse
+  // We want the one closest to 'from' (i.e., smallest positive t)
+  let t = -1
+  if (t1 > 0) t = t1
+  if (t2 > 0 && (t < 0 || t2 < t)) t = t2
+
+  if (t < 0) return to
+
+  return { x: from.x + t * dx, y: from.y + t * dy }
 }
 
 // ── Main resolver ─────────────────────────────────────────────────────────────

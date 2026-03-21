@@ -141,6 +141,7 @@ export function emitNode(
     halfWidth,
     halfHeight,
     bbox: fromCorners(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight),
+    shape: (node.style.shape === 'circle') ? 'circle' : (node.style.shape === 'ellipse') ? 'ellipse' : 'rectangle',
   }
 
   // Register geometry for anchor resolution
