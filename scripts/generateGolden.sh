@@ -57,6 +57,9 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{knot}'; then
     TIKZ_LIBRARIES="knots"
   fi
+  if echo "$FIXTURE_CONTENT" | grep -qE 'arrows=\{|Stealth\[|Latex\[|-Stealth|-Latex'; then
+    TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}arrows.meta"
+  fi
 
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{tikzcd}'; then
     USE_PACKAGES="\\usepackage{tikz}\\usepackage{tikz-cd}"

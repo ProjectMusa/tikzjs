@@ -1,0 +1,22 @@
+\begin{tikzpicture}
+[scale=1.0]
+\node(k) at (0,0) [circle,scale=0.6,draw,fill]{};
+\node(label) at (0.25,-0.25) []{$k$};
+\node(a) at (-1,0) [circle,scale=0.6,draw,fill]{};
+\node(b) at (0.7,0.7) [circle,scale=0.6,draw,fill]{};
+\node(c) at (0,-1) [circle,scale=0.6,draw,fill]{};
+\draw[arrows={-Stealth[scale=1.2] Stealth[scale=1.2]}] (k)--(c);
+\foreach \from/\to in {k/b,a/k,b/a}
+\draw[arrows={-Stealth[scale=1.2]}] (\from)--(\to);
+\node(mutation) at (1.8,-0.2) [scale=1.2] {$\longrightarrow$};
+\node(mutation) at (1.8,0.2) [] {$\mu_k$};
+\node(k') at (4,0) [circle,scale=0.6,draw,fill]{};
+\node(label') at (4.25,-0.25) []{$k$};
+\node(a') at (3,0) [circle,scale=0.6,draw,fill]{};
+\node(b') at (4.7,0.7) [circle,scale=0.6,draw,fill]{};
+\node(c') at (4,-1) [circle,scale=0.6,draw,fill]{};
+\draw[arrows={-Stealth[scale=1.2] Stealth[scale=1.2]}] (c')--(k');
+\draw[arrows={-Stealth[scale=1.2] Stealth[scale=1.2]}] (a')--(c');
+\draw[arrows={-Stealth[scale=1.2]}] (b')--(k');
+\draw[arrows={-Stealth[scale=1.2]}] (k')--(a');
+\end{tikzpicture}
