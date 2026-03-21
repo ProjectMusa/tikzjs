@@ -863,6 +863,11 @@ coord_term
 coord_factor
   = '(' ws e:coord_num ws ')' { return e; }
   / '{' ws e:coord_num ws '}' { return e; }
+  / 'sqrt' ws '(' ws e:coord_num ws ')' { return Math.sqrt(e); }
+  / 'sin'  ws '(' ws e:coord_num ws ')' { return Math.sin(e * Math.PI / 180); }
+  / 'cos'  ws '(' ws e:coord_num ws ')' { return Math.cos(e * Math.PI / 180); }
+  / 'abs'  ws '(' ws e:coord_num ws ')' { return Math.abs(e); }
+  / 'pi'   { return 3.14159265358979; }
   / '-' ws n:pos_number       { return -n; }
   / '+' ws n:pos_number       { return n; }
   / n:pos_number              { return n; }

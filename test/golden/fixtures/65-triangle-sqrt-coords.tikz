@@ -1,0 +1,8 @@
+\begin{tikzpicture}
+\draw(0,0)circle(0.06)node[below]{$\delta_1$};
+\draw(2,0)circle(0.06)node[below]{$\delta_2$};
+\draw(1,{sqrt(3)})circle(0.06)node[above]{$\delta_0$};
+\draw(0.03,{0.03*sqrt(3)})--(1-0.03,{0.96*sqrt(3)});
+\draw(0.06,0)--(2-0.06,0);
+\draw(1+0.03,{0.96*sqrt(3)})--(2-0.03,{0.03*sqrt(3)});
+\end{tikzpicture}
