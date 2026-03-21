@@ -187,7 +187,16 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       if (dashIdx !== -1) {
         const startStr = raw.slice(0, dashIdx).trim()
         const endStr   = raw.slice(dashIdx + 1).trim()
-        const parseTip = (s: string) => { const m = s.match(/^(\w+)/) ; return m ? { kind: m[1] } : null }
+        const parseTip = (s: string): ArrowTipSpec | null => {
+          const m = s.match(/^(\w+)(?:\[([^\]]*)\])?/)
+          if (!m) return null
+          const opts: Record<string, string> = {}
+          if (m[2]) for (const kv of m[2].split(',')) {
+            const [k, v] = kv.split('=').map(x => x.trim())
+            if (k && v !== undefined) opts[k] = v
+          }
+          return Object.keys(opts).length ? { kind: m[1], options: opts } : { kind: m[1] }
+        }
         if (startStr) { const t = parseTip(startStr); if (t) style.arrowStart = t }
         if (endStr)   { const t = parseTip(endStr);   if (t) style.arrowEnd   = t }
       }

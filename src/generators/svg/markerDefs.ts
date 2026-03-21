@@ -112,7 +112,8 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         color,
       }
 
-    case 'Stealth':
+    case 'Stealth': {
+      const scale = parseFloat(spec.options?.scale ?? '1') || 1
       return {
         id,
         pathData: spec.reversed
@@ -121,11 +122,12 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         viewBox: '0 0 10 10',
         refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 6,
-        markerHeight: 6,
+        markerWidth: 6 * scale,
+        markerHeight: 6 * scale,
         orient: 'auto-start-reverse',
         color,
       }
+    }
 
     case 'Latex':
       return {
