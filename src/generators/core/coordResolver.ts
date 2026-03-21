@@ -249,7 +249,7 @@ export class CoordResolver {
         // The new node's center is then computed by nodeEmitter via anchorOffsetFromAnchor.
         const refGeo = this._nodeRegistry.getByName(coord.refName)
         if (!refGeo) return { x: 0, y: 0 }
-        const distPx = ptToPx(coord.distancePt > 0 ? coord.distancePt : this._nodeDistancePt)
+        const distPx = ptToPx(coord.distancePt !== undefined ? coord.distancePt : this._nodeDistancePt)
         const { centerX: cx, centerY: cy, halfWidth: hw, halfHeight: hh } = refGeo
         switch (coord.direction) {
           case 'below':       return { x: cx,          y: cy + hh + distPx }

@@ -99,7 +99,7 @@ export function extractPlacementRef(rawOptions: RawOption[]): CoordRef | null {
     // Match: "of NODENAME" or "DIST of NODENAME"
     const m = /^(?:([\d.]+\s*(?:cm|mm|pt|in|em|ex))\s+)?of\s+(.+)$/i.exec(val)
     if (!m) continue
-    const distPt = m[1] ? parsePlacementDist(m[1]) : 0 // 0 = use diagram node distance
+    const distPt = m[1] ? parsePlacementDist(m[1]) : undefined // undefined = use diagram node distance
     const coord: NodePlacementCoord = {
       cs: 'node-placement',
       refName: m[2].trim(),

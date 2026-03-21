@@ -47,13 +47,13 @@ export interface CalcCoord {
 /**
  * TikZ `positioning` library: `below=of NODE`, `above=of NODE`, etc.
  * Places the new node's anchor (opposite of direction) at NODE's border + distancePt gap.
- * distancePt=0 means use the diagram's `node distance` setting.
+ * distancePt=undefined means use the diagram's `node distance` setting.
  */
 export interface NodePlacementCoord {
   cs: 'node-placement'
   refName: string
   direction: 'above' | 'below' | 'left' | 'right' | 'above left' | 'above right' | 'below left' | 'below right'
-  distancePt: number
+  distancePt?: number
 }
 
 export type Coord = XYCoord | PolarCoord | NodeAnchorCoord | CalcCoord | NodePlacementCoord

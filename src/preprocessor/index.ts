@@ -54,12 +54,38 @@ export interface ExpandedDoc {
  * Comments (%) are preserved through the pipeline but stripped before the
  * PEG parser sees them (the PEG grammar handles inline comments).
  */
+/**
+ * Extract %!preamble...%!end-preamble blocks and inject their content
+ * (stripped of the leading "%  " comment prefix) before the tikzpicture.
+ * These blocks contain \tikzset / \def definitions used only in extra fixtures.
+ */
+function extractPreambleBlocks(source: string): string {
+  const preambleRe = /^%!preamble\r?\n([\s\S]*?)^%!end-preamble\r?\n?/m
+  const m = preambleRe.exec(source)
+  if (!m) return source
+  const injected = m[1]
+    .split('\n')
+    .map(line => {
+      const stripped = line.replace(/^%  /, '')
+      // Balance braces: some fixture preambles have missing closing `}` for \tikzset{...}
+      let depth = 0
+      for (const ch of stripped) { if (ch === '{') depth++; else if (ch === '}') depth-- }
+      return depth > 0 ? stripped + '}'.repeat(depth) : stripped
+    })
+    .join('\n')
+  // Strip the preamble block and prepend the extracted definitions
+  return injected + '\n' + source.replace(preambleRe, '')
+}
+
 export function preprocess(rawSource: string): ExpandedDoc {
   const macroTable = new MacroTable()
   const styleRegistry = new StyleRegistry()
 
+  // Pass 0: Extract %!preamble blocks (extra-fixture convention)
+  let src = extractPreambleBlocks(rawSource)
+
   // Pass 1: Collect and strip macro definitions (\def, \newcommand)
-  let src = collectAndStripMacros(rawSource, macroTable)
+  src = collectAndStripMacros(src, macroTable)
 
   // Pass 2: Collect and strip style definitions (\tikzset, \tikzstyle)
   src = collectAndStripStyles(src, styleRegistry)
