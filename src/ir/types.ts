@@ -106,6 +106,10 @@ export interface ArrowTipSpec {
  * Populated by styleResolver.ts; raw source preserved in rawOptions.
  */
 export interface ResolvedStyle {
+  // Current color (from `color=X` option) — inherited by child scopes.
+  // When `draw` or `fill` resolves to 'currentColor', this value is used instead of black.
+  color?: string
+
   // Stroke
   draw?: string // CSS color string or 'none'
   drawWidth?: number // pt

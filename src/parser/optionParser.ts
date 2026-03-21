@@ -97,6 +97,13 @@ export function resolveOptions(
     applyOption(opt, style, emSizePt)
   }
 
+  // Resolve 'currentColor' slots against the inherited/local color.
+  // This handles \begin{tikzpicture}[color=X] propagating into child \draw commands.
+  if (style.color) {
+    if (style.draw === 'currentColor') style.draw = style.color
+    if (style.fill === 'currentColor') style.fill = style.color
+  }
+
   return style
 }
 
@@ -130,8 +137,10 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'color':
       if (value) {
         const color = resolveColor(value as string)
-        // Only update slots that were already set to 'currentColor' by the implied
-        // draw/fill option. This prevents \draw[color=red] from getting fill="#FF0000".
+        // Store as the inherited current color (used to resolve 'currentColor' slots).
+        style.color = color
+        // Also immediately resolve any 'currentColor' slots set by the implied draw/fill option.
+        // This prevents \draw[color=red] from getting fill="#FF0000".
         if (style.draw === 'currentColor') style.draw = color
         if (style.fill === 'currentColor') style.fill = color
       }

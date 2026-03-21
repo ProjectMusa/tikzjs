@@ -99,6 +99,9 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   svg.setAttribute('width',   `${widthPt}pt`)
   svg.setAttribute('height',  `${heightPt}pt`)
   svg.setAttribute('viewBox', viewBox)
+  // Propagate `color=X` from the tikzpicture options via CSS so that child
+  // elements using stroke/fill="currentColor" inherit the correct colour.
+  if (globalStyle.color) svg.setAttribute('style', `color:${globalStyle.color}`)
 
   // Add <defs> with marker, pattern, and clip-path definitions if any
   const allClipDefs = [...(r2.clipDefs ?? [])]
