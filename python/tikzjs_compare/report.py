@@ -1,12 +1,15 @@
 """
 HTML report with summary table + expandable per-fixture detail panels.
+Only fixtures with a non-zero structural diff (or missing ref / render error) are shown.
+Perfect matches are counted in the summary header but not listed.
 """
 
 import base64
+import html as html_module
 from pathlib import Path
 
 from .compare import CompareResult
-from .config import REPORT_DIR, DIFF_THRESHOLD
+from .config import REPORT_DIR, DIFF_THRESHOLD, FIXTURES_DIR
 
 
 # ── CSS ───────────────────────────────────────────────────────────────────────
@@ -19,9 +22,11 @@ h1 { background: #1a1a2e; color: #fff; padding: 14px 24px; font-size: 15px; font
 
 /* ── summary bar ── */
 .summary { background: #fff; border-bottom: 1px solid #ddd;
-           padding: 10px 24px; display: flex; gap: 20px; align-items: center; }
-.pass-count { color: #1a7a1a; font-weight: 700; }
-.fail-count { color: #cc0000; font-weight: 700; }
+           padding: 10px 24px; display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
+.pass-count  { color: #1a7a1a; font-weight: 700; }
+.fail-count  { color: #cc0000; font-weight: 700; }
+.perf-count  { color: #2d8a4e; background: #d4f5e2; padding: 2px 10px;
+               border-radius: 999px; font-size: 12px; font-weight: 600; }
 .meta { color: #666; font-size: 12px; }
 
 /* ── legend ── */
@@ -37,11 +42,13 @@ table.main th { background: #2a2a3e; color: #ddd; padding: 7px 12px;
 table.main td { padding: 7px 12px; vertical-align: middle; border-bottom: 1px solid #e8e8e8; }
 tr.pass-row { background: #f5fff5; }
 tr.fail-row { background: #fff5f5; }
-tr.pass-row:hover, tr.fail-row:hover { filter: brightness(0.97); cursor: pointer; }
+tr.warn-row { background: #fffbf0; }
+tr.pass-row:hover, tr.fail-row:hover, tr.warn-row:hover { filter: brightness(0.97); cursor: pointer; }
 
 .status { font-weight: 700; font-size: 12px; width: 52px; }
 .pass-row .status { color: #1a7a1a; }
 .fail-row .status { color: #cc0000; }
+.warn-row .status { color: #b8860b; }
 
 .fname { font-family: monospace; font-size: 12px; }
 .stats { font-size: 11px; color: #555; font-family: monospace; }
@@ -73,6 +80,14 @@ tr.detail-row.open .detail-panel { display: block; }
 .img-card img { display: block; max-height: 160px; max-width: 320px;
                 border: 1px solid #444; border-radius: 3px; }
 
+/* TikZ source */
+.tikz-source { background: #0d0d1a; border-radius: 6px; padding: 12px 14px;
+               font-family: ui-monospace, 'Cascadia Code', monospace;
+               font-size: 12px; line-height: 1.55; color: #c8d3f5;
+               overflow-x: auto; white-space: pre; }
+.tikz-source .kw  { color: #89ddff; }   /* \command */
+.tikz-source .opt { color: #c3e88d; }   /* [options] */
+
 """
 
 # ── JS ────────────────────────────────────────────────────────────────────────
@@ -83,7 +98,6 @@ document.querySelectorAll('tr.data-row').forEach(row => {
     const detail = row.nextElementSibling;
     if (!detail || !detail.classList.contains('detail-row')) return;
     const isOpen = detail.classList.contains('open');
-    // close all
     document.querySelectorAll('tr.detail-row.open').forEach(d => d.classList.remove('open'));
     if (!isOpen) detail.classList.add('open');
   });
@@ -127,15 +141,23 @@ def _diff_bar(pct: float) -> str:
     </div>'''
 
 
+def _tikz_source(name: str) -> str:
+    p = FIXTURES_DIR / f'{name}.tikz'
+    if not p.exists():
+        return ''
+    return html_module.escape(p.read_text(encoding='utf-8'))
+
+
 def _detail_panel(result: CompareResult) -> str:
     b_ours   = _b64(result.name, 'ours')
     b_ref    = _b64(result.name, 'ref')
     b_diff   = _b64(result.name, 'diff')
     b_struct = _b64(result.name, 'struct')
+    tikz_src = _tikz_source(result.name)
 
-    return f'''<div class="detail-panel">
-  <div class="detail-grid">
-
+    images_section = ''
+    if b_ours or b_ref or b_diff:
+        images_section = f'''
     <div>
       <div class="section-title">Rasterized output</div>
       <div class="img-strip">
@@ -143,8 +165,11 @@ def _detail_panel(result: CompareResult) -> str:
         {_img_card('reference', b_ref)}
         {_img_card('pixel diff ×5', b_diff)}
       </div>
-    </div>
+    </div>'''
 
+    struct_section = ''
+    if b_struct:
+        struct_section = f'''
     <div>
       <div class="section-title">
         Structural diff
@@ -158,24 +183,54 @@ def _detail_panel(result: CompareResult) -> str:
       <div class="img-strip">
         {_img_card(f'struct diff {result.struct_diff:.2f}%', b_struct)}
       </div>
-    </div>
+    </div>'''
 
+    source_section = ''
+    if tikz_src:
+        source_section = f'''
+    <div>
+      <div class="section-title">TikZ source</div>
+      <pre class="tikz-source">{tikz_src}</pre>
+    </div>'''
+
+    return f'''<div class="detail-panel">
+  <div class="detail-grid">
+    {images_section}
+    {struct_section}
+    {source_section}
   </div>
 </div>'''
+
+
+def _is_perfect(r: CompareResult) -> bool:
+    """True for fixtures that pass cleanly with no warnings — hidden from the diff table."""
+    return r.passed and not r.warnings and r.stats.get('ref') != 'missing'
 
 
 # ── main entry ────────────────────────────────────────────────────────────────
 
 def write_html_report(results: list[CompareResult]) -> Path:
-    """Write REPORT_DIR/report.html and return the path."""
-    n_pass = sum(1 for r in results if r.passed)
-    n_fail = len(results) - n_pass
+    """Write REPORT_DIR/index.html and return the path."""
+    n_pass    = sum(1 for r in results if r.passed)
+    n_fail    = len(results) - n_pass
+    n_perfect = sum(1 for r in results if _is_perfect(r))
+    n_warn    = sum(1 for r in results if r.passed and r.warnings)
+
+    visible = [r for r in results if not _is_perfect(r)]
 
     rows_html = []
-    for r in results:
-        row_cls    = 'pass-row' if r.passed else 'fail-row'
-        status_txt = 'PASS' if r.passed else 'FAIL'
-        stats_str  = '&nbsp; '.join(
+    for r in visible:
+        if not r.passed:
+            row_cls    = 'fail-row'
+            status_txt = 'FAIL'
+        elif r.warnings:
+            row_cls    = 'warn-row'
+            status_txt = 'WARN'
+        else:
+            row_cls    = 'pass-row'
+            status_txt = 'PASS'
+
+        stats_str = '&nbsp; '.join(
             f'<b>{k}</b>={v}' for k, v in r.stats.items()
         )
         issues = ('<br>'.join(r.failures + r.warnings)
@@ -193,10 +248,20 @@ def write_html_report(results: list[CompareResult]) -> Path:
             <td colspan="5">{_detail_panel(r)}</td>
           </tr>''')
 
+    perfect_pill = (f'<span class="perf-count">{n_perfect} perfect</span>'
+                    if n_perfect else '')
+
+    no_diffs_msg = ''
+    if not visible:
+        no_diffs_msg = '''<tr><td colspan="5" style="text-align:center;padding:48px;color:#2d8a4e;font-size:14px;">
+          All fixtures match perfectly.
+        </td></tr>'''
+
     html = f"""<!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>tikzjs golden comparison</title>
   <style>{_CSS}</style>
 </head>
@@ -206,6 +271,8 @@ def write_html_report(results: list[CompareResult]) -> Path:
   <div class="summary">
     <span class="pass-count">{n_pass} passed</span>
     <span class="fail-count">{n_fail} failed</span>
+    {f'<span style="color:#b8860b;font-weight:700">{n_warn} warn</span>' if n_warn else ''}
+    {perfect_pill}
     <span class="meta">of {len(results)} fixtures</span>
     <span class="meta">struct diff threshold: {DIFF_THRESHOLD}%</span>
   </div>
@@ -216,7 +283,7 @@ def write_html_report(results: list[CompareResult]) -> Path:
     <span class="leg"><span class="swatch" style="background:#aaa"></span> both</span>
     <span class="leg"><span class="swatch" style="background:#44f"></span> extra in ours</span>
     <span class="leg"><span class="swatch" style="background:#f44"></span> missing from ours</span>
-    <span style="color:#888">— click any row to expand detail</span>
+    <span style="color:#888">— click any row to expand · perfect matches hidden</span>
   </div>
 
   <table class="main">
@@ -228,12 +295,14 @@ def write_html_report(results: list[CompareResult]) -> Path:
       <th>Issues</th>
     </tr>
     {''.join(rows_html)}
+    {no_diffs_msg}
   </table>
 
   <script>{_JS}</script>
 </body>
 </html>"""
 
-    report_path = REPORT_DIR / 'report.html'
+    REPORT_DIR.mkdir(parents=True, exist_ok=True)
+    report_path = REPORT_DIR / 'index.html'
     report_path.write_text(html, encoding='utf-8')
     return report_path

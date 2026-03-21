@@ -25,14 +25,21 @@ jobs:
           node-version: '20'
           cache: 'npm'
 
-      - name: Install dependencies
+      - name: Install Node dependencies and build
         run: npm ci
 
-      - name: Install Playwright browser
-        run: npx playwright install --with-deps chromium
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-      - name: Run visual diff
-        run: DIFF_OUT_DIR=./gh-pages node scripts/visualdiff.js
+      - name: Install Python comparison tool
+        run: pip install --quiet python/
+
+      - name: Install cairosvg system deps
+        run: sudo apt-get install -y --no-install-recommends libcairo2 libpango-1.0-0 libpangocairo-1.0-0
+
+      - name: Run structural comparison
+        run: TIKZJS_REPORT_DIR=./gh-pages python -m tikzjs_compare
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
