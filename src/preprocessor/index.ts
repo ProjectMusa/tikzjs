@@ -19,6 +19,7 @@
 
 import { MacroTable, collectAndStripMacros, expandMacros } from './macroExpander.js'
 import { StyleRegistry, parseTikzset, parseTikzstyle } from './styleRegistry.js'
+import { registerColor } from '../parser/optionParser.js'
 import { expandAllForeach } from './foreachExpander.js'
 import { extractTikzcdEnvironments, TikzcdGrid } from './tikzcdPreprocessor.js'
 import { extractKnotEnvironments, KnotEnvironment } from './knotPreprocessor.js'
@@ -211,6 +212,26 @@ function collectAndStripStyles(src: string, registry: StyleRegistry): string {
         continue // strip from output
       }
 
+      if (token === '\\definecolor') {
+        scanner.skipWhitespaceAndComments()
+        if (scanner.peek() === '{') {
+          const colorName = scanner.readGroup()
+          scanner.skipWhitespaceAndComments()
+          if (scanner.peek() === '{') {
+            const model = scanner.readGroup().trim()
+            scanner.skipWhitespaceAndComments()
+            if (scanner.peek() === '{') {
+              const spec = scanner.readGroup().trim()
+              const css = defineColorToCSS(model, spec)
+              if (css) registerColor(colorName, css)
+              continue // strip from output
+            }
+          }
+        }
+        result += token
+        continue
+      }
+
       result += token
       continue
     }
@@ -219,6 +240,40 @@ function collectAndStripStyles(src: string, registry: StyleRegistry): string {
   }
 
   return result
+}
+
+/** Convert \definecolor model+spec to a CSS hex string. */
+function defineColorToCSS(model: string, spec: string): string | null {
+  const parts = spec.split(',').map(s => s.trim())
+  switch (model) {
+    case 'rgb': {
+      if (parts.length !== 3) return null
+      const [r, g, b] = parts.map(p => Math.round(parseFloat(p) * 255))
+      return `#${hex2(r)}${hex2(g)}${hex2(b)}`
+    }
+    case 'RGB': {
+      if (parts.length !== 3) return null
+      const [r, g, b] = parts.map(p => Math.min(255, Math.max(0, parseInt(p, 10))))
+      return `#${hex2(r)}${hex2(g)}${hex2(b)}`
+    }
+    case 'HTML': {
+      return `#${spec.replace(/^#/, '')}`
+    }
+    case 'cmyk': {
+      if (parts.length !== 4) return null
+      const [c, m, y, k] = parts.map(p => parseFloat(p))
+      const r = Math.round(255 * (1 - c) * (1 - k))
+      const g = Math.round(255 * (1 - m) * (1 - k))
+      const b = Math.round(255 * (1 - y) * (1 - k))
+      return `#${hex2(r)}${hex2(g)}${hex2(b)}`
+    }
+    default:
+      return null
+  }
+}
+
+function hex2(n: number): string {
+  return Math.max(0, Math.min(255, n)).toString(16).padStart(2, '0')
 }
 
 

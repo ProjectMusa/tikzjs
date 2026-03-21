@@ -481,6 +481,11 @@ const NAMED_COLORS: Record<string, string> = {
   violet:    '#800080',
 }
 
+/** Register a user-defined color (e.g. from \definecolor). */
+export function registerColor(name: string, cssValue: string): void {
+  NAMED_COLORS[name.toLowerCase()] = cssValue
+}
+
 function isNamedColor(s: string): boolean {
   return s.toLowerCase() in NAMED_COLORS
 }
