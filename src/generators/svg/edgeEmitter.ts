@@ -70,13 +70,17 @@ export function emitEdge(
       pathEl.setAttribute('stroke-dasharray', dashMap[edge.style.drawDash] ?? edge.style.drawDash)
     }
 
-    // Markers
+    // Markers — resolve 'default' tip using arrowDefault if set
+    const resolveDefaultTip = (tip: import('../../ir/types.js').ArrowTipSpec) =>
+      tip.kind === 'default' && edge.style.arrowDefault
+        ? { ...tip, kind: edge.style.arrowDefault }
+        : tip
     if (edge.style.arrowEnd) {
-      const mid = ensureMarker(edge.style.arrowEnd, markerRegistry, color)
+      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowEnd), markerRegistry, color)
       pathEl.setAttribute('marker-end', `url(#${mid})`)
     }
     if (edge.style.arrowStart) {
-      const mid = ensureMarker(edge.style.arrowStart, markerRegistry, color)
+      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowStart), markerRegistry, color)
       pathEl.setAttribute('marker-start', `url(#${mid})`)
     }
 

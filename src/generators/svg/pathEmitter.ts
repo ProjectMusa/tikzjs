@@ -195,10 +195,27 @@ export function emitPath(
       }
 
       case 'to': {
-        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
-        const to = resolver.resolve(seg.to)
+        let to = resolver.resolve(seg.to)
+        // Clip to-side if destination is a node
+        const toGeo = getNodeGeoForCoord(seg.to, nodeRegistry)
+        if (toGeo) {
+          to = clipToNodeBoundary(lastPos, to, toGeo)
+        }
+        // Clip from-side if last coord was a node (adjusts the pending move if applicable)
+        const fromGeoTo = lastCoordRef ? getNodeGeoForCoord(lastCoordRef, nodeRegistry) : null
+        let from = lastPos
+        if (fromGeoTo) {
+          from = clipToNodeBoundary(to, lastPos, fromGeoTo)
+        }
+        // Emit M for the (possibly clipped) start position
+        if (pendingMove) {
+          d += `M ${from.x} ${from.y} `
+          pendingMove = null
+        } else if (from.x !== lastPos.x || from.y !== lastPos.y) {
+          d += `M ${from.x} ${from.y} `
+        }
         // For 'to', handle bend/loop options to produce bezier approximation
-        const bendPath = buildBendPath(lastPos, to, seg.rawOptions)
+        const bendPath = buildBendPath(from, to, seg.rawOptions)
         d += bendPath.d
         bboxes.push(bendPath.bbox)
         lastPos = to
@@ -382,13 +399,17 @@ export function emitPath(
     const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     pathEl.setAttribute('d', d.trim())
 
-    // Determine marker IDs
+    // Determine marker IDs — resolve 'default' tip using arrowDefault if set
+    const resolveDefaultTip = (tip: import('../../ir/types.js').ArrowTipSpec) =>
+      tip.kind === 'default' && path.style.arrowDefault
+        ? { ...tip, kind: path.style.arrowDefault }
+        : tip
     const markerIds: { start?: string; end?: string } = {}
     if (path.style.arrowStart) {
-      markerIds.start = ensureMarker(path.style.arrowStart, markerRegistry, path.style.draw ?? 'currentColor')
+      markerIds.start = ensureMarker(resolveDefaultTip(path.style.arrowStart), markerRegistry, path.style.draw ?? 'currentColor')
     }
     if (path.style.arrowEnd) {
-      markerIds.end = ensureMarker(path.style.arrowEnd, markerRegistry, path.style.draw ?? 'currentColor')
+      markerIds.end = ensureMarker(resolveDefaultTip(path.style.arrowEnd), markerRegistry, path.style.draw ?? 'currentColor')
     }
 
     applyAttrs(pathEl, buildPathAttrs(path.style, markerIds))

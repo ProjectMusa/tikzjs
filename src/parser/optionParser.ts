@@ -180,6 +180,13 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       break
 
     // ── Arrow tips ────────────────────────────────────────────
+    case '>': {
+      // `>=Stealth` sets the default arrow tip for `>` (i.e. `->`, `<->` etc.)
+      const tipName = normalizeTipKind(((value as string) || '').trim())
+      if (tipName) style.arrowDefault = tipName
+      break
+    }
+
     case 'arrows': {
       // Parse arrows={start-end} or arrows=start-end, e.g. "-Stealth[scale=1.2]"
       const raw = ((value as string) || '').trim().replace(/^\{|\}$/g, '').trim()
@@ -299,6 +306,10 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     }
 
     // ── Transform ─────────────────────────────────────────────
+    case 'transform shape':
+      style.transformShape = true
+      break
+
     case 'rotate':
       if (value) style.rotate = parseFloat(value as string)
       break

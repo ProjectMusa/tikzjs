@@ -109,6 +109,12 @@ export function emitNode(
     halfHeight = r
   }
 
+  // `transform shape` makes node shapes scale with the tikzpicture coordinate transform
+  if (node.style.transformShape && resolver.coordScale !== 1) {
+    halfWidth  *= resolver.coordScale
+    halfHeight *= resolver.coordScale
+  }
+
   // Resolve position: the node's anchor sits at position
   const anchorPos = resolver.resolve(node.position)
   const anchorOffset = anchorOffsetFromAnchor(node.anchor, halfWidth, halfHeight)

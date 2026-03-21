@@ -124,6 +124,8 @@ export interface ResolvedStyle {
   // Arrow tips
   arrowStart?: ArrowTipSpec
   arrowEnd?: ArrowTipSpec
+  /** Default arrow tip kind, set by `>=TipName` option (e.g. `>=Stealth`). */
+  arrowDefault?: string
 
   // Node geometry
   shape?: string // 'rectangle' | 'circle' | 'ellipse' | 'coordinate' | ...
@@ -143,6 +145,7 @@ export interface ResolvedStyle {
   nodeLabels?: Array<{ position: string; text: string }>
 
   // Transform
+  transformShape?: boolean // TikZ `transform shape` — applies tikzpicture transforms to node shapes
   rotate?: number // degrees
   xshift?: number // pt
   yshift?: number // pt
