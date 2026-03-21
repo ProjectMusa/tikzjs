@@ -156,6 +156,7 @@
     const inlineNodes = [];
     const inlineCoords = [];
     let lastCoord = ft.coordRef(0, 0);  // current path position for inline node placement
+    let prevCoord = null;               // previous coordinate (for midway interpolation)
     // Last known absolute position (for resolving relative ++ offsets in inline node placement).
     let lastAbsCoord = ft.coordRef(0, 0);
 
@@ -164,6 +165,7 @@
       switch (item.kind) {
         case 'op-coord':
           rawSegs.push(ft.moveSegment(item.coord));
+          prevCoord = lastCoord;
           if (item.coord.mode === 'absolute') {
             lastCoord = item.coord;
             lastAbsCoord = item.coord;
@@ -227,11 +229,36 @@
         case 'op-cos':
           rawSegs.push({ _pendingCos: true });
           break;
-        case 'op-node':
-          item.node.position = lastCoord;  // inline node sits at current path position
+        case 'op-node': {
+          // Check if node has a position key (midway, near start, etc.)
+          var nodeOpts = item.node.rawOptions || [];
+          var nodeKeys = nodeOpts.map(function(o) { return o.key; });
+          var posKey = nodeKeys.find(function(k) { return POSITION_KEYS.has(k); });
+          var posVal = nodeKeys.find(function(k) { return k === 'pos'; });
+          var t = null;
+          if (posKey === 'midway')       t = 0.5;
+          else if (posKey === 'near start' || posKey === 'very near start') t = 0.25;
+          else if (posKey === 'near end'   || posKey === 'very near end')   t = 0.75;
+          else if (posKey === 'at start')  t = 0;
+          else if (posKey === 'at end')    t = 1;
+          if (posVal) {
+            var posOpt = nodeOpts.find(function(o) { return o.key === 'pos'; });
+            if (posOpt && posOpt.value) t = parseFloat(posOpt.value);
+          }
+          if (t !== null && prevCoord) {
+            // Interpolate between prevCoord and lastCoord
+            item.node.position = { mode: 'absolute', coord: { cs: 'calc', expr: {
+              kind: 'add',
+              a: { kind: 'scale', factor: 1 - t, expr: { kind: 'coord', ref: prevCoord } },
+              b: { kind: 'scale', factor: t,     expr: { kind: 'coord', ref: lastCoord } }
+            }}};
+          } else {
+            item.node.position = lastCoord;  // inline node sits at current path position
+          }
           inlineNodes.push(item.node);
           rawSegs.push(ft.nodeOnPathSegment(item.node.id));
           break;
+        }
         case 'op-close':
           rawSegs.push(ft.closeSegment());
           break;

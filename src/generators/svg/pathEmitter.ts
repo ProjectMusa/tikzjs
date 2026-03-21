@@ -157,8 +157,8 @@ export function emitPath(
         if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
         // SVG arc command: A rx ry x-rotation large-arc-flag sweep-flag x y
         const { startAngle, endAngle, xRadius, yRadius } = seg
-        const rx = ptToPx(xRadius)
-        const ry = yRadius !== undefined ? ptToPx(yRadius) : rx
+        const rx = ptToPx(xRadius * resolver.coordScale)
+        const ry = yRadius !== undefined ? ptToPx(yRadius * resolver.coordScale) : rx
         const startRad = (startAngle * Math.PI) / 180
         const endRad = (endAngle * Math.PI) / 180
         const startX = lastPos.x
