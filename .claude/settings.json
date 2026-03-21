@@ -65,7 +65,8 @@
       "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/2 TIKZJS_REFS_DIR=test/extra/refs/2 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/2 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 012)",
       "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/3 TIKZJS_REFS_DIR=test/extra/refs/3 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/3 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 001)",
       "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/4 TIKZJS_REFS_DIR=test/extra/refs/4 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/4 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 002)",
-      "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/4 TIKZJS_REFS_DIR=test/extra/refs/4 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/4 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 003)"
+      "Bash(TIKZJS_FIXTURES_DIR=test/extra/fixtures/4 TIKZJS_REFS_DIR=test/extra/refs/4 TIKZJS_REPORT_DIR=/tmp/tikzjs-extra/4 GOLDEN_VERBOSE=1 .venv/bin/python -m tikzjs_compare 003)",
+      "Bash(for BATCH in 0 1 2 3 4)"
     ]
   },
   "defaultMode": "bypassPermissions"

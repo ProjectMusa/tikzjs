@@ -95,20 +95,32 @@
         } else {
           // This coord is the target of the pending edge
           var dst = item;
-          if (edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor' &&
+          var allEdgeOpts = outerRawOpts.concat(edgeOpts);
+          // Detect loop option — self-loop edge regardless of destination
+          var loopOpt = edgeOpts.find(function(o) { return o.key === 'loop' || o.key === 'loop above' || o.key === 'loop below' || o.key === 'loop left' || o.key === 'loop right'; })
+                     || outerRawOpts.find(function(o) { return o.key === 'loop' || o.key === 'loop above' || o.key === 'loop below' || o.key === 'loop left' || o.key === 'loop right'; });
+          if (loopOpt && edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor') {
+            var selfId = nodeReg[edgeSourceItem.coord.coord.nodeName];
+            if (selfId) {
+              var loopDir = loopOpt.key.replace('loop', '').trim() || 'right';
+              edges.push(ft.makeEdge(selfId, selfId, { kind: 'loop', direction: loopDir }, outerStyle, allEdgeOpts, { labels: edgeLabels }));
+            }
+          } else if (edgeSourceItem && edgeSourceItem.coord.coord.cs === 'node-anchor' &&
               dst.coord.coord.cs === 'node-anchor') {
             var fromId = nodeReg[edgeSourceItem.coord.coord.nodeName];
             var toId   = nodeReg[dst.coord.coord.nodeName];
             if (fromId && toId) {
-              var allOpts = outerRawOpts.concat(edgeOpts);
               var bendLeft  = edgeOpts.find(function(o) { return o.key === 'bend left'; })
                            || outerRawOpts.find(function(o) { return o.key === 'bend left'; });
               var bendRight = edgeOpts.find(function(o) { return o.key === 'bend right'; })
                            || outerRawOpts.find(function(o) { return o.key === 'bend right'; });
+              var inOpt  = edgeOpts.find(function(o) { return o.key === 'in'; });
+              var outOpt = edgeOpts.find(function(o) { return o.key === 'out'; });
               var routing = { kind: 'straight' };
-              if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: parseFloat(bendLeft.value  || '30') };
-              else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: parseFloat(bendRight.value || '30') };
-              edges.push(ft.makeEdge(fromId, toId, routing, outerStyle, allOpts, { labels: edgeLabels }));
+              if (bendLeft)       routing = { kind: 'bend', direction: 'left',  angle: Math.abs(parseFloat(bendLeft.value  || '30')) };
+              else if (bendRight) routing = { kind: 'bend', direction: 'right', angle: Math.abs(parseFloat(bendRight.value || '30')) };
+              else if (inOpt && outOpt) routing = { kind: 'in-out', inAngle: parseFloat(inOpt.value || '0'), outAngle: parseFloat(outOpt.value || '0') };
+              edges.push(ft.makeEdge(fromId, toId, routing, outerStyle, allEdgeOpts, { labels: edgeLabels }));
             }
           }
           inEdge = false;

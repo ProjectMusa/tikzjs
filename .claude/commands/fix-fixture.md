@@ -32,6 +32,8 @@ Use this checklist to identify issues precisely:
 
 ## Diagnosis guide
 
+When in doubt of some constants that control size, margin, bend, bezier curves etc look up the manuals or TikZ/TeX source code in the environment, we have TexLive installed.
+
 | Symptom                           | Likely cause                                                            |
 | --------------------------------- | ----------------------------------------------------------------------- |
 | Missing elements (blue in struct) | Path op not emitted / wrong segment kind                                |

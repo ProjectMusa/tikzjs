@@ -230,33 +230,46 @@ function buildLoopPath(
   direction: 'left' | 'right' | 'above' | 'below' | number
 ): { d: string; midpoint: AbsoluteCoordinate } {
   const { centerX, centerY, halfWidth, halfHeight } = geo
-  const loopSize = Math.max(halfWidth, halfHeight) * 2
+  const loopSize = Math.max(halfWidth, halfHeight) * 2.2
 
+  // Direction vector in SVG coords (y-axis points down)
   let dx = 0, dy = 0
-  if (direction === 'above') dy = -1
-  else if (direction === 'below') dy = 1
-  else if (direction === 'left') dx = -1
-  else if (direction === 'right') dx = 1
+  if (direction === 'above')      { dy = -1 }
+  else if (direction === 'below') { dy = 1 }
+  else if (direction === 'left')  { dx = -1 }
+  else if (direction === 'right') { dx = 1 }
   else {
+    // TikZ angle: 0=right, 90=up — negate y for SVG y-down
     const rad = (Number(direction) * Math.PI) / 180
     dx = Math.cos(rad); dy = -Math.sin(rad)
   }
 
-  // Control points for the loop
-  const startX = centerX + dy * halfWidth - dx * halfHeight
-  const startY = centerY - dx * halfHeight + dy * halfWidth
-  const endX   = centerX - dy * halfWidth - dx * halfHeight
-  const endY   = centerY + dx * halfHeight + dy * halfWidth
-  const c1x = startX + dx * loopSize + dy * loopSize * 0.5
-  const c1y = startY + dy * loopSize - dx * loopSize * 0.5
-  const c2x = endX   + dx * loopSize - dy * loopSize * 0.5
-  const c2y = endY   + dy * loopSize + dx * loopSize * 0.5
+  // Perpendicular to loop direction (for spreading attachment points)
+  const px = -dy, py = dx
+
+  // Distance from center to node border in the loop direction
+  // (ellipse border formula: r = wh / sqrt((dy*w)^2 + (dx*h)^2))
+  const borderDist = (halfWidth * halfHeight) /
+    Math.sqrt((dy * halfWidth) ** 2 + (dx * halfHeight) ** 2 + 1e-9)
+
+  // Two attachment points on the node border, spread perpendicularly
+  const spread = Math.min(halfWidth, halfHeight) * 0.4
+  const startX = centerX + dx * borderDist + px * spread
+  const startY = centerY + dy * borderDist + py * spread
+  const endX   = centerX + dx * borderDist - px * spread
+  const endY   = centerY + dy * borderDist - py * spread
+
+  // Cubic bezier control points extending outward in the loop direction
+  const c1x = startX + dx * loopSize + px * loopSize * 0.5
+  const c1y = startY + dy * loopSize + py * loopSize * 0.5
+  const c2x = endX   + dx * loopSize - px * loopSize * 0.5
+  const c2y = endY   + dy * loopSize - py * loopSize * 0.5
 
   return {
     d: `M ${startX} ${startY} C ${c1x} ${c1y} ${c2x} ${c2y} ${endX} ${endY}`,
     midpoint: {
-      x: centerX + dx * loopSize,
-      y: centerY + dy * loopSize,
+      x: centerX + dx * (borderDist + loopSize),
+      y: centerY + dy * (borderDist + loopSize),
     },
   }
 }
