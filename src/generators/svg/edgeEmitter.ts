@@ -234,7 +234,9 @@ function buildLoopPath(
   direction: 'left' | 'right' | 'above' | 'below' | number
 ): { d: string; midpoint: AbsoluteCoordinate } {
   const { centerX, centerY, halfWidth, halfHeight } = geo
-  const loopSize = Math.max(halfWidth, halfHeight) * 2.2
+  // TikZ default loop: in=120, out=60, looseness=8.
+  // Scale with node size — loops extend roughly 2x the node's half-dimension.
+  const loopSize = Math.max(20, Math.max(halfWidth, halfHeight) * 2.0)
 
   // Direction vector in SVG coords (y-axis points down)
   let dx = 0, dy = 0
@@ -264,10 +266,11 @@ function buildLoopPath(
   const endY   = centerY + dy * borderDist - py * spread
 
   // Cubic bezier control points extending outward in the loop direction
-  const c1x = startX + dx * loopSize + px * loopSize * 0.5
-  const c1y = startY + dy * loopSize + py * loopSize * 0.5
-  const c2x = endX   + dx * loopSize - px * loopSize * 0.5
-  const c2y = endY   + dy * loopSize - py * loopSize * 0.5
+  // Lateral spread is small (0.2) to create narrow TikZ-style ovals, not wide circles
+  const c1x = startX + dx * loopSize + px * loopSize * 0.2
+  const c1y = startY + dy * loopSize + py * loopSize * 0.2
+  const c2x = endX   + dx * loopSize - px * loopSize * 0.2
+  const c2y = endY   + dy * loopSize - py * loopSize * 0.2
 
   return {
     d: `M ${startX} ${startY} C ${c1x} ${c1y} ${c2x} ${c2y} ${endX} ${endY}`,

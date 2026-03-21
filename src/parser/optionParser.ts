@@ -295,11 +295,24 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'label': {
       if (value) {
         const s = (value as string).trim()
-        const m = s.match(/^(above left|above right|below left|below right|above|below|left|right|north|south|east|west|center)\s*:(.*)$/s)
         const stripBraces = (t: string) => t.startsWith('{') && t.endsWith('}') ? t.slice(1, -1) : t
-        const lbl = m
-          ? { position: m[1].trim(), text: stripBraces(m[2].trim()) }
-          : { position: 'above', text: stripBraces(s) }
+        // Match named position or numeric angle before the colon
+        const m = s.match(/^(above left|above right|below left|below right|above|below|left|right|north|south|east|west|center)\s*:(.*)$/s)
+        const mAngle = !m ? s.match(/^(-?\d+(?:\.\d+)?)\s*:(.*)$/s) : null
+        let lbl: { position: string; text: string }
+        if (m) {
+          lbl = { position: m[1].trim(), text: stripBraces(m[2].trim()) }
+        } else if (mAngle) {
+          // Convert TikZ angle to position: 0=right, 90=above, 180=left, 270=below
+          const angle = ((parseFloat(mAngle[1]) % 360) + 360) % 360
+          let pos = 'right'
+          if (angle > 45 && angle <= 135) pos = 'above'
+          else if (angle > 135 && angle <= 225) pos = 'left'
+          else if (angle > 225 && angle <= 315) pos = 'below'
+          lbl = { position: pos, text: stripBraces(mAngle[2].trim()) }
+        } else {
+          lbl = { position: 'above', text: stripBraces(s) }
+        }
         style.nodeLabels = [...(style.nodeLabels ?? []), lbl]
       }
       break
