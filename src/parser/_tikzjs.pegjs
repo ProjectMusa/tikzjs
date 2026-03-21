@@ -642,6 +642,7 @@ path_operation
   / t:to_op           { return t; }
   / e:edge_op         { return e; }
   / n:node_op         { return n; }
+  / n:bare_node_op    { return n; }
   / a:arc_op          { return a; }
   / ci:circle_op      { return ci; }
   / el:ellipse_op     { return el; }
@@ -847,6 +848,15 @@ node_op "node"
       if (at_coord) node.pos = at_coord;
       registerNode(node);
       return { kind: 'op-node', node };
+    }
+
+// Bare {text} on a path acts as an implicit inline node (equivalent to node {text})
+bare_node_op
+  = ws '{' content:node_body '}' ws
+    {
+      var node = ft.makeNode(ft.coordRef(0, 0), content || '', resolveOpts([]), []);
+      registerNode(node);
+      return { kind: 'op-node', node: node };
     }
 
 node_at "at clause"

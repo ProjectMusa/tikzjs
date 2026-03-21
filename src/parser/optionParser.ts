@@ -294,8 +294,16 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       break
     case 'label': {
       if (value) {
-        const s = (value as string).trim()
+        let s = (value as string).trim()
         const stripBraces = (t: string) => t.startsWith('{') && t.endsWith('}') ? t.slice(1, -1) : t
+        // Strip leading [options] block (e.g. label={[yshift=-0.8cm]text})
+        if (s.startsWith('[')) {
+          let depth = 0
+          for (let i = 0; i < s.length; i++) {
+            if (s[i] === '[') depth++
+            else if (s[i] === ']') { depth--; if (depth === 0) { s = s.slice(i + 1).trim(); break } }
+          }
+        }
         // Match named position or numeric angle before the colon
         const m = s.match(/^(above left|above right|below left|below right|above|below|left|right|north|south|east|west|center)\s*:(.*)$/s)
         const mAngle = !m ? s.match(/^(-?\d+(?:\.\d+)?)\s*:(.*)$/s) : null
