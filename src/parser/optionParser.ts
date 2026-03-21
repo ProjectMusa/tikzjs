@@ -282,9 +282,10 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       if (value) style.scale = parseFloat(value as string)
       break
     case 'xscale':
+      if (value) style.xscale = parseFloat(value as string)
+      break
     case 'yscale':
-      // Store in extra for now
-      if (value) setExtra(style, key, value as string)
+      if (value) style.yscale = parseFloat(value as string)
       break
 
     // ── Opacity ───────────────────────────────────────────────

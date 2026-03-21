@@ -164,10 +164,13 @@ export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale 
     parts.push(`rotate(${-style.rotate},${cx},${cy})`)
   }
 
-  if (style.scale && style.scale !== 1) {
+  const sx = (style.scale ?? 1) * (style.xscale ?? 1)
+  const sy = (style.scale ?? 1) * (style.yscale ?? 1)
+  if (sx !== 1 || sy !== 1) {
     // Scale around the node center, not the SVG origin.
-    // SVG has no scale(s, cx, cy) syntax, so we decompose into translate/scale/translate.
-    parts.push(`translate(${cx},${cy}) scale(${style.scale}) translate(${-cx},${-cy})`)
+    // SVG has no scale(sx, sy, cx, cy) syntax, so we decompose into translate/scale/translate.
+    const scaleStr = sx === sy ? `scale(${sx})` : `scale(${sx},${sy})`
+    parts.push(`translate(${cx},${cy}) ${scaleStr} translate(${-cx},${-cy})`)
   }
 
   if (style.xslant) {

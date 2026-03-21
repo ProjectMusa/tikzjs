@@ -144,6 +144,8 @@ export interface ResolvedStyle {
   xslant?: number // dimensionless shear factor
   yslant?: number // dimensionless shear factor
   scale?: number
+  xscale?: number
+  yscale?: number
 
   // Path geometry
   opacity?: number // 0..1
