@@ -197,8 +197,26 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
           }
           return Object.keys(opts).length ? { kind: m[1], options: opts } : { kind: m[1] }
         }
+        // Count stacked tips by matching all tip tokens in a string
+        const parseTips = (s: string): ArrowTipSpec | null => {
+          const tipRe = /(\w+)(?:\[([^\]]*)\])?/g
+          const tips: ArrowTipSpec[] = []
+          let m: RegExpExecArray | null
+          while ((m = tipRe.exec(s)) !== null) {
+            const opts: Record<string, string> = {}
+            if (m[2]) for (const kv of m[2].split(',')) {
+              const [k, v] = kv.split('=').map(x => x.trim())
+              if (k && v !== undefined) opts[k] = v
+            }
+            tips.push(Object.keys(opts).length ? { kind: m[1], options: opts } : { kind: m[1] })
+          }
+          if (tips.length === 0) return null
+          const t = tips[0]
+          if (tips.length > 1) t.count = tips.length
+          return t
+        }
         if (startStr) { const t = parseTip(startStr); if (t) style.arrowStart = t }
-        if (endStr)   { const t = parseTip(endStr);   if (t) style.arrowEnd   = t }
+        if (endStr)   { const t = parseTips(endStr);  if (t) style.arrowEnd   = t }
       }
       break
     }

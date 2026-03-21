@@ -114,6 +114,22 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
 
     case 'Stealth': {
       const scale = parseFloat(spec.options?.scale ?? '1') || 1
+      if ((spec.count ?? 1) >= 2) {
+        // Double Stealth: two stacked filled arrowheads
+        return {
+          id,
+          pathData: spec.reversed
+            ? `<path d="M 0 5 L 10 0 L 7 5 L 10 10 Z M 10 5 L 20 0 L 17 5 L 20 10 Z" fill="${color}"/>`
+            : `<path d="M 20 5 L 10 0 L 13 5 L 10 10 Z M 10 5 L 0 0 L 3 5 L 0 10 Z" fill="${color}"/>`,
+          viewBox: '0 0 20 10',
+          refX: spec.reversed ? 0 : 20,
+          refY: 5,
+          markerWidth: 10 * scale,
+          markerHeight: 6 * scale,
+          orient: 'auto-start-reverse',
+          color,
+        }
+      }
       return {
         id,
         pathData: spec.reversed

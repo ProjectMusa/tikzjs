@@ -99,6 +99,7 @@ export interface ArrowTipSpec {
   kind: string // 'Stealth' | 'Latex' | 'To' | 'Hook' | '>' | 'none' | ...
   reversed?: boolean
   options?: Record<string, string>
+  count?: number // stacked tip count (2 = double arrowhead)
 }
 
 /**

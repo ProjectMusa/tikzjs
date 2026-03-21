@@ -196,5 +196,6 @@ export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale 
  */
 export function arrowMarkerId(spec: ArrowTipSpec): string {
   const base = spec.kind.replace(/[^a-zA-Z0-9]/g, '_')
-  return spec.reversed ? `${base}_rev` : base
+  const countSuffix = (spec.count ?? 1) > 1 ? `_x${spec.count}` : ''
+  return spec.reversed ? `${base}${countSuffix}_rev` : `${base}${countSuffix}`
 }
