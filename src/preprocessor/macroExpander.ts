@@ -210,6 +210,18 @@ export function expandMacros(src: string, table: MacroTable): string {
       if (macro) {
         const args = readMacroArgs(scanner, macro.argCount, macro.optionalFirstDefault)
         result += expandMacroBody(macro.body, args)
+        // In TeX, {} after a 0-arg macro is a name-terminating empty group — consume it
+        if (macro.argCount === 0) {
+          const saved = scanner.save()
+          if (!scanner.done && scanner.peek() === '{') {
+            scanner.consume() // {
+            if (!scanner.done && scanner.peek() === '}') {
+              scanner.consume() // }
+            } else {
+              scanner.restore(saved)
+            }
+          }
+        }
       } else {
         result += token
       }

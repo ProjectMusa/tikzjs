@@ -1,0 +1,36 @@
+\begin{tikzpicture}
+			[scale=0.6,inner sep=0.5mm,
+			vertex/.style={circle,draw},
+			thickedge/.style={line width=2pt}]
+			\def\r{2}
+			\foreach \point in {(90:\r),(135:\r),(45:\r),(-45:\r),(-90:\r),(-135:\r)}
+			\draw[fill=white] \point circle(.12);
+			\node[vertex] [label=above:$a_0$] (1) at (-10,0) [fill=white] {};
+			\node[vertex] [label=below:$b_0$] (2) at (-9,-2) [fill=white] {};
+			\node[vertex] [label=above:$a_1$] (3) at (-8,0) [fill=white] {};
+			\node[vertex]  [label=below:$b_1$] (4) at (-7,-2) [fill=white] {};
+			\node[vertex] [label=above:$a_2$] (5) at (-6,0) [fill=white] {};
+			\node[vertex] [label=below:$b_2$] (6) at (-5,-2) [fill=white] {};
+			\node[vertex] [label=above:$a_3$] (7) at (-4,0) [fill=white] {};
+			\node[vertex] [label=below:$b_3$] (8) at (-3,-2) [fill=white] {};
+			\node[vertex] [label=above left:$a_4$] (9) at (-2,0) [fill=white] {};
+			\draw[-latex] (2) -- (1);
+			\draw[-latex] (1) -- (3);
+			\draw[-latex] (3) -- (2);
+			\draw[-latex] (5) -- (3);
+			\draw[-latex] (3) -- (4);
+			\draw[-latex] (4) -- (5);
+			\draw[-latex] (5) -- (7);
+			\draw[-latex] (7) -- (6);
+			\draw[-latex] (6) -- (5);
+			\draw[-latex] (9) -- (7);
+			\draw[-latex] (7) -- (8);
+			\draw[-latex] (8) -- (9);
+			\draw[-latex] (177:\r) arc (177:138:\r{} and 2);
+			\draw[-latex] (132:\r) arc (132:93:\r{} and 2);
+			\draw[-latex] (87:\r) arc (87:48:\r{} and 2);
+			\draw[-latex] (-48:\r) arc (-48:-87:\r{} and 2);
+			\draw[-latex] (-93:\r) arc (-93:-132:\r{} and 2);
+			\draw[-latex] (-138:\r) arc (-138:-177:\r{} and 2);
+			\draw [dashed] (42:\r) arc (42:-42:\r{} and 2);
+		\end{tikzpicture}
