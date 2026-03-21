@@ -1,0 +1,43 @@
+\begin{tikzpicture}
+\draw (0, 0) -- (5, 0);
+\draw (2, 1) -- (7, 1);
+
+\def\oa{(2,0)}
+\def\ob{(2.5,0)}
+\def\oc{(3,0)}
+\def\od{(3.5,0)}
+\def\oe{(4,0)}
+\def\of{(4.5,0)}
+\def\og{(5,0)}
+
+\def\ta{(2,1)}
+\def\tb{(2.5,1)}
+\def\tc{(3,1)}
+\def\td{(3.5,1)}
+\def\te{(4,1)}
+\def\tf{(4.5,1)}
+\def\tg{(5,1)}
+
+\draw \oa -- \ta;
+\draw \ob -- \tb;
+\draw \oc -- \tc;
+\draw \od -- \td;
+\draw \oe -- \te;
+\draw \of -- \tf;
+\draw \og -- \tg;
+
+\filldraw \oa circle [radius=2pt]
+                 \ob circle [radius=2pt]
+                 \oc circle [radius=2pt]
+		 \od circle [radius=2pt]
+		 \oe circle [radius=2pt]
+		 \of circle [radius=2pt]
+		 \og circle [radius=2pt]
+		 \ta circle [radius=2pt]
+		 \tb circle [radius=2pt]
+		 \tc circle [radius=2pt]
+		 \td circle [radius=2pt]
+		 \te circle [radius=2pt]
+		 \tf circle [radius=2pt]
+		 \tg circle [radius=2pt];
+\end{tikzpicture}
