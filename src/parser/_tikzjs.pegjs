@@ -276,20 +276,31 @@
       }
     }
 
-    return { segments: resolvePending(rawSegs), inlineNodes, inlineCoords };
+    // Helper: check if a node already has an explicit position key
+    function hasPositionKey(node) {
+      var opts = node.rawOptions || [];
+      return opts.some(function(o) { return POSITION_KEYS.has(o.key) || o.key === 'pos'; });
+    }
+
+    return { segments: resolvePending(rawSegs, inlineNodes, hasPositionKey), inlineNodes, inlineCoords };
   }
 
-  function resolvePending(rawSegs) {
+  function resolvePending(rawSegs, inlineNodes, hasPositionKey) {
     const segments = [];
+    var lastMoveCoord = null; // track current path position for midpoint computation
     for (let i = 0; i < rawSegs.length; i++) {
       const seg = rawSegs[i];
+      if (seg && seg.kind === 'move') {
+        lastMoveCoord = seg.to;
+      }
       if (seg && seg._pendingLine !== undefined) {
         // Skip over inline node-on-path segments to find the target coordinate
         var lineTarget = null;
         var lineSkip = 0;
+        var skippedNodes = [];
         for (var j = i + 1; j < rawSegs.length; j++) {
           if (rawSegs[j] && rawSegs[j].kind === 'node-on-path') {
-            segments.push(rawSegs[j]);
+            skippedNodes.push(rawSegs[j]);
             lineSkip++;
           } else if (rawSegs[j] && rawSegs[j].kind === 'move') {
             lineTarget = rawSegs[j];
@@ -300,19 +311,52 @@
           }
         }
         if (lineTarget) {
+          // Update skipped inline nodes to midpoint between from and to
+          if (lastMoveCoord && skippedNodes.length > 0) {
+            for (var k = 0; k < skippedNodes.length; k++) {
+              var nodeId = skippedNodes[k].nodeId;
+              var inNode = inlineNodes.find(function(n) { return n.id === nodeId; });
+              if (inNode && !hasPositionKey(inNode)) {
+                var fromExpr = { kind: 'coord', ref: lastMoveCoord };
+                var toExpr = { kind: 'coord', ref: lineTarget.to };
+                if (seg._pendingLine === '-|') {
+                  // Horizontal-first: corner at (target.x, from.y)
+                  // perpendicular: a provides x, b provides y
+                  inNode.position = { mode: 'absolute', coord: { cs: 'calc', expr: {
+                    kind: 'perpendicular', a: toExpr, b: fromExpr, through: fromExpr
+                  }}};
+                } else if (seg._pendingLine === '|-') {
+                  // Vertical-first: corner at (from.x, target.y)
+                  inNode.position = { mode: 'absolute', coord: { cs: 'calc', expr: {
+                    kind: 'perpendicular', a: fromExpr, b: toExpr, through: fromExpr
+                  }}};
+                } else {
+                  // Straight line: midpoint
+                  inNode.position = { mode: 'absolute', coord: { cs: 'calc', expr: {
+                    kind: 'add',
+                    a: { kind: 'scale', factor: 0.5, expr: fromExpr },
+                    b: { kind: 'scale', factor: 0.5, expr: toExpr }
+                  }}};
+                }
+              }
+            }
+          }
+          for (var k = 0; k < skippedNodes.length; k++) segments.push(skippedNodes[k]);
           const to = lineTarget.to;
           if (seg._pendingLine === '--') segments.push(ft.lineSegment(to));
           else if (seg._pendingLine === '-|') segments.push(ft.hvLineSegment(to, true));
           else segments.push(ft.hvLineSegment(to, false));
+          lastMoveCoord = to;
           i += lineSkip;
         }
       } else if (seg && seg._pendingCurve !== undefined) {
         // Skip over inline node-on-path segments to find the target coordinate
         var curveTarget = null;
         var curveSkip = 0;
+        var skippedCurveNodes = [];
         for (var j = i + 1; j < rawSegs.length; j++) {
           if (rawSegs[j] && rawSegs[j].kind === 'node-on-path') {
-            segments.push(rawSegs[j]);
+            skippedCurveNodes.push(rawSegs[j]);
             curveSkip++;
           } else if (rawSegs[j] && rawSegs[j].kind === 'move') {
             curveTarget = rawSegs[j];
@@ -323,7 +367,23 @@
           }
         }
         if (curveTarget) {
+          // Update skipped inline nodes to midpoint between from and to
+          if (lastMoveCoord && skippedCurveNodes.length > 0) {
+            for (var k = 0; k < skippedCurveNodes.length; k++) {
+              var nodeId = skippedCurveNodes[k].nodeId;
+              var inNode = inlineNodes.find(function(n) { return n.id === nodeId; });
+              if (inNode && !hasPositionKey(inNode)) {
+                inNode.position = { mode: 'absolute', coord: { cs: 'calc', expr: {
+                  kind: 'add',
+                  a: { kind: 'scale', factor: 0.5, expr: { kind: 'coord', ref: lastMoveCoord } },
+                  b: { kind: 'scale', factor: 0.5, expr: { kind: 'coord', ref: curveTarget.to } }
+                }}};
+              }
+            }
+          }
+          for (var k = 0; k < skippedCurveNodes.length; k++) segments.push(skippedCurveNodes[k]);
           segments.push(ft.curveSegment(seg._pendingCurve, curveTarget.to));
+          lastMoveCoord = curveTarget.to;
           i += curveSkip;
         }
       } else if (seg && seg._pendingRectangle) {
