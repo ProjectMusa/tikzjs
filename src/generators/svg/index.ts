@@ -56,16 +56,20 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   // The tikzpicture-level `scale` is a coordinate transform (scales all positions),
   // not a visual node scale. Extract it for the CoordResolver and strip it from the
   // inherited style so it doesn't bleed into per-node visual scaling.
+  // `xscale` and `yscale` independently scale x/y coordinates.
   const coordScale = globalStyle.scale ?? 1
-  const inheritedStyle: ResolvedStyle = coordScale !== 1
-    ? { ...globalStyle, scale: undefined }
+  const coordXScale = globalStyle.xscale ?? 1
+  const coordYScale = globalStyle.yscale ?? 1
+  const inheritedStyle: ResolvedStyle = (coordScale !== 1 || coordXScale !== 1 || coordYScale !== 1)
+    ? { ...globalStyle, scale: undefined, xscale: undefined, yscale: undefined }
     : globalStyle
 
   const nodeDistancePt = globalStyle.nodeDistance ?? DEFAULT_NODE_DISTANCE_PT
   // Custom x/y coordinate unit vectors (e.g. x=1.5em, y=0.75pt).
   // Default is 1cm = 28.45274pt. Compute scale factors relative to default.
-  const xScale = globalStyle.xUnit !== undefined ? globalStyle.xUnit / DEFAULT_COORD_UNIT_PT : 1
-  const yScale = globalStyle.yUnit !== undefined ? globalStyle.yUnit / DEFAULT_COORD_UNIT_PT : 1
+  // Also apply xscale/yscale from tikzpicture options (independent x/y scaling).
+  const xScale = (globalStyle.xUnit !== undefined ? globalStyle.xUnit / DEFAULT_COORD_UNIT_PT : 1) * coordXScale
+  const yScale = (globalStyle.yUnit !== undefined ? globalStyle.yUnit / DEFAULT_COORD_UNIT_PT : 1) * coordYScale
   const coordResolver = new CoordResolver(nodeRegistry, coordScale, nodeDistancePt, xScale, yScale)
 
   const baseCtx: RenderContext = {
