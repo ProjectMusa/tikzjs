@@ -1,0 +1,20 @@
+\begin{tikzpicture}[every node/.style = {fill = black, inner sep = 1, circle}]
+    \foreach \i in {1,2} {
+        \node (in\i) at (\i, 0) {};
+    };
+    \foreach \i in {1,...,4} {
+        \node (h\i) at (.8*\i - .9, 1) {};
+    };
+    \node (out) at (1.5, 2) {};
+    \foreach \i in {1,...,4} {
+        \foreach \j in {1,2} {
+            \draw (in\j) -- (h\i);
+        }
+        \draw (h\i) -- (out);
+    };
+    \node[green!50!black] (h5) at (3.1, 1) {};
+    \foreach \j in {1,2} {
+        \draw[green!50!black] (in\j) -- (h5);
+    }
+    \draw[green!50!black] (h5) -- (out);
+\end{tikzpicture}

@@ -542,6 +542,14 @@
   const nodeRegistry = (options && options.nodeRegistry)  ? options.nodeRegistry  : {};
 
   function resolveOpts(rawOpts) { return op.resolveOptions(rawOpts, registry); }
+  // Resolve options for nodes: prepends 'every node' style if defined in registry
+  function resolveNodeOpts(rawOpts) {
+    var everyNodeDef = registry.get('every node');
+    if (everyNodeDef && everyNodeDef.rawOptions) {
+      return op.resolveOptions([...everyNodeDef.rawOptions, ...rawOpts], registry);
+    }
+    return op.resolveOptions(rawOpts, registry);
+  }
   function parseRaw(optStr)     { return op.parseRawOptions(optStr || ''); }
   function anchorFor(rawOpts)   { return sr.anchorFromPlacement(rawOpts); }
   function registerNode(node)   { if (node && node.name) nodeRegistry[node.name] = node.id; return node; }
@@ -699,7 +707,7 @@ standalone_node_statement
       const rawOpts = parseRaw(merged);
       const pos     = at_coord || at_coord2 || ft.extractPlacementRef(rawOpts) || ft.coordRef(0, 0);
       const name    = al || al2 || al3 || undefined;
-      const node    = ft.makeNode(pos, cnt || '', resolveOpts(rawOpts), rawOpts,
+      const node    = ft.makeNode(pos, cnt || '', resolveNodeOpts(rawOpts), rawOpts,
         { name, anchor: anchorFor(rawOpts) });
       registerNode(node);
       var nodePath = ft.makePath([ft.moveSegment(pos), ft.nodeOnPathSegment(node.id)], {}, [], [node]);
@@ -975,7 +983,7 @@ node_op "node"
       const merged  = [opt, opt2].filter(s => s.length > 0).join(',');
       const rawOpts = parseRaw(merged);
       const name    = al || al2 || undefined;
-      const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveOpts(rawOpts), rawOpts,
+      const node    = ft.makeNode(ft.coordRef(0, 0), cnt || '', resolveNodeOpts(rawOpts), rawOpts,
         { name, anchor: anchorFor(rawOpts) });
       if (at_coord) node.pos = at_coord;
       registerNode(node);
@@ -986,7 +994,7 @@ node_op "node"
 bare_node_op
   = ws '{' content:node_body '}' ws
     {
-      var node = ft.makeNode(ft.coordRef(0, 0), content || '', resolveOpts([]), []);
+      var node = ft.makeNode(ft.coordRef(0, 0), content || '', resolveNodeOpts([]), []);
       registerNode(node);
       return { kind: 'op-node', node: node };
     }
