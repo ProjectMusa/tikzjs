@@ -46,7 +46,8 @@ EXTRA_BATCHES  ?= 5
 BATCH          ?= 0
 
 .PHONY: all gen build test test-unit test-golden golden \
-        cdiff cdiff-v cdiff-one venv serve clean install watch \
+        cdiff cdiff-v cdiff-one cdiff-save-baseline cdiff-check-baseline \
+        venv serve clean install watch \
         extra-fetch extra-golden cdiff-extra cdiff-extra-v cdiff-one-extra serve-extra
 
 # Default target
@@ -104,6 +105,8 @@ $(VENV)/bin/activate: python/requirements.txt python/pyproject.toml
 
 # Run full pixel + connected-component comparison against reference SVGs.
 # Output: /tmp/tikzjs-golden/report.html  (open in browser or `make serve`)
+BASELINE     := test/golden/baseline.json
+
 cdiff: build venv
 	@echo "→ Running golden comparison (Python/OpenCV)..."
 	$(PYTHON) -m tikzjs_compare
@@ -118,6 +121,16 @@ cdiff-v: build venv
 cdiff-one: build venv
 	@echo "→ Comparing fixture: $(NAME)"
 	GOLDEN_VERBOSE=1 $(PYTHON) -m tikzjs_compare $(NAME)
+
+# Save structural diff baseline for regression detection
+cdiff-save-baseline: build venv
+	@echo "→ Saving baseline to $(BASELINE)..."
+	$(PYTHON) -m tikzjs_compare --save-baseline $(BASELINE)
+
+# Check current diffs against saved baseline (fails on regression > 0.5%)
+cdiff-check-baseline: build venv
+	@echo "→ Checking against baseline $(BASELINE)..."
+	$(PYTHON) -m tikzjs_compare --check-baseline $(BASELINE)
 
 # ── Dev server ────────────────────────────────────────────────────────────────
 

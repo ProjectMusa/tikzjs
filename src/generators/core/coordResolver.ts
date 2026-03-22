@@ -243,10 +243,10 @@ function clipToEllipse(
 // ── Main resolver ─────────────────────────────────────────────────────────────
 
 /** Default node distance for `below=of` positioning (1cm in pt). */
-export const DEFAULT_NODE_DISTANCE_PT = 28.4528
+export const DEFAULT_NODE_DISTANCE_PT = 28.4528  // TIKZ_CONSTANTS.PT_PER_CM
 
 /** Default coordinate unit in pt (1cm). */
-export const DEFAULT_COORD_UNIT_PT = 28.45274
+export const DEFAULT_COORD_UNIT_PT = 28.4528  // TIKZ_CONSTANTS.PT_PER_CM
 
 export class CoordResolver {
   private _nodeRegistry: NodeGeometryRegistry

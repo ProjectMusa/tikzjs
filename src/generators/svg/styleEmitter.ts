@@ -107,8 +107,8 @@ function dimToPt(dim: string): number {
   switch (m[2] ?? 'pt') {
     case 'pt': return val
     case 'bp': return val * (72.27 / 72)
-    case 'cm': return val * 28.4528
-    case 'mm': return val * 2.84528
+    case 'cm': return val * TIKZ_CONSTANTS.PT_PER_CM
+    case 'mm': return val * TIKZ_CONSTANTS.PT_PER_CM / 10
     case 'in': return val * 72.27
     default:   return val
   }

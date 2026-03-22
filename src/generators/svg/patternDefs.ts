@@ -11,6 +11,7 @@
  */
 
 import { ptToPx } from './coordResolver.js'
+import { TIKZ_CONSTANTS } from './constants.js'
 
 /** Registry: pattern name → SVG pattern element id. */
 export type PatternRegistry = Map<string, string>
@@ -70,7 +71,7 @@ function buildPatternElement(document: Document, name: string, id: string): Elem
   // PGF defaults: 3bp tile (≈2.989pt), 0.4pt line width, 0.5pt dot radius.
   // Using 3pt is close enough; perpendicular spacing = 3/√2 ≈ 2.12pt vs PGF's 2.989/√2 ≈ 2.11pt.
   const t = ptToPx(3)    // tile size
-  const lw = ptToPx(0.4) // line width
+  const lw = ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT) // line width
   const r = ptToPx(0.5)  // dot radius
 
   const pat = document.createElementNS('http://www.w3.org/2000/svg', 'pattern')

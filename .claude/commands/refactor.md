@@ -141,7 +141,13 @@ When a second render target is needed:
 
 ## Verification
 
+Before starting:
+1. `make cdiff-save-baseline` — snapshot current structural diff values to `test/golden/baseline.json`
+
 After each step:
 1. `npm test` — currently-passing tests continue to pass
 2. `npm run build` — no TypeScript errors
-3. After all steps: `make cdiff` — no SVG regressions for currently-passing fixtures
+3. `make cdiff-check-baseline` — verify no fixture regressed by more than 0.5% structural diff vs the saved baseline
+
+After all steps:
+4. `make cdiff` — full visual comparison report for manual review

@@ -499,8 +499,8 @@ function renderMultilineLabel(
 /** Convert a dimension string with unit to pt. */
 function dimToPt(val: number, unit: string): number {
   switch (unit.toLowerCase()) {
-    case 'cm':  return val * 28.4528
-    case 'mm':  return val * 2.84528
+    case 'cm':  return val * TIKZ_CONSTANTS.PT_PER_CM
+    case 'mm':  return val * TIKZ_CONSTANTS.PT_PER_CM / 10
     case 'in':  return val * 72.27
     case 'pt':  return val
     case 'em':  return val * 10
@@ -557,8 +557,8 @@ export function buildImagePlaceholder(widthPx: number, heightPx: number): string
   const cx  = (widthPx / 2).toFixed(3)
   const cy  = (heightPx / 2).toFixed(3)
   // Reference uses ~0.12pt thin lines and ~0.24pt border; convert to px
-  const swThin   = (0.12 * (52 / 28.4528)).toFixed(3)  // ≈ 0.219 px
-  const swBorder = (0.24 * (52 / 28.4528)).toFixed(3)  // ≈ 0.437 px
+  const swThin   = (0.12 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3)  // ≈ 0.219 px
+  const swBorder = (0.24 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3)  // ≈ 0.437 px
   const fontSize = Math.max(6, Math.min(11, widthPx * 0.13)).toFixed(1)
   return (
     `<rect x="0" y="0" width="${w}" height="${h}" fill="#bfbfbf"/>` +

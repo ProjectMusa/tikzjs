@@ -1,0 +1,390 @@
+{
+  "01-straight-line": {
+    "struct": 2.2,
+    "raw": 6.8
+  },
+  "02-arrow": {
+    "struct": 1.94,
+    "raw": 5.4
+  },
+  "03-bezier-curve": {
+    "struct": 1.49,
+    "raw": 7.3
+  },
+  "04-grid": {
+    "struct": 1.98,
+    "raw": 7.8
+  },
+  "05-node-label": {
+    "struct": 1.67,
+    "raw": 7.7
+  },
+  "06-orthogonal": {
+    "struct": 1.85,
+    "raw": 4.4
+  },
+  "07-colors-styles": {
+    "struct": 2.6,
+    "raw": 4.4
+  },
+  "08-tikzcd-basic": {
+    "struct": 7.59,
+    "raw": 11.0
+  },
+  "09-tikzcd-adjunction": {
+    "struct": 6.53,
+    "raw": 8.8
+  },
+  "10-foreach": {
+    "struct": 2.78,
+    "raw": 9.4
+  },
+  "11-node-anchor-placement": {
+    "struct": 1.36,
+    "raw": 6.3
+  },
+  "12-bezier-multi": {
+    "struct": 1.48,
+    "raw": 8.5
+  },
+  "13-polar-coords": {
+    "struct": 2.18,
+    "raw": 4.8
+  },
+  "14-orthogonal-nodes": {
+    "struct": 1.87,
+    "raw": 8.9
+  },
+  "15-filled-shapes": {
+    "struct": 1.58,
+    "raw": 14.4
+  },
+  "16-arrows-meta": {
+    "struct": 4.71,
+    "raw": 6.4
+  },
+  "17-scope-style": {
+    "struct": 3.43,
+    "raw": 7.1
+  },
+  "18-arc-shapes": {
+    "struct": 0.99,
+    "raw": 2.2
+  },
+  "19-node-shapes": {
+    "struct": 3.36,
+    "raw": 8.0
+  },
+  "20-tikzcd-triangle": {
+    "struct": 7.18,
+    "raw": 9.1
+  },
+  "21-tikzcd-column-sep": {
+    "struct": 6.03,
+    "raw": 5.4
+  },
+  "22-node-size": {
+    "struct": 8.74,
+    "raw": 12.5
+  },
+  "23-line-cap-join": {
+    "struct": 1.46,
+    "raw": 15.3
+  },
+  "24-line-join": {
+    "struct": 2.59,
+    "raw": 5.6
+  },
+  "25-dash-styles": {
+    "struct": 4.05,
+    "raw": 14.8
+  },
+  "26-cycle-fill": {
+    "struct": 0.69,
+    "raw": 9.0
+  },
+  "27-named-coords": {
+    "struct": 2.5,
+    "raw": 4.7
+  },
+  "28-node-styles": {
+    "struct": 7.98,
+    "raw": 8.1
+  },
+  "29-tikzcd-square": {
+    "struct": 7.59,
+    "raw": 11.0
+  },
+  "30-tikzcd-parallel": {
+    "struct": 5.92,
+    "raw": 9.2
+  },
+  "31-bend-left-path": {
+    "struct": 1.27,
+    "raw": 4.5
+  },
+  "32-arc-operations": {
+    "struct": 0.85,
+    "raw": 1.6
+  },
+  "33-parabola-bend": {
+    "struct": 0.74,
+    "raw": 1.5
+  },
+  "34-sine-cosine-curve": {
+    "struct": 0.96,
+    "raw": 4.0
+  },
+  "35-grid-with-steps": {
+    "struct": 6.71,
+    "raw": 14.7
+  },
+  "36-ellipse-rotation": {
+    "struct": 7.87,
+    "raw": 6.5
+  },
+  "37-multiple-circles": {
+    "struct": 0.8,
+    "raw": 2.7
+  },
+  "38-transparency-circles": {
+    "struct": 1.07,
+    "raw": 3.7
+  },
+  "39-rotation-transformation": {
+    "struct": 4.56,
+    "raw": 15.7
+  },
+  "40-scale-transformation": {
+    "struct": 4.67,
+    "raw": 11.7
+  },
+  "41-slant-transformation": {
+    "struct": 2.39,
+    "raw": 6.0
+  },
+  "42-scoped-layers": {
+    "struct": 1.69,
+    "raw": 4.7
+  },
+  "43-path-via-controls": {
+    "struct": 0.78,
+    "raw": 3.2
+  },
+  "44-filled-vs-stroked": {
+    "struct": 0.87,
+    "raw": 2.6
+  },
+  "45-node-with-arrows": {
+    "struct": 1.1,
+    "raw": 3.7
+  },
+  "46-edge-node-label": {
+    "struct": 4.5,
+    "raw": 5.8
+  },
+  "47-tikzcd-longer": {
+    "struct": 8.68,
+    "raw": 12.5
+  },
+  "48-trefoil-knot": {
+    "struct": 0.57,
+    "raw": 11.8
+  },
+  "49-knot-lib": {
+    "struct": 3.35,
+    "raw": 11.3
+  },
+  "50-tangle": {
+    "struct": 2.28,
+    "raw": 8.8
+  },
+  "51-xshift-yshift": {
+    "struct": 2.18,
+    "raw": 7.0
+  },
+  "52-rounded-corners": {
+    "struct": 1.89,
+    "raw": 7.4
+  },
+  "53-minimum-size": {
+    "struct": 1.71,
+    "raw": 5.7
+  },
+  "54-circle-node-rect": {
+    "struct": 3.79,
+    "raw": 8.9
+  },
+  "55-grid-axes": {
+    "struct": 0.44,
+    "raw": 5.6
+  },
+  "56-def-macros-filldraw": {
+    "struct": 2.01,
+    "raw": 5.2
+  },
+  "57-stealth-arrows-foreach": {
+    "struct": 3.32,
+    "raw": 6.6
+  },
+  "58-path-edge-ticks": {
+    "struct": 1.52,
+    "raw": 8.6
+  },
+  "59-tikzstyle-text-node": {
+    "struct": 1.28,
+    "raw": 10.2
+  },
+  "60-line-dots-dashed": {
+    "struct": 7.09,
+    "raw": 5.3
+  },
+  "61-fill-opacity-grid": {
+    "struct": 2.12,
+    "raw": 19.7
+  },
+  "62-labeled-rect-grid": {
+    "struct": 2.63,
+    "raw": 5.9
+  },
+  "63-rect-chain-arrows": {
+    "struct": 2.77,
+    "raw": 7.7
+  },
+  "64-circle-rect-nodes-scale": {
+    "struct": 4.81,
+    "raw": 14.6
+  },
+  "65-triangle-sqrt-coords": {
+    "struct": 0.56,
+    "raw": 4.7
+  },
+  "66-circles-quadrilateral-labels": {
+    "struct": 2.46,
+    "raw": 7.2
+  },
+  "67-octagon-labels-angles": {
+    "struct": 2.37,
+    "raw": 8.2
+  },
+  "68-graph-morphisms-labels": {
+    "struct": 3.13,
+    "raw": 3.2
+  },
+  "69-graph-lines-dashed-dotted": {
+    "struct": 4.82,
+    "raw": 5.5
+  },
+  "70-graph-arcs-polar-foreach": {
+    "struct": 2.05,
+    "raw": 7.4
+  },
+  "71-graph-blue-thick-dotted-axes": {
+    "struct": 3.78,
+    "raw": 4.3
+  },
+  "72-rounded-rect-sffamily-texttt": {
+    "struct": 3.07,
+    "raw": 18.7
+  },
+  "73-rect-nodes-latex-arrows-feedback": {
+    "struct": 3.52,
+    "raw": 11.9
+  },
+  "74-circles-filled-quad-dotted": {
+    "struct": 2.46,
+    "raw": 7.2
+  },
+  "75-rect-arcs-scale": {
+    "struct": 4.35,
+    "raw": 21.5
+  },
+  "76-orthogonal-connectors-inline-nodes": {
+    "struct": 5.28,
+    "raw": 13.2
+  },
+  "77-profit-graph-thick-lines": {
+    "struct": 7.9,
+    "raw": 6.7
+  },
+  "78-neural-net-every-node-style": {
+    "struct": 1.67,
+    "raw": 9.4
+  },
+  "79-markov-chain-ellipse-loops": {
+    "struct": 12.07,
+    "raw": 10.1
+  },
+  "80-linewidth-text-positioning": {
+    "struct": 11.11,
+    "raw": 11.6
+  },
+  "81-linewidth-text-labels": {
+    "struct": 12.89,
+    "raw": 13.4
+  },
+  "82-diamond-shapes": {
+    "struct": 0.83,
+    "raw": 7.3
+  },
+  "83-chart-colored-lines": {
+    "struct": 4.2,
+    "raw": 17.2
+  },
+  "84-neural-network-layers": {
+    "struct": 1.36,
+    "raw": 27.6
+  },
+  "85-molecule-structure-yscale": {
+    "struct": 2.51,
+    "raw": 9.9
+  },
+  "86-arc-semicircle-arrows": {
+    "struct": 4.35,
+    "raw": 21.5
+  },
+  "87-rectangle-arrows-up": {
+    "struct": 4.76,
+    "raw": 19.9
+  },
+  "88-rectangle-arrows-down": {
+    "struct": 4.2,
+    "raw": 20.0
+  },
+  "89-colored-graph-labels": {
+    "struct": 7.7,
+    "raw": 16.8
+  },
+  "90-directed-graph-filled": {
+    "struct": 7.19,
+    "raw": 17.5
+  },
+  "91-hexagonal-graph": {
+    "struct": 6.91,
+    "raw": 14.8
+  },
+  "92-double-border-circle": {
+    "struct": 6.7,
+    "raw": 18.4
+  },
+  "93-double-border-graph-edges": {
+    "struct": 7.94,
+    "raw": 15.8
+  },
+  "94-circle-graph-green": {
+    "struct": 7.98,
+    "raw": 16.9
+  },
+  "95-double-border-red-circle": {
+    "struct": 7.49,
+    "raw": 17.5
+  },
+  "96-gray-directed-graph": {
+    "struct": 7.19,
+    "raw": 17.5
+  },
+  "97-regular-polygon": {
+    "struct": 2.15,
+    "raw": 6.2
+  }
+}
