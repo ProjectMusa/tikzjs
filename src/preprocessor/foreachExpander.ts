@@ -94,12 +94,21 @@ function readForeachVariables(scanner: Scanner): string[] {
 
   variables.push(scanner.readControlSequence())
 
-  // Check for /\y /\z pattern
+  // Check for /\y /\z pattern (handles optional spaces: \x/\y or \x / \y)
   while (!scanner.done) {
     scanner.skipSpaces()
-    if (scanner.peek() === '/' && scanner.peek(1) === '\\') {
+    if (scanner.peek() === '/') {
+      // Look ahead past optional spaces for a backslash
+      const saved = scanner.pos
       scanner.consume() // '/'
-      variables.push(scanner.readControlSequence())
+      scanner.skipSpaces()
+      if (!scanner.done && scanner.peek() === '\\') {
+        variables.push(scanner.readControlSequence())
+      } else {
+        // Not a variable separator — rewind
+        scanner.pos = saved
+        break
+      }
     } else {
       break
     }
