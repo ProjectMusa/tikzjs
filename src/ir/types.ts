@@ -154,6 +154,8 @@ export interface ResolvedStyle {
   scale?: number
   xscale?: number
   yscale?: number
+  xUnit?: number // pt — custom x coordinate unit length (default 1cm = 28.45274pt)
+  yUnit?: number // pt — custom y coordinate unit length (default 1cm = 28.45274pt)
 
   // Path geometry
   opacity?: number // 0..1

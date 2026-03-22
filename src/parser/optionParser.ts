@@ -356,6 +356,14 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       if (value) style.yscale = parseFloat(value as string)
       break
 
+    // ── Coordinate unit vectors ──────────────────────────────
+    case 'x':
+      if (value) style.xUnit = parseDimension(value as string, emSizePt)
+      break
+    case 'y':
+      if (value) style.yUnit = parseDimension(value as string, emSizePt)
+      break
+
     // ── Opacity ───────────────────────────────────────────────
     case 'opacity':
       if (value) style.opacity = parseFloat(value as string)

@@ -219,19 +219,27 @@ function clipToEllipse(
 /** Default node distance for `below=of` positioning (1cm in pt). */
 export const DEFAULT_NODE_DISTANCE_PT = 28.4528
 
+/** Default coordinate unit in pt (1cm). */
+export const DEFAULT_COORD_UNIT_PT = 28.45274
+
 export class CoordResolver {
   private _nodeRegistry: NodeGeometryRegistry
   /** Global coordinate scale from \begin{tikzpicture}[scale=...]. */
   private _coordScale: number
+  /** Separate x/y scale factors from custom x= and y= unit vectors. */
+  private _xScale: number
+  private _yScale: number
   /** node distance (pt) for positioning library: `below=of NODE` etc. */
   private _nodeDistancePt: number
   /** Current absolute position (updated as we move along a path). */
   private _currentX = 0
   private _currentY = 0
 
-  constructor(nodeRegistry: NodeGeometryRegistry, coordScale = 1, nodeDistancePt = DEFAULT_NODE_DISTANCE_PT) {
+  constructor(nodeRegistry: NodeGeometryRegistry, coordScale = 1, nodeDistancePt = DEFAULT_NODE_DISTANCE_PT, xScale = 1, yScale = 1) {
     this._nodeRegistry = nodeRegistry
     this._coordScale = coordScale
+    this._xScale = xScale
+    this._yScale = yScale
     this._nodeDistancePt = nodeDistancePt
   }
 
@@ -275,13 +283,16 @@ export class CoordResolver {
   resolveCoord(coord: Coord): AbsoluteCoordinate {
     switch (coord.cs) {
       case 'xy':
-        return { x: ptToPx(coord.x * this._coordScale), y: -ptToPx(coord.y * this._coordScale) } // SVG y-axis is inverted
+        return {
+          x: ptToPx(coord.x * this._coordScale * this._xScale),
+          y: -ptToPx(coord.y * this._coordScale * this._yScale),
+        } // SVG y-axis is inverted
 
       case 'polar': {
         const rad = (coord.angle * Math.PI) / 180
         return {
-          x: ptToPx(coord.radius * this._coordScale) * Math.cos(rad),
-          y: -ptToPx(coord.radius * this._coordScale) * Math.sin(rad),
+          x: ptToPx(coord.radius * this._coordScale * this._xScale) * Math.cos(rad),
+          y: -ptToPx(coord.radius * this._coordScale * this._yScale) * Math.sin(rad),
         }
       }
 
@@ -369,10 +380,14 @@ export class CoordResolver {
 
   /** The coordinate scale factor (from tikzpicture-level scale=...). */
   get coordScale(): number { return this._coordScale }
+  /** The x coordinate unit scale factor (from x=... option). */
+  get xScale(): number { return this._xScale }
+  /** The y coordinate unit scale factor (from y=... option). */
+  get yScale(): number { return this._yScale }
 
   /** Create a clone for sub-path processing. */
   clone(): CoordResolver {
-    const c = new CoordResolver(this._nodeRegistry, this._coordScale, this._nodeDistancePt)
+    const c = new CoordResolver(this._nodeRegistry, this._coordScale, this._nodeDistancePt, this._xScale, this._yScale)
     c._currentX = this._currentX
     c._currentY = this._currentY
     return c

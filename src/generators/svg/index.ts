@@ -16,7 +16,7 @@
  */
 
 import { IRDiagram, IRElement, ResolvedStyle } from '../../ir/types.js'
-import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTANCE_PT } from './coordResolver.js'
+import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTANCE_PT, DEFAULT_COORD_UNIT_PT } from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { PatternRegistry, renderPatternDefs } from './patternDefs.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
@@ -62,7 +62,11 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     : globalStyle
 
   const nodeDistancePt = globalStyle.nodeDistance ?? DEFAULT_NODE_DISTANCE_PT
-  const coordResolver = new CoordResolver(nodeRegistry, coordScale, nodeDistancePt)
+  // Custom x/y coordinate unit vectors (e.g. x=1.5em, y=0.75pt).
+  // Default is 1cm = 28.45274pt. Compute scale factors relative to default.
+  const xScale = globalStyle.xUnit !== undefined ? globalStyle.xUnit / DEFAULT_COORD_UNIT_PT : 1
+  const yScale = globalStyle.yUnit !== undefined ? globalStyle.yUnit / DEFAULT_COORD_UNIT_PT : 1
+  const coordResolver = new CoordResolver(nodeRegistry, coordScale, nodeDistancePt, xScale, yScale)
 
   const baseCtx: RenderContext = {
     document,

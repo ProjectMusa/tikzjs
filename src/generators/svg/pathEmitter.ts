@@ -258,7 +258,7 @@ export function emitPath(
         // 'step'/'xstep'/'ystep' may be on the path-level \draw[...] options or on the grid[...] itself.
         // Path-level comes first; grid-level options override if present.
         const gridOpts = [...path.rawOptions, ...(gridSeg.rawOptions ?? [])]
-        const gridPath = buildGridPath(lastPos, to, gridOpts)
+        const gridPath = buildGridPath(lastPos, to, gridOpts, resolver.xScale * resolver.coordScale, resolver.yScale * resolver.coordScale)
         d += gridPath.d
         bboxes.push(fromCorners(
           Math.min(lastPos.x, to.x), Math.min(lastPos.y, to.y),
@@ -521,7 +521,9 @@ function buildBendPath(
 function buildGridPath(
   from: AbsoluteCoordinate,
   to: AbsoluteCoordinate,
-  rawOptions: { key: string; value?: string }[]
+  rawOptions: { key: string; value?: string }[],
+  xScale = 1,
+  yScale = 1,
 ): { d: string } {
   const minX = Math.min(from.x, to.x)
   const maxX = Math.max(from.x, to.x)
@@ -534,8 +536,9 @@ function buildGridPath(
   const xstepOpt = getOpt('xstep')
   const ystepOpt = getOpt('ystep')
 
-  const xstep = ptToPx(parseDimensionPt(xstepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT)
-  const ystep = ptToPx(parseDimensionPt(ystepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT)
+  // Grid step is in coordinate units — scale by x/y unit factors
+  const xstep = ptToPx((parseDimensionPt(xstepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT) * xScale)
+  const ystep = ptToPx((parseDimensionPt(ystepOpt ?? stepOpt) || TIKZ_CONSTANTS.DEFAULT_GRID_STEP_PT) * yScale)
 
   let d = ''
 
