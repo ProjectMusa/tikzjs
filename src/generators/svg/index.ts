@@ -25,8 +25,6 @@ import { DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 import { RenderContext, ElementRenderResult } from './renderContext.js'
 import { SVGRendererRegistry, defaultSVGRegistry } from './rendererRegistry.js'
 
-const { JSDOM } = require('jsdom')
-
 export interface SVGGeneratorOptions {
   padding?: number
   /** Custom math renderer. Defaults to MathJax server-side rendering. */
@@ -35,14 +33,23 @@ export interface SVGGeneratorOptions {
   constants?: Partial<SVGRenderingConstants>
   /** Override individual element-kind handlers. */
   registry?: Partial<SVGRendererRegistry>
+  /**
+   * Provide a DOM Document instance for SVG element creation.
+   * In browsers, use `document.implementation.createHTMLDocument('')`.
+   * Defaults to JSDOM in Node.js environments.
+   */
+  document?: Document
 }
 
 /**
  * Generate an SVG string from an IRDiagram.
  */
 export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}): string {
-  const dom = new JSDOM('<!DOCTYPE html><html><body></body></html>')
-  const document = dom.window.document
+  // Use provided document (browser) or fall back to JSDOM (Node.js)
+  const document = opts.document ?? (() => {
+    const { JSDOM } = require('jsdom')
+    return new JSDOM('<!DOCTYPE html><html><body></body></html>').window.document
+  })()
 
   const C: SVGRenderingConstants = { ...DEFAULT_CONSTANTS, ...(opts.constants ?? {}) }
   const nodeRegistry = new NodeGeometryRegistry()

@@ -28,6 +28,14 @@ jobs:
       - name: Install Node dependencies and build
         run: npm ci
 
+      - name: Install demo dependencies
+        working-directory: demo
+        run: npm ci
+
+      - name: Build demo app
+        working-directory: demo
+        run: npm run build
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -39,7 +47,7 @@ jobs:
         run: sudo apt-get install -y --no-install-recommends libcairo2 libpango-1.0-0 libpangocairo-1.0-0
 
       - name: Run structural comparison
-        run: TIKZJS_REPORT_DIR=./gh-pages python -m tikzjs_compare
+        run: TIKZJS_REPORT_DIR=./gh-pages/report python -m tikzjs_compare
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3
