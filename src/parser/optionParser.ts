@@ -292,6 +292,9 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'align':
       if (value) style.align = value as 'left' | 'center' | 'right'
       break
+    case 'text centered': style.align = 'center'; break
+    case 'text ragged right': style.align = 'left'; break
+    case 'text badly centered': style.align = 'center'; break
     case 'node font':
       if (value) {
         const fontSize = LATEX_FONT_SIZES[value as string]

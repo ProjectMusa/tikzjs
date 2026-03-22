@@ -1,0 +1,6 @@
+\begin{tikzpicture}[scale=0.6]
+\draw (0.89,0.55) node[]{\tiny{$\ldots$}};
+\draw (0,0) rectangle (1.8,0.4);
+\draw[->] (0.7,0.4) arc (0:180:0.3) ;
+\draw[->] (1.7,0.4) arc (0:180:0.3) ;
+\end{tikzpicture}
