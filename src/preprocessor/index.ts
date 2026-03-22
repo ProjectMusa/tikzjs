@@ -128,7 +128,7 @@ function hasMacros(table: MacroTable): boolean {
  * in the style registry before the content is parsed.
  */
 function extractTikzpictureOptionStyles(src: string, registry: StyleRegistry): void {
-  const beginRe = /\\begin\s*\{\s*tikz(?:js)?picture\s*\}/g
+  const beginRe = /\\begin\s*\{\s*(?:tikz(?:js)?picture|scope)\s*\}/g
   let m: RegExpExecArray | null
   while ((m = beginRe.exec(src)) !== null) {
     let i = m.index + m[0].length
