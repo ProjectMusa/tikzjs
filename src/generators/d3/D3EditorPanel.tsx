@@ -9,6 +9,9 @@ export interface D3EditorPanelProps {
   onDiagramChange: (diagram: IRDiagram) => void
   svgOptions?: SVGGeneratorOptions
   showGrid?: boolean
+  highlightElementId?: string | null
+  /** Called when user clicks an element on the canvas. */
+  onElementSelect?: (elementId: string | null) => void
 }
 
 export interface D3EditorPanelHandle {
@@ -16,9 +19,16 @@ export interface D3EditorPanelHandle {
 }
 
 export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>(
-  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid }, ref) {
+  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, highlightElementId, onElementSelect }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const controllerRef = useRef<D3EditorController | null>(null)
+    // Keep stable refs to callbacks so we don't recreate the controller
+    const onDiagramChangeRef = useRef(onDiagramChange)
+    onDiagramChangeRef.current = onDiagramChange
+    const onElementSelectRef = useRef(onElementSelect)
+    onElementSelectRef.current = onElementSelect
+    const svgOptionsRef = useRef(svgOptions)
+    svgOptionsRef.current = svgOptions
 
     useImperativeHandle(ref, () => ({
       get controller() {
@@ -26,28 +36,30 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
       },
     }))
 
-    // Create editor on mount
+    // Create or recreate editor when diagram becomes available
     useEffect(() => {
       if (!containerRef.current || !diagram) return
 
+      // Destroy previous controller if any
+      controllerRef.current?.destroy()
+
       controllerRef.current = createD3Editor(containerRef.current, diagram, {
-        onIRChange: onDiagramChange,
-        svgOptions,
+        onIRChange: (d) => onDiagramChangeRef.current(d),
+        onElementSelect: (id) => onElementSelectRef.current?.(id),
+        svgOptions: svgOptionsRef.current,
         showGrid: showGrid !== false,
       })
+
+      // Re-apply highlight if there was one
+      if (highlightElementId) {
+        controllerRef.current.highlightElement(highlightElementId)
+      }
 
       return () => {
         controllerRef.current?.destroy()
         controllerRef.current = null
       }
-    }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-    // Update diagram when it changes externally
-    useEffect(() => {
-      if (diagram && controllerRef.current) {
-        controllerRef.current.setDiagram(diagram)
-      }
-    }, [diagram])
+    }, [diagram]) // eslint-disable-line react-hooks/exhaustive-deps
 
     // Toggle grid visibility
     useEffect(() => {
@@ -55,6 +67,13 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
         controllerRef.current.setShowGrid(showGrid !== false)
       }
     }, [showGrid])
+
+    // Highlight element on canvas
+    useEffect(() => {
+      if (controllerRef.current) {
+        controllerRef.current.highlightElement(highlightElementId ?? null)
+      }
+    }, [highlightElementId])
 
     return (
       <div

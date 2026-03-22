@@ -211,6 +211,8 @@ export function emitNode(
   // Build SVG element
   const g = document.createElementNS('http://www.w3.org/2000/svg', 'g')
   g.setAttribute('id', node.id)
+  g.setAttribute('data-ir-id', node.id)
+  g.setAttribute('data-ir-kind', 'node')
   if (node.name) g.setAttribute('data-name', node.name)
 
   // Optional: draw node border

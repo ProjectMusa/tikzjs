@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Editor } from '../components/Editor'
 import { Preview } from '../components/Preview'
-import { D3EditorPanel } from 'tikzjs'
+import { D3EditorPanel, IRInspector } from 'tikzjs'
 import { ExamplePicker } from '../components/ExamplePicker'
 import { examples } from '../lib/examples'
 import type { IRDiagram } from 'tikzjs'
@@ -111,6 +111,8 @@ export function Playground() {
 
   const [activeTool, setActiveTool] = useState<string>('select')
   const [showGrid, setShowGrid] = useState(true)
+  const [showInspector, setShowInspector] = useState(false)
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
 
   const editorSvgOptions = {
     document: window.document.implementation.createHTMLDocument(''),
@@ -227,14 +229,35 @@ export function Playground() {
                 onDiagramChange={handleDiagramChange}
                 svgOptions={editorSvgOptions}
                 showGrid={showGrid}
+                highlightElementId={selectedElementId}
+                onElementSelect={setSelectedElementId}
               />
             </div>
           </div>
+
+          {/* IR Inspector side panel */}
+          {showInspector && (
+            <div
+              style={{
+                width: 320,
+                flexShrink: 0,
+                borderLeft: '1px solid #333',
+                overflow: 'hidden',
+              }}
+            >
+              <IRInspector
+                diagram={diagram}
+                selectedElementId={selectedElementId}
+                onSelectElement={setSelectedElementId}
+              />
+            </div>
+          )}
 
           {/* Right-side icon toolbar */}
           <div
             style={{
               width: 44,
+              flexShrink: 0,
               background: '#181825',
               borderLeft: '1px solid #333',
               display: 'flex',
@@ -291,6 +314,32 @@ export function Playground() {
                 <line x1="0" y1="9.3" x2="14" y2="9.3" />
                 <line x1="4.7" y1="0" x2="4.7" y2="14" />
                 <line x1="9.3" y1="0" x2="9.3" y2="14" />
+              </svg>
+            </button>
+            {/* IR Inspector toggle */}
+            <button
+              title={showInspector ? 'Hide IR Inspector' : 'Show IR Inspector'}
+              onClick={() => setShowInspector(!showInspector)}
+              style={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: showInspector ? '#45475a' : 'transparent',
+                color: showInspector ? '#cdd6f4' : '#6c7086',
+                border: 'none',
+                borderRadius: 6,
+                fontSize: 16,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <rect x="1" y="1" width="12" height="12" rx="1.5" />
+                <line x1="9" y1="1" x2="9" y2="13" />
+                <line x1="9.5" y1="4" x2="12" y2="4" />
+                <line x1="9.5" y1="6.5" x2="12" y2="6.5" />
+                <line x1="9.5" y1="9" x2="12" y2="9" />
               </svg>
             </button>
           </div>

@@ -12,9 +12,11 @@
  */
 
 import type { IRDiagram } from '../../ir/types.js'
-import type { MathRenderer } from '../../math/index.js'
 import type { SVGGeneratorOptions } from '../svg/index.js'
-import { renderDiagram, insertGrid } from './renderer.js'
+import { NodeGeometryRegistry } from '../core/coordResolver.js'
+import { renderDiagram } from './renderer.js'
+import { insertGrid } from './grid.js'
+import { highlightElement as _highlightElement } from './highlight.js'
 import { setupDrag, setupSelection, injectStyles } from './interactions.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -22,6 +24,8 @@ import { setupDrag, setupSelection, injectStyles } from './interactions.js'
 export interface D3EditorOptions {
   /** Called after each IR mutation (e.g., drag end). */
   onIRChange?: (diagram: IRDiagram) => void
+  /** Called when user clicks an element on the canvas (or null on deselect). */
+  onElementSelect?: (elementId: string | null) => void
   /** Disable editing — render-only mode. */
   readOnly?: boolean
   /** SVG generator options (math renderer, constants, etc.). */
@@ -41,6 +45,8 @@ export interface D3EditorController {
   setShowGrid(show: boolean): void
   /** Whether the grid is currently visible. */
   getShowGrid(): boolean
+  /** Highlight an element on the canvas by its IR id. */
+  highlightElement(id: string | null): void
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -61,6 +67,8 @@ export function createD3Editor(
   let currentDiagram = diagram
   let styleElement: HTMLStyleElement | null = null
   let gridVisible = opts.showGrid !== false // default true
+  let currentElementMap: Map<string, SVGElement> = new Map()
+  let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
 
   function render() {
     // Clear previous content
@@ -78,12 +86,15 @@ export function createD3Editor(
 
     if (!result.svgElement) return
 
+    currentElementMap = result.elementMap
+    currentNodeRegistry = result.nodeRegistry
+
     // Insert coordinate grid
     insertGrid(result.svgElement, gridVisible)
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      setupSelection(result.svgElement, result.elementMap, controller)
+      setupSelection(result.svgElement, result.elementMap, controller, opts.onElementSelect)
       setupDrag(
         result.svgElement,
         result.elementMap,
@@ -120,6 +131,11 @@ export function createD3Editor(
     },
     getShowGrid() {
       return gridVisible
+    },
+    highlightElement(id: string | null) {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg) return
+      _highlightElement(svg, id, currentElementMap, currentNodeRegistry)
     },
     destroy() {
       container.innerHTML = ''

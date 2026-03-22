@@ -428,6 +428,8 @@ export function emitPath(
   if (d.trim()) {
     const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     pathEl.setAttribute('d', d.trim())
+    pathEl.setAttribute('data-ir-id', path.id)
+    pathEl.setAttribute('data-ir-kind', 'path')
 
     // Determine marker IDs — resolve 'default' tip using arrowDefault if set
     const resolveDefaultTip = (tip: import('../../ir/types.js').ArrowTipSpec) =>

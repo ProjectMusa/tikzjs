@@ -11,32 +11,26 @@ import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
 
-const SELECTED_CLASS = 'd3-selected'
-
 export function setupSelection(
   svgElement: SVGSVGElement,
   elementMap: Map<string, SVGElement>,
   controller: D3EditorController,
+  onSelect?: (id: string | null) => void,
 ): void {
-  // Click on node to select
+  // Click on element to select — call highlightElement immediately for instant feedback,
+  // then notify parent via onSelect (which updates React state for the inspector)
   for (const [id, el] of elementMap) {
     d3.select(el).on('click', (event: MouseEvent) => {
       event.stopPropagation()
-      if (!event.shiftKey) {
-        // Clear other selections
-        svgElement.querySelectorAll(`.${SELECTED_CLASS}`).forEach(
-          e => e.classList.remove(SELECTED_CLASS),
-        )
-      }
-      el.classList.toggle(SELECTED_CLASS)
+      controller.highlightElement(id)
+      if (onSelect) onSelect(id)
     })
   }
 
-  // Click on background to deselect all
+  // Click on background to deselect
   d3.select(svgElement).on('click', () => {
-    svgElement.querySelectorAll(`.${SELECTED_CLASS}`).forEach(
-      e => e.classList.remove(SELECTED_CLASS),
-    )
+    controller.highlightElement(null)
+    if (onSelect) onSelect(null)
   })
 }
 
@@ -136,11 +130,6 @@ export function injectStyles(container: HTMLElement): HTMLStyleElement {
     .d3-draggable:hover { filter: brightness(1.1); }
     .d3-dragging { cursor: grabbing !important; opacity: 0.8; }
     .d3-locked { cursor: not-allowed; opacity: 0.9; }
-    .d3-selected > *:first-child {
-      stroke: #4c8bf5 !important;
-      stroke-width: 2px !important;
-      stroke-dasharray: 4 2;
-    }
   `
   container.prepend(style)
   return style

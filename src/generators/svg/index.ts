@@ -45,10 +45,18 @@ export interface SVGGeneratorOptions {
   document?: Document
 }
 
+/** Result of generating an SVG DOM element from an IRDiagram. */
+export interface SVGElementResult {
+  svg: SVGSVGElement
+  nodeRegistry: NodeGeometryRegistry
+  coordResolver: CoordResolver
+}
+
 /**
- * Generate an SVG string from an IRDiagram.
+ * Generate an SVG DOM element from an IRDiagram.
+ * Returns the live DOM tree — all elements already have data-ir-id attributes.
  */
-export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}): string {
+export function generateSVGElement(diagram: IRDiagram, opts: SVGGeneratorOptions = {}): SVGElementResult {
   // Use provided document (browser) or fall back to JSDOM (Node.js)
   const document = opts.document ?? (() => {
     const { JSDOM } = require('jsdom')
@@ -148,7 +156,14 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     svg.appendChild(el)
   }
 
-  return svg.outerHTML
+  return { svg: svg as unknown as SVGSVGElement, nodeRegistry, coordResolver }
+}
+
+/**
+ * Generate an SVG string from an IRDiagram.
+ */
+export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}): string {
+  return generateSVGElement(diagram, opts).svg.outerHTML
 }
 
 // ── Unified render pass ───────────────────────────────────────────────────────

@@ -55,6 +55,8 @@ export function emitEdge(
   if (d) {
     const pathEl = document.createElementNS('http://www.w3.org/2000/svg', 'path')
     pathEl.setAttribute('d', d)
+    pathEl.setAttribute('data-ir-id', edge.id)
+    pathEl.setAttribute('data-ir-kind', 'edge')
     pathEl.setAttribute('fill', 'none')
 
     // Apply stroke style
