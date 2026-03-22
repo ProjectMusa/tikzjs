@@ -8,14 +8,8 @@
  * Extracted from the original TikzNodeElement.ts and generalized.
  */
 
-// MathJax requires CommonJS require() — these are not ES modules
-const { mathjax } = require('mathjax-full/js/mathjax.js')
-const { TeX } = require('mathjax-full/js/input/tex.js')
-const { SVG } = require('mathjax-full/js/output/svg.js')
-const { jsdomAdaptor } = require('mathjax-full/js/adaptors/jsdomAdaptor.js')
-const { RegisterHTMLHandler } = require('mathjax-full/js/handlers/html.js')
-const { AllPackages } = require('mathjax-full/js/input/tex/AllPackages.js')
-const { JSDOM } = require('jsdom')
+// MathJax and JSDOM are loaded lazily on first use to avoid crashing
+// in browser environments where these Node.js-only modules are unavailable.
 
 /** Rendered math result. */
 export interface MathResult {
@@ -44,6 +38,14 @@ let _mathJaxDoc: any = null
 
 function getMathJax(): { adaptor: any; doc: any } {
   if (_mathJaxDoc) return { adaptor: _adaptor, doc: _mathJaxDoc }
+
+  const { mathjax } = require('mathjax-full/js/mathjax.js')
+  const { TeX } = require('mathjax-full/js/input/tex.js')
+  const { SVG } = require('mathjax-full/js/output/svg.js')
+  const { jsdomAdaptor } = require('mathjax-full/js/adaptors/jsdomAdaptor.js')
+  const { RegisterHTMLHandler } = require('mathjax-full/js/handlers/html.js')
+  const { AllPackages } = require('mathjax-full/js/input/tex/AllPackages.js')
+  const { JSDOM } = require('jsdom')
 
   _adaptor = jsdomAdaptor(JSDOM)
   RegisterHTMLHandler(_adaptor)
