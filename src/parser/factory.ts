@@ -93,20 +93,43 @@ function parsePlacementDist(s: string): number {
  */
 export function extractPlacementRef(rawOptions: RawOption[]): CoordRef | null {
   const DIRS = new Set(['above', 'below', 'left', 'right', 'above left', 'above right', 'below left', 'below right'])
+  // Old-style "below of" keys → direction
+  const OLD_DIRS: Record<string, NodePlacementCoord['direction']> = {
+    'above of': 'above', 'below of': 'below', 'left of': 'left', 'right of': 'right',
+    'above left of': 'above left', 'above right of': 'above right',
+    'below left of': 'below left', 'below right of': 'below right',
+  }
   for (const opt of rawOptions) {
-    if (!DIRS.has(opt.key)) continue
-    const val = (opt.value as string || '').trim()
-    // Match: "of NODENAME" or "DIST of NODENAME"
-    const m = /^(?:([\d.]+\s*(?:cm|mm|pt|in|em|ex))\s+)?of\s+(.+)$/i.exec(val)
-    if (!m) continue
-    const distPt = m[1] ? parsePlacementDist(m[1]) : undefined // undefined = use diagram node distance
-    const coord: NodePlacementCoord = {
-      cs: 'node-placement',
-      refName: m[2].trim(),
-      direction: opt.key as NodePlacementCoord['direction'],
-      distancePt: distPt,
+    // New syntax: below=of NODE  or  below=2cm of NODE
+    if (DIRS.has(opt.key)) {
+      const val = (opt.value as string || '').trim()
+      const m = /^(?:([\d.]+\s*(?:cm|mm|pt|in|em|ex))\s+)?of\s+(.+)$/i.exec(val)
+      if (!m) continue
+      const distPt = m[1] ? parsePlacementDist(m[1]) : undefined
+      const coord: NodePlacementCoord = {
+        cs: 'node-placement',
+        refName: m[2].trim(),
+        direction: opt.key as NodePlacementCoord['direction'],
+        distancePt: distPt,
+      }
+      return { mode: 'absolute', coord }
     }
-    return { mode: 'absolute', coord }
+    // Old syntax: below of=NODE  or  node distance + below of=NODE
+    const dir = OLD_DIRS[opt.key]
+    if (dir) {
+      const refName = ((opt.value as string) || '').trim()
+      if (!refName) continue
+      // Check for per-node "node distance=..." in the same option list
+      const ndOpt = rawOptions.find(o => o.key === 'node distance' && o.value)
+      const distPt = ndOpt ? parsePlacementDist((ndOpt.value as string).trim()) : undefined
+      const coord: NodePlacementCoord = {
+        cs: 'node-placement',
+        refName,
+        direction: dir,
+        distancePt: distPt || undefined, // fallback to diagram node distance
+      }
+      return { mode: 'absolute', coord }
+    }
   }
   return null
 }
