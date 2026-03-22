@@ -277,7 +277,9 @@ export function emitPath(
         const cx = pendingMove ? pendingMove.x : lastPos.x
         const cy = pendingMove ? pendingMove.y : lastPos.y
         pendingMove = null
-        const r = ptToPx((seg as any).radius)
+        // Circle radius is affected by coordinate transforms (scale, x/y units)
+        const cScale = resolver.coordScale
+        const r = ptToPx((seg as any).radius * cScale)
         d += `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z `
         worldBboxes.push(rotatedEllipseBBox(cx, cy, r, r, path.style.rotate ?? 0))
         lastPos = { x: cx, y: cy }
@@ -288,8 +290,10 @@ export function emitPath(
         const cx = pendingMove ? pendingMove.x : lastPos.x
         const cy = pendingMove ? pendingMove.y : lastPos.y
         pendingMove = null
-        const rx = ptToPx((seg as any).xRadius)
-        const ry = ptToPx((seg as any).yRadius)
+        // Ellipse radii are affected by coordinate transforms
+        const eScale = resolver.coordScale
+        const rx = ptToPx((seg as any).xRadius * eScale)
+        const ry = ptToPx((seg as any).yRadius * eScale)
         d += `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z `
         worldBboxes.push(rotatedEllipseBBox(cx, cy, rx, ry, path.style.rotate ?? 0))
         lastPos = { x: cx, y: cy }
