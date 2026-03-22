@@ -195,23 +195,23 @@ export function emitNode(
   if (node.style.draw !== undefined && node.style.draw !== 'none') {
     const shape = node.style.shape ?? 'rectangle'
     if (node.style.double) {
-      // TikZ `double` border: outer ring + white gap + inner border (with fill).
-      // Default double distance = 0.6pt. The outer ring is at halfWidth + gap + lineWidth.
+      // TikZ `double` works by drawing the border twice at the same geometry:
+      // 1. First pass: stroke-width = doubleDistance + 2*lineWidth (in the draw color)
+      // 2. Second pass: stroke-width = doubleDistance (in white) to erase the middle
+      // This creates the visual effect of two thin parallel lines.
       const lineWidthPx = node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
       const gapPx = ptToPx(node.style.doubleDistance ?? 0.6)
-      const outerHW = halfWidth  + gapPx + lineWidthPx
-      const outerHH = halfHeight + gapPx + lineWidthPx
-      // Outer ring (stroke only, no fill)
-      const outerStyle = { ...node.style, fill: 'none' }
-      const outer = buildBorderElement(document, shape, centerX, centerY, outerHW, outerHH, outerStyle)
+      // Outer stroke in draw color (total width = gap + 2*line)
+      const outerWidth = gapPx + 2 * lineWidthPx
+      const outerStyle: ResolvedStyle = { ...node.style, fill: node.style.fill ?? 'none', drawWidth: undefined }
+      const outer = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, outerStyle)
+      outer.setAttribute('stroke-width', String(outerWidth))
       g.appendChild(outer)
-      // White gap filler (filled white, no stroke, sized to cover gap)
-      const gapStyle: ResolvedStyle = { fill: '#ffffff', draw: 'none' }
-      const gapEl = buildBorderElement(document, shape, centerX, centerY, outerHW - lineWidthPx / 2, outerHH - lineWidthPx / 2, gapStyle)
-      g.appendChild(gapEl)
-      // Inner border (with fill)
-      const border = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)
-      g.appendChild(border)
+      // Inner stroke in white to create the gap
+      const gapStyle: ResolvedStyle = { draw: '#ffffff', fill: 'none', roundedCorners: node.style.roundedCorners }
+      const gap = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, gapStyle)
+      gap.setAttribute('stroke-width', String(gapPx))
+      g.appendChild(gap)
     } else {
       const border = buildBorderElement(document, shape, centerX, centerY, halfWidth, halfHeight, node.style)
       g.appendChild(border)
