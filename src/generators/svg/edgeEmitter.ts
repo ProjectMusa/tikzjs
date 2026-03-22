@@ -235,50 +235,60 @@ function buildLoopPath(
   direction: 'left' | 'right' | 'above' | 'below' | number
 ): { d: string; midpoint: AbsoluteCoordinate } {
   const { centerX, centerY, halfWidth, halfHeight } = geo
-  // TikZ default loop: in=120, out=60, looseness=8.
-  // Scale with node size — loops extend roughly 2x the node's half-dimension.
-  const loopSize = Math.max(20, Math.max(halfWidth, halfHeight) * 2.0)
+  const DEG = Math.PI / 180
 
-  // Direction vector in SVG coords (y-axis points down)
-  let dx = 0, dy = 0
-  if (direction === 'above')      { dy = -1 }
-  else if (direction === 'below') { dy = 1 }
-  else if (direction === 'left')  { dx = -1 }
-  else if (direction === 'right') { dx = 1 }
+  // TikZ loop defaults: looseness=8, min distance=5mm (≈14.17pt)
+  // loop above: out=105, in=75   loop below: out=285, in=255
+  // loop left:  out=195, in=165  loop right: out=15,  in=-15
+  let outAngle: number, inAngle: number
+  if (direction === 'above')      { outAngle = 105; inAngle = 75 }
+  else if (direction === 'below') { outAngle = 285; inAngle = 255 }
+  else if (direction === 'left')  { outAngle = 195; inAngle = 165 }
+  else if (direction === 'right') { outAngle = 15;  inAngle = -15 }
   else {
-    // TikZ angle: 0=right, 90=up — negate y for SVG y-down
-    const rad = (Number(direction) * Math.PI) / 180
-    dx = Math.cos(rad); dy = -Math.sin(rad)
+    // Numeric angle: spread ±15° around direction
+    outAngle = Number(direction) + 15
+    inAngle  = Number(direction) - 15
   }
 
-  // Perpendicular to loop direction (for spreading attachment points)
-  const px = -dy, py = dx
+  // Border intersection point at a given TikZ angle
+  const borderPoint = (tikzAngle: number) => {
+    const rad = tikzAngle * DEG
+    const cos = Math.cos(rad), sin = Math.sin(rad)
+    // Ellipse border: scale unit direction to reach border
+    const r = (halfWidth * halfHeight) /
+      Math.sqrt((sin * halfWidth) ** 2 + (cos * halfHeight) ** 2 + 1e-9)
+    return {
+      x: centerX + r * cos,
+      y: centerY - r * sin, // SVG y-down
+    }
+  }
 
-  // Distance from center to node border in the loop direction
-  // (ellipse border formula: r = wh / sqrt((dy*w)^2 + (dx*h)^2))
-  const borderDist = (halfWidth * halfHeight) /
-    Math.sqrt((dy * halfWidth) ** 2 + (dx * halfHeight) ** 2 + 1e-9)
+  const start = borderPoint(outAngle)
+  const end   = borderPoint(inAngle)
 
-  // Two attachment points on the node border, spread perpendicularly
-  const spread = Math.min(halfWidth, halfHeight) * 0.4
-  const startX = centerX + dx * borderDist + px * spread
-  const startY = centerY + dy * borderDist + py * spread
-  const endX   = centerX + dx * borderDist - px * spread
-  const endY   = centerY + dy * borderDist - py * spread
+  // Distance between start and end points
+  const dx = end.x - start.x, dy = end.y - start.y
+  const dist = Math.max(Math.sqrt(dx * dx + dy * dy), ptToPx(5 * 2.84528)) // min distance 5mm
 
-  // Cubic bezier control points extending outward in the loop direction
-  // Lateral spread is small (0.2) to create narrow TikZ-style ovals, not wide circles
-  const c1x = startX + dx * loopSize + px * loopSize * 0.2
-  const c1y = startY + dy * loopSize + py * loopSize * 0.2
-  const c2x = endX   + dx * loopSize - px * loopSize * 0.2
-  const c2y = endY   + dy * loopSize - py * loopSize * 0.2
+  // TikZ to-path formula: d = 0.3915 × distance × looseness
+  const looseness = 8
+  const d = 0.3915 * dist * looseness
+
+  // Control points extend from start/end in the out/in directions
+  // TikZ places control points at shift=(angle:distance) from the endpoint
+  const c1x = start.x + d * Math.cos(outAngle * DEG)
+  const c1y = start.y - d * Math.sin(outAngle * DEG) // SVG y-down
+  const c2x = end.x + d * Math.cos(inAngle * DEG)
+  const c2y = end.y - d * Math.sin(inAngle * DEG)
+
+  // Midpoint: apex of the loop (average of control points)
+  const midX = (c1x + c2x) / 2
+  const midY = (c1y + c2y) / 2
 
   return {
-    d: `M ${startX} ${startY} C ${c1x} ${c1y} ${c2x} ${c2y} ${endX} ${endY}`,
-    midpoint: {
-      x: centerX + dx * (borderDist + loopSize),
-      y: centerY + dy * (borderDist + loopSize),
-    },
+    d: `M ${start.x} ${start.y} C ${c1x} ${c1y} ${c2x} ${c2y} ${end.x} ${end.y}`,
+    midpoint: { x: midX, y: midY },
   }
 }
 
