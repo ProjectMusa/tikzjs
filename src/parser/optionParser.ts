@@ -237,9 +237,12 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     // Named tip shorthands (traditional arrow library): -latex, latex-, stealth-, -stealth, etc.
     case 'latex':   case '-latex':  style.arrowEnd = { kind: 'Latex' };   style.arrowStart = undefined; break
     case 'latex-':                  style.arrowStart = { kind: 'Latex' }; style.arrowEnd   = undefined; break
+    case 'latex-latex':             style.arrowStart = { kind: 'Latex' }; style.arrowEnd   = { kind: 'Latex' }; break
     case 'stealth': case '-stealth': style.arrowEnd = { kind: 'Stealth' }; style.arrowStart = undefined; break
     case 'stealth-':                style.arrowStart = { kind: 'Stealth' }; style.arrowEnd = undefined; break
+    case 'stealth-stealth':         style.arrowStart = { kind: 'Stealth' }; style.arrowEnd = { kind: 'Stealth' }; break
     case 'to': case '-to': style.arrowEnd = { kind: 'default' }; style.arrowStart = undefined; break
+    case 'to-to':                   style.arrowStart = { kind: 'default' }; style.arrowEnd = { kind: 'default' }; break
 
     // arrows.meta style: \ar[Rightarrow], \ar[hook], etc.
     case 'Rightarrow':     style.arrowEnd = { kind: 'Rightarrow' }; break
@@ -282,6 +285,9 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     // ── Text ──────────────────────────────────────────────────
     case 'text':
       if (value) style.textColor = resolveColor(value as string)
+      break
+    case 'text width':
+      if (value) style.textWidth = parseDimension(value as string, emSizePt)
       break
     case 'align':
       if (value) style.align = value as 'left' | 'center' | 'right'

@@ -107,9 +107,12 @@ export function emitNode(
     ? ptToPx(node.style.innerSep)
     : DEFAULT_INNER_SEP_PX
 
+  // TikZ `text width` sets the content box width (text wraps to fit); the node box = textWidth + 2*innerSep
+  const textWidthPx = node.style.textWidth !== undefined ? ptToPx(node.style.textWidth) : undefined
+
   let halfWidth = Math.max(
     MIN_HALF_SIZE,
-    labelWidth / 2 + innerSep,
+    textWidthPx !== undefined ? textWidthPx / 2 + innerSep : labelWidth / 2 + innerSep,
     node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
   )
   let halfHeight = Math.max(

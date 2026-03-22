@@ -138,6 +138,7 @@ export interface ResolvedStyle {
 
   // Text
   textColor?: string
+  textWidth?: number // pt — TikZ `text width`, forces node box width and enables text wrapping
   align?: 'left' | 'center' | 'right'
   fontSize?: number // pt
 
