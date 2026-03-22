@@ -10,7 +10,7 @@ import { CoordResolver, NodeGeometryRegistry, getAnchorPosition, clipToNodeBound
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
-import { MathRenderer, defaultMathRenderer, scriptMathModeRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, scriptMathModeRenderer as defaultScriptMathModeRenderer } from '../../math/index.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
@@ -28,7 +28,8 @@ export function emitEdge(
   nodeRegistry: NodeGeometryRegistry,
   markerRegistry: MarkerRegistry,
   mathRenderer: MathRenderer = defaultMathRenderer,
-  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
+  scriptMathModeRenderer: MathRenderer = defaultScriptMathModeRenderer,
 ): EdgeRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []

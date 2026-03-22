@@ -13,5 +13,8 @@ module.exports = {
     // Only strip .js extension from relative imports (./foo.js, ../bar.js)
     // NOT from node_modules paths
     '^(\\.{1,2}/.*)\\.js$': '$1',
+    // Stub D3 modules in Node.js tests — the D3 editor is browser-only
+    '^d3-selection$': '<rootDir>/test/__mocks__/d3-stub.js',
+    '^d3-drag$': '<rootDir>/test/__mocks__/d3-stub.js',
   },
 }

@@ -25,7 +25,6 @@ import { emitEdge } from './edgeEmitter.js'
 import { emitMatrix } from './matrixEmitter.js'
 import { emitKnot } from './knotEmitter.js'
 import { ensurePattern } from './patternDefs.js'
-import { mathModeRenderer } from '../../math/index.js'
 
 // ── Handler type aliases ──────────────────────────────────────────────────────
 
@@ -65,7 +64,7 @@ const defaultNodeHandler: NodeHandler = (el, ctx) => {
 
 const defaultMatrixHandler: MatrixHandler = (el, ctx) => {
   if (ctx.pass !== 1) return null
-  const result = emitMatrix(el, ctx.document, ctx.coordResolver, ctx.nodeRegistry, mathModeRenderer, ctx.constants)
+  const result = emitMatrix(el, ctx.document, ctx.coordResolver, ctx.nodeRegistry, ctx.mathModeRenderer, ctx.constants)
   return { pathElements: [], nodeElements: result.elements, bboxes: [result.bbox] }
 }
 
@@ -102,7 +101,7 @@ const defaultPathHandler: PathHandler = (el, ctx) => {
 const defaultEdgeHandler: EdgeHandler = (el, ctx) => {
   if (ctx.pass !== 2) return null
   const merged = { ...el, style: mergeStyles(ctx.inheritedStyle, el.style) }
-  const result = emitEdge(merged, ctx.document, ctx.nodeRegistry, ctx.markerRegistry, ctx.mathRenderer, ctx.constants)
+  const result = emitEdge(merged, ctx.document, ctx.nodeRegistry, ctx.markerRegistry, ctx.mathRenderer, ctx.constants, ctx.scriptMathModeRenderer)
   return { pathElements: result.elements, nodeElements: [], bboxes: [result.bbox] }
 }
 

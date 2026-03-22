@@ -1,0 +1,118 @@
+/**
+ * IR mutation functions for the D3 interactive editor.
+ *
+ * These functions locate and modify IR elements in place.
+ * The IR is the single source of truth — D3 reads from it and writes back.
+ */
+
+import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix } from '../../ir/types.js'
+
+/**
+ * Walk the element tree (including scope children and matrix cells)
+ * and return the element with the given id.
+ */
+export function findElement(elements: IRElement[], id: string): IRElement | null {
+  for (const el of elements) {
+    if (el.kind !== 'knot' && 'id' in el && el.id === id) return el
+    if (el.kind === 'scope') {
+      const found = findElement(el.children, id)
+      if (found) return found
+    }
+    if (el.kind === 'matrix') {
+      for (const row of el.rows) {
+        for (const cell of row) {
+          if (cell && cell.id === id) return cell
+        }
+      }
+    }
+    if (el.kind === 'path') {
+      for (const node of el.inlineNodes) {
+        if (node.id === id) return node
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * Find an IRNode by id in the diagram.
+ */
+export function findNode(diagram: IRDiagram, nodeId: string): IRNode | null {
+  const el = findElement(diagram.elements, nodeId)
+  if (el && el.kind === 'node') return el
+  return null
+}
+
+/**
+ * Check if a node's position can be dragged (only xy coordinates).
+ */
+export function isDraggable(node: IRNode): boolean {
+  return node.position.coord.cs === 'xy'
+}
+
+/**
+ * Move a node to a new position (in TeX points).
+ * Only works for nodes with xy coordinates.
+ * Returns true if the node was moved.
+ */
+export function moveNode(diagram: IRDiagram, nodeId: string, newXPt: number, newYPt: number): boolean {
+  const node = findNode(diagram, nodeId)
+  if (!node) return false
+  if (node.position.coord.cs !== 'xy') return false
+
+  node.position.coord.x = newXPt
+  node.position.coord.y = newYPt
+  return true
+}
+
+/**
+ * Update a node's label text.
+ */
+export function updateNodeLabel(diagram: IRDiagram, nodeId: string, newLabel: string): boolean {
+  const node = findNode(diagram, nodeId)
+  if (!node) return false
+  node.label = newLabel
+  return true
+}
+
+/**
+ * Get all node IDs that are connected to a given node via edges.
+ * Returns the edge IDs and connected node IDs for selective re-rendering.
+ */
+export function getConnectedEdges(diagram: IRDiagram, nodeId: string): string[] {
+  const edgeIds: string[] = []
+  function walk(elements: IRElement[]) {
+    for (const el of elements) {
+      if ((el.kind === 'edge' || ('tikzcdKind' in el && el.tikzcdKind)) && 'from' in el) {
+        if (el.from === nodeId || el.to === nodeId) {
+          edgeIds.push(el.id)
+        }
+      }
+      if (el.kind === 'scope') walk(el.children)
+    }
+  }
+  walk(diagram.elements)
+  return edgeIds
+}
+
+/**
+ * Collect all IRNode elements from the diagram (including nested in scopes, matrices, paths).
+ */
+export function collectNodes(elements: IRElement[]): IRNode[] {
+  const nodes: IRNode[] = []
+  for (const el of elements) {
+    if (el.kind === 'node') nodes.push(el)
+    if (el.kind === 'scope') nodes.push(...collectNodes(el.children))
+    if (el.kind === 'matrix') {
+      for (const row of el.rows) {
+        for (const cell of row) {
+          if (cell) nodes.push(cell)
+        }
+      }
+    }
+    if (el.kind === 'path') {
+      nodes.push(...el.inlineNodes)
+    }
+  }
+  return nodes
+}

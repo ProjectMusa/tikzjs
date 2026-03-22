@@ -20,7 +20,7 @@ import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTA
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { PatternRegistry, renderPatternDefs } from './patternDefs.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
-import { MathRenderer, defaultMathRenderer } from '../../math/index.js'
+import { MathRenderer, defaultMathRenderer, mathModeRenderer as defaultMathModeRenderer, scriptMathModeRenderer as defaultScriptMathModeRenderer } from '../../math/index.js'
 import { DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 import { RenderContext, ElementRenderResult } from './renderContext.js'
 import { SVGRendererRegistry, defaultSVGRegistry } from './rendererRegistry.js'
@@ -29,6 +29,10 @@ export interface SVGGeneratorOptions {
   padding?: number
   /** Custom math renderer. Defaults to MathJax server-side rendering. */
   mathRenderer?: MathRenderer
+  /** Math renderer for tikzcd matrix cells (mathMode=true). Defaults to mathModeRenderer. */
+  mathModeRenderer?: MathRenderer
+  /** Math renderer for tikzcd arrow labels (scriptStyle scale). Defaults to scriptMathModeRenderer. */
+  scriptMathModeRenderer?: MathRenderer
   /** Override generator-level rendering constants (scale, gaps, padding, etc.). */
   constants?: Partial<SVGRenderingConstants>
   /** Override individual element-kind handlers. */
@@ -56,6 +60,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
   const markerRegistry: MarkerRegistry = new Map()
   const patternRegistry: PatternRegistry = new Map()
   const mathRenderer = opts.mathRenderer ?? defaultMathRenderer
+  const mathModeRenderer = opts.mathModeRenderer ?? defaultMathModeRenderer
+  const scriptMathModeRenderer = opts.scriptMathModeRenderer ?? defaultScriptMathModeRenderer
   const registry: SVGRendererRegistry = { ...defaultSVGRegistry, ...(opts.registry ?? {}) }
 
   const globalStyle: ResolvedStyle = diagram.globalStyle ?? {}
@@ -86,6 +92,8 @@ export function generateSVG(diagram: IRDiagram, opts: SVGGeneratorOptions = {}):
     markerRegistry,
     patternRegistry,
     mathRenderer,
+    mathModeRenderer,
+    scriptMathModeRenderer,
     constants: C,
     inheritedStyle,
     registry,

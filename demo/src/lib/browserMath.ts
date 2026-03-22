@@ -16,7 +16,7 @@ import { RegisterHTMLHandler } from 'mathjax-full/js/handlers/html.js'
 // @ts-expect-error
 import { AllPackages } from 'mathjax-full/js/input/tex/AllPackages.js'
 
-import type { MathRenderer, MathResult } from '../../../src/math/index.js'
+import type { MathRenderer, MathResult } from 'tikzjs'
 
 // ── Unit conversion (matching src/math/index.ts) ─────────────────────────────
 

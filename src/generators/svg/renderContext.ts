@@ -47,6 +47,10 @@ export interface RenderContext {
   markerRegistry: MarkerRegistry
   patternRegistry: PatternRegistry
   mathRenderer: MathRenderer
+  /** Math renderer for tikzcd matrix cells (treats undelimited strings as math). */
+  mathModeRenderer: MathRenderer
+  /** Math renderer for tikzcd arrow labels (scriptstyle scale). */
+  scriptMathModeRenderer: MathRenderer
   constants: SVGRenderingConstants
   /** Style inherited from enclosing scopes. */
   inheritedStyle: ResolvedStyle

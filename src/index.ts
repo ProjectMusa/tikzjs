@@ -22,10 +22,16 @@ import { IRDiagram, IRElement } from './ir/types.js'
 import { preprocess, ExpandedDoc } from './preprocessor/index.js'
 import { parseExpanded, parseRaw } from './parser/index.js'
 import { generateSVG, SVGGeneratorOptions } from './generators/svg/index.js'
+import { generateTikZ, TikZGeneratorOptions } from './generators/tikz/index.js'
 
 export type { IRDiagram, IRElement } from './ir/types.js'
 export type { ExpandedDoc } from './preprocessor/index.js'
 export type { SVGGeneratorOptions } from './generators/svg/index.js'
+export { generateTikZ } from './generators/tikz/index.js'
+export type { TikZGeneratorOptions } from './generators/tikz/index.js'
+export { createD3Editor } from './generators/d3/index.js'
+export type { D3EditorController, D3EditorOptions } from './generators/d3/index.js'
+export { moveNode, findNode, isDraggable, collectNodes, findElement } from './generators/d3/irMutator.js'
 export type { SVGRenderingConstants } from './generators/svg/constants.js'
 export { DEFAULT_CONSTANTS } from './generators/svg/constants.js'
 export type { SVGRendererRegistry } from './generators/svg/rendererRegistry.js'
@@ -59,6 +65,14 @@ export function generate(tikzSource: string, opts?: SVGGeneratorOptions): string
  */
 export function generateFromIR(diagram: IRDiagram, opts?: SVGGeneratorOptions): string {
   return generateSVG(diagram, opts)
+}
+
+/**
+ * Generate standardized TikZ source from an IRDiagram.
+ * Useful for round-tripping or pretty-printing.
+ */
+export function generateTikZFromIR(diagram: IRDiagram, opts?: TikZGeneratorOptions): string {
+  return generateTikZ(diagram, opts)
 }
 
 // ── Backward-compatibility exports (matching old main.ts API) ─────────────────

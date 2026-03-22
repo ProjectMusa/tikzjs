@@ -98,6 +98,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
+      tikzjs: path.resolve(__dirname, '../src/index.ts'),
       jsdom: path.resolve(__dirname, 'src/lib/jsdomStub.ts'),
     },
   },
