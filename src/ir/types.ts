@@ -130,7 +130,10 @@ export interface ResolvedStyle {
   // Node geometry
   shape?: string // 'rectangle' | 'circle' | 'ellipse' | 'coordinate' | ...
   innerSep?: number // pt
+  innerXSep?: number // pt — independent horizontal inner sep
+  innerYSep?: number // pt — independent vertical inner sep
   outerSep?: number // pt
+  fit?: string[] // node names to enclose (fit library)
   minimumWidth?: number // pt
   minimumHeight?: number // pt
   minimumSize?: number // pt (sets both width and height)

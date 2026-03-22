@@ -267,6 +267,12 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'inner sep':
       if (value) style.innerSep = parseDimension(value as string, emSizePt)
       break
+    case 'inner xsep':
+      if (value) style.innerXSep = parseDimension(value as string, emSizePt)
+      break
+    case 'inner ysep':
+      if (value) style.innerYSep = parseDimension(value as string, emSizePt)
+      break
     case 'outer sep':
       if (value) style.outerSep = parseDimension(value as string, emSizePt)
       break
@@ -282,6 +288,20 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'node distance':
       if (value) style.nodeDistance = parseDimension(value as string, emSizePt)
       break
+    case 'fit': {
+      // fit=(node1) (node2) (node3) — extract node names from parenthesized refs
+      if (value) {
+        const fitStr = value as string
+        const names: string[] = []
+        const re = /\(([^)]+)\)/g
+        let m: RegExpExecArray | null
+        while ((m = re.exec(fitStr)) !== null) {
+          names.push(m[1].trim())
+        }
+        if (names.length > 0) style.fit = names
+      }
+      break
+    }
 
     // ── Text ──────────────────────────────────────────────────
     case 'text':

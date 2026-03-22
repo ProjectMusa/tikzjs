@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+\draw (0,-0.2) rectangle (0.4,0);
+\draw[->] (0.1,0)--(0.1,0.2);
+\draw[->] (0.3,0)--(0.3,0.2);
+\end{tikzpicture}

@@ -106,42 +106,73 @@ export function emitNode(
   const innerSep = node.style.innerSep !== undefined
     ? ptToPx(node.style.innerSep)
     : DEFAULT_INNER_SEP_PX
+  const innerXSep = node.style.innerXSep !== undefined ? ptToPx(node.style.innerXSep) : innerSep
+  const innerYSep = node.style.innerYSep !== undefined ? ptToPx(node.style.innerYSep) : innerSep
 
-  // TikZ `text width` sets the content box width (text wraps to fit); the node box = textWidth + 2*innerSep
-  const textWidthPx = node.style.textWidth !== undefined ? ptToPx(node.style.textWidth) : undefined
-
-  let halfWidth = Math.max(
-    MIN_HALF_SIZE,
-    textWidthPx !== undefined ? textWidthPx / 2 + innerSep : labelWidth / 2 + innerSep,
-    node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
-  )
-  let halfHeight = Math.max(
-    MIN_HALF_SIZE,
-    labelHeight / 2 + innerSep,
-    node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
-  )
-  // TikZ circle shape: force equal half-dimensions (largest wins)
-  if (node.style.shape === 'circle') {
-    const r = Math.max(halfWidth, halfHeight)
-    halfWidth = r
-    halfHeight = r
+  // ── fit library: compute bounding box of referenced nodes ──
+  let fitBBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
+  if (node.style.fit && node.style.fit.length > 0) {
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    for (const refName of node.style.fit) {
+      const refGeo = nodeRegistry.getByName(refName)
+      if (refGeo) {
+        minX = Math.min(minX, refGeo.centerX - refGeo.halfWidth)
+        minY = Math.min(minY, refGeo.centerY - refGeo.halfHeight)
+        maxX = Math.max(maxX, refGeo.centerX + refGeo.halfWidth)
+        maxY = Math.max(maxY, refGeo.centerY + refGeo.halfHeight)
+      }
+    }
+    if (isFinite(minX)) fitBBox = { minX, minY, maxX, maxY }
   }
 
-  // Apply node-level scale (TikZ `scale` on a node scales the entire shape)
-  if (nodeScale !== 1)  halfWidth  *= nodeScale
-  if (nodeScaleY !== 1) halfHeight *= nodeScaleY
+  let halfWidth: number
+  let halfHeight: number
+  let centerX: number
+  let centerY: number
 
-  // `transform shape` makes node shapes scale with the tikzpicture coordinate transform
-  if (node.style.transformShape && resolver.coordScale !== 1) {
-    halfWidth  *= resolver.coordScale
-    halfHeight *= resolver.coordScale
+  if (fitBBox) {
+    // Fit node: size and position from bounding box of referenced nodes + padding
+    centerX = (fitBBox.minX + fitBBox.maxX) / 2
+    centerY = (fitBBox.minY + fitBBox.maxY) / 2
+    halfWidth = (fitBBox.maxX - fitBBox.minX) / 2 + innerXSep
+    halfHeight = (fitBBox.maxY - fitBBox.minY) / 2 + innerYSep
+  } else {
+    // TikZ `text width` sets the content box width (text wraps to fit); the node box = textWidth + 2*innerSep
+    const textWidthPx = node.style.textWidth !== undefined ? ptToPx(node.style.textWidth) : undefined
+
+    halfWidth = Math.max(
+      MIN_HALF_SIZE,
+      textWidthPx !== undefined ? textWidthPx / 2 + innerXSep : labelWidth / 2 + innerXSep,
+      node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
+    )
+    halfHeight = Math.max(
+      MIN_HALF_SIZE,
+      labelHeight / 2 + innerYSep,
+      node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
+    )
+    // TikZ circle shape: force equal half-dimensions (largest wins)
+    if (node.style.shape === 'circle') {
+      const r = Math.max(halfWidth, halfHeight)
+      halfWidth = r
+      halfHeight = r
+    }
+
+    // Apply node-level scale (TikZ `scale` on a node scales the entire shape)
+    if (nodeScale !== 1)  halfWidth  *= nodeScale
+    if (nodeScaleY !== 1) halfHeight *= nodeScaleY
+
+    // `transform shape` makes node shapes scale with the tikzpicture coordinate transform
+    if (node.style.transformShape && resolver.coordScale !== 1) {
+      halfWidth  *= resolver.coordScale
+      halfHeight *= resolver.coordScale
+    }
+
+    // Resolve position: the node's anchor sits at position
+    const anchorPos = resolver.resolve(node.position)
+    const anchorOffset = anchorOffsetFromAnchor(node.anchor, halfWidth, halfHeight)
+    centerX = anchorPos.x - anchorOffset.dx
+    centerY = anchorPos.y - anchorOffset.dy
   }
-
-  // Resolve position: the node's anchor sits at position
-  const anchorPos = resolver.resolve(node.position)
-  const anchorOffset = anchorOffsetFromAnchor(node.anchor, halfWidth, halfHeight)
-  const centerX = anchorPos.x - anchorOffset.dx
-  const centerY = anchorPos.y - anchorOffset.dy
 
   const geo: NodeGeometry = {
     centerX,
