@@ -269,11 +269,13 @@ function buildLoopPath(
 
   // Distance between start and end points
   const dx = end.x - start.x, dy = end.y - start.y
-  const dist = Math.max(Math.sqrt(dx * dx + dy * dy), ptToPx(5 * 2.84528)) // min distance 5mm
+  const dist = Math.sqrt(dx * dx + dy * dy)
 
-  // TikZ to-path formula: d = 0.3915 × distance × looseness
+  // TikZ to-path formula: arm = max(0.3915 × distance × looseness, minDistance)
+  // For loops: looseness=8, min distance=5mm (14.17pt)
   const looseness = 8
-  const d = 0.3915 * dist * looseness
+  const minDistPx = ptToPx(5 * 2.84528) // 5mm
+  const d = Math.max(0.3915 * dist * looseness, minDistPx)
 
   // Control points extend from start/end in the out/in directions
   // TikZ places control points at shift=(angle:distance) from the endpoint

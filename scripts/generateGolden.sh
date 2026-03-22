@@ -60,6 +60,9 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
   if echo "$FIXTURE_CONTENT" | grep -qE 'arrows=\{|Stealth\[|Latex\[|-Stealth|-Latex'; then
     TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}arrows.meta"
   fi
+  if echo "$FIXTURE_CONTENT" | grep -qE 'ellipse|regular polygon|star|trapezium|semicircle|cylinder|diamond'; then
+    TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}shapes.geometric"
+  fi
 
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{tikzcd}'; then
     USE_PACKAGES="\\usepackage{tikz}\\usepackage{tikz-cd}"

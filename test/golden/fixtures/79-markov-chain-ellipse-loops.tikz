@@ -1,0 +1,14 @@
+\begin{tikzpicture}
+  \node[ellipse, draw] (0) at (0, 0) {poor};
+  \node[ellipse, draw] (1) at (3, 2) {middle class};
+  \node[ellipse, draw] (2) at (6, 0) {rich};
+  \draw[->, thick, black]
+  (0) edge [bend left=10, above] node {$0.1$} (1)
+  (1) edge [bend left=10, below] node {$0.4$} (0)
+  (2) edge [bend left=10, below] node {$0.1$} (0)
+  (1) edge [bend left=10, above] node {$0.2$} (2)
+  (2) edge [bend left=10, below] node {$0.1$} (1)
+  (0) edge [loop above] node {$0.9$}(0)
+  (1) edge [loop above] node {$0.4$} (1)
+  (2) edge [loop above] node {$0.8$} (2);
+\end{tikzpicture}
