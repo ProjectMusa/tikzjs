@@ -85,19 +85,18 @@ export function preprocess(rawSource: string): ExpandedDoc {
   // Pass 0: Extract %!preamble blocks (extra-fixture convention)
   let src = extractPreambleBlocks(rawSource)
 
-  // Pass 1: Collect and strip macro definitions (\def, \newcommand)
-  src = collectAndStripMacros(src, macroTable)
-
-  // Pass 2: Collect and strip style definitions (\tikzset, \tikzstyle)
-  src = collectAndStripStyles(src, styleRegistry)
-
-  // Pass 3: Expand \foreach loops
+  // Pass 1: Expand \foreach loops (before macro collection, so \def inside
+  // foreach bodies captures expanded loop variables, not raw \x placeholders)
   src = expandAllForeach(src)
 
+  // Pass 2: Collect and strip macro definitions (\def, \newcommand)
+  src = collectAndStripMacros(src, macroTable)
+
+  // Pass 3: Collect and strip style definitions (\tikzset, \tikzstyle)
+  src = collectAndStripStyles(src, styleRegistry)
+
   // Pass 4: Expand user macros
-  if (macroTable['_macros'] || hasMacros(macroTable)) {
-    src = expandMacros(src, macroTable)
-  }
+  src = expandMacros(src, macroTable)
 
   // Pass 5: Extract \begin{knot}...\end{knot} environments
   const { expandedSource: knotExpanded, knots: knotEnvs } = extractKnotEnvironments(src)
