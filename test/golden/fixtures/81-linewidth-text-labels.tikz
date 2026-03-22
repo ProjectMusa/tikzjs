@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+        \node () at (0, 0) {\textcolor{white}{.}};
+        \node () at (0.25*\linewidth, 0) {\footnotesize Discretionary lane changes};
+        \node () at (0.75*\linewidth, 0) {\footnotesize Mandatory overtaking};
+    \end{tikzpicture}

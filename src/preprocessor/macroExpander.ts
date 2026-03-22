@@ -276,6 +276,16 @@ export function collectAndStripMacros(src: string, table: MacroTable): string {
         continue
       }
 
+      // Replace TeX dimension registers with fixed values
+      if (token === '\\linewidth' || token === '\\textwidth' || token === '\\columnwidth') {
+        result += '345pt'
+        continue
+      }
+      if (token === '\\pgflinewidth') {
+        result += '0.4pt'
+        continue
+      }
+
       // Strip single-arg LaTeX commands that have no visual effect in TikZ
       if (token === '\\vspace' || token === '\\hspace' || token === '\\pgfmathsetmacro') {
         scanner.skipWhitespaceAndComments()

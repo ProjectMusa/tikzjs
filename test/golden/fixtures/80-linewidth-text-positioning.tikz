@@ -1,0 +1,5 @@
+\begin{tikzpicture}
+        \node () at (0, 0) {\textcolor{white}{.}};
+        \node () at (0.25*\linewidth, 0) {\footnotesize Stopped Incident};
+        \node () at (0.75*\linewidth, 0) {\footnotesize Slow-Moving Incident};
+    \end{tikzpicture}
