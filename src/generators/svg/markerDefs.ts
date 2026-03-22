@@ -13,6 +13,7 @@
 
 import { ArrowTipSpec } from '../../ir/types.js'
 import { arrowMarkerId } from './styleEmitter.js'
+import { ptToPx } from '../core/coordResolver.js'
 
 export interface MarkerSpec {
   id: string
@@ -37,24 +38,34 @@ export type MarkerRegistry = Map<string, MarkerSpec>
 export function ensureMarker(
   spec: ArrowTipSpec,
   registry: MarkerRegistry,
-  color = 'currentColor'
+  color = 'currentColor',
+  lineWidthPt = 0.4
 ): string {
-  const id = arrowMarkerId(spec) + (color !== 'currentColor' ? '_' + color.replace('#', '') : '')
+  // Include quantized line width in the ID so different widths get different markers
+  const lwKey = lineWidthPt.toFixed(2)
+  const id = arrowMarkerId(spec)
+    + (color !== 'currentColor' ? '_' + color.replace('#', '') : '')
+    + (lwKey !== '0.40' ? '_lw' + lwKey : '')
   if (registry.has(id)) return id
 
-  const markerSpec = buildMarkerSpec(spec, id, color)
+  const markerSpec = buildMarkerSpec(spec, id, color, lineWidthPt)
   registry.set(id, markerSpec)
   return id
 }
 
-function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerSpec {
+function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string, lineWidthPt = 0.4): MarkerSpec {
+  // TikZ arrow tips scale with line width: size = basePt + factor * lineWidthPt
+  // Default line width is 0.4pt. Scale factor relative to that baseline.
+  const lw = lineWidthPt
   switch (spec.kind) {
     case 'default':
-    case '>':
+    case '>': {
+      // PGF 'to' arrow: length = 0.44pt + 5*lw, width ≈ 0.35pt + 4*lw
+      const lengthPt = 0.44 + 5 * lw
+      const widthPt = 0.35 + 4 * lw
+      const lengthPx = ptToPx(lengthPt)
+      const widthPx = ptToPx(widthPt)
       // Two cubic Bézier curves meeting at the tip — matches PGF 'to' arrow geometry.
-      // Derived from pgfcorearrows.code.tex: move(-3a,4a) curveto(-2.75a,2.5a)(0,0.25a)(0.75a,0)
-      //                                      curveto(0,-0.25a)(-2.75a,-2.5a)(-3a,-4a)
-      // Scaled to 10×10 viewBox with tip at (10,5); stroke only, round caps.
       return {
         id,
         pathData: spec.reversed
@@ -63,11 +74,12 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         viewBox: '0 0 10 10',
         refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 7,
-        markerHeight: 7,
+        markerWidth: Math.max(5, lengthPx),
+        markerHeight: Math.max(5, widthPx),
         orient: 'auto-start-reverse',
         color,
       }
+    }
 
     case 'twohead':
       return {
@@ -114,6 +126,9 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
 
     case 'Stealth': {
       const scale = parseFloat(spec.options?.scale ?? '1') || 1
+      // TikZ Stealth: length = 3pt + 5*lw, width = 2.4pt + 3.5*lw
+      const sLengthPx = ptToPx(3 + 5 * lw) * scale
+      const sWidthPx = ptToPx(2.4 + 3.5 * lw) * scale
       if ((spec.count ?? 1) >= 2) {
         // Double Stealth: two stacked filled arrowheads
         return {
@@ -124,8 +139,8 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
           viewBox: '0 0 20 10',
           refX: spec.reversed ? 0 : 20,
           refY: 5,
-          markerWidth: 10 * scale,
-          markerHeight: 6 * scale,
+          markerWidth: sLengthPx * 2,
+          markerHeight: sWidthPx,
           orient: 'auto-start-reverse',
           color,
         }
@@ -138,17 +153,17 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         viewBox: '0 0 10 10',
         refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 6 * scale,
-        markerHeight: 6 * scale,
+        markerWidth: sLengthPx,
+        markerHeight: sWidthPx,
         orient: 'auto-start-reverse',
         color,
       }
     }
 
-    case 'Latex':
-      // TikZ Latex arrow: filled kite-like shape with slightly concave sides.
-      // Based on pgflibraryarrows.meta.code.tex: length ~4.8pt, width ~3.6pt at default line width.
-      // viewBox 0 0 10 10: tip at (10,5), back at (0,5), width spans (0→10 on y-axis mapped to ±half-width)
+    case 'Latex': {
+      // TikZ Latex arrow: length = 3pt + 4.5*lw, width = 2.4pt + 3.6*lw
+      const latexLengthPx = ptToPx(3 + 4.5 * lw)
+      const latexWidthPx = ptToPx(2.4 + 3.6 * lw)
       return {
         id,
         pathData: spec.reversed
@@ -157,11 +172,12 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string): MarkerS
         viewBox: '0 0 10 10',
         refX: spec.reversed ? 0 : 10,
         refY: 5,
-        markerWidth: 9,
-        markerHeight: 7,
+        markerWidth: latexLengthPx,
+        markerHeight: latexWidthPx,
         orient: 'auto-start-reverse',
         color,
       }
+    }
 
     case 'Rightarrow':
       return {

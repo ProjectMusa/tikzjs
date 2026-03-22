@@ -75,12 +75,13 @@ export function emitEdge(
       tip.kind === 'default' && edge.style.arrowDefault
         ? { ...tip, kind: edge.style.arrowDefault }
         : tip
+    const edgeLwPt = edge.style.drawWidth ?? TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT
     if (edge.style.arrowEnd) {
-      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowEnd), markerRegistry, color)
+      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowEnd), markerRegistry, color, edgeLwPt)
       pathEl.setAttribute('marker-end', `url(#${mid})`)
     }
     if (edge.style.arrowStart) {
-      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowStart), markerRegistry, color)
+      const mid = ensureMarker(resolveDefaultTip(edge.style.arrowStart), markerRegistry, color, edgeLwPt)
       pathEl.setAttribute('marker-start', `url(#${mid})`)
     }
 

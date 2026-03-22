@@ -409,11 +409,12 @@ export function emitPath(
         ? { ...tip, kind: path.style.arrowDefault }
         : tip
     const markerIds: { start?: string; end?: string } = {}
+    const lwPt = path.style.drawWidth ?? TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT
     if (path.style.arrowStart) {
-      markerIds.start = ensureMarker(resolveDefaultTip(path.style.arrowStart), markerRegistry, path.style.draw ?? 'currentColor')
+      markerIds.start = ensureMarker(resolveDefaultTip(path.style.arrowStart), markerRegistry, path.style.draw ?? 'currentColor', lwPt)
     }
     if (path.style.arrowEnd) {
-      markerIds.end = ensureMarker(resolveDefaultTip(path.style.arrowEnd), markerRegistry, path.style.draw ?? 'currentColor')
+      markerIds.end = ensureMarker(resolveDefaultTip(path.style.arrowEnd), markerRegistry, path.style.draw ?? 'currentColor', lwPt)
     }
 
     applyAttrs(pathEl, buildPathAttrs(path.style, markerIds))
