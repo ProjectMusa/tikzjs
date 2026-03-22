@@ -270,20 +270,9 @@ export function collectAndStripMacros(src: string, table: MacroTable): string {
         continue
       }
 
-      // Strip \definecolor{name}{model}{spec} (3 args) and \colorlet{name}{color} (2 args)
+      // Pass \definecolor and \colorlet through — they are handled in collectAndStripStyles
       if (token === '\\definecolor' || token === '\\colorlet') {
-        const startPos = scanner.save()
-        const argCount = token === '\\colorlet' ? 2 : 3
-        let ok = true
-        for (let i = 0; i < argCount; i++) {
-          scanner.skipWhitespaceAndComments()
-          if (scanner.peek() !== '{') { ok = false; break }
-          scanner.readGroup()
-        }
-        if (!ok) {
-          scanner.restore(startPos)
-          result += token
-        }
+        result += token
         continue
       }
 
