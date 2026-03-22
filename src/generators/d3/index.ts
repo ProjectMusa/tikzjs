@@ -14,7 +14,7 @@
 import type { IRDiagram } from '../../ir/types.js'
 import type { MathRenderer } from '../../math/index.js'
 import type { SVGGeneratorOptions } from '../svg/index.js'
-import { renderDiagram } from './renderer.js'
+import { renderDiagram, insertGrid } from './renderer.js'
 import { setupDrag, setupSelection, injectStyles } from './interactions.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -26,6 +26,8 @@ export interface D3EditorOptions {
   readOnly?: boolean
   /** SVG generator options (math renderer, constants, etc.). */
   svgOptions?: SVGGeneratorOptions
+  /** Show coordinate grid on initial render (default: true). */
+  showGrid?: boolean
 }
 
 export interface D3EditorController {
@@ -35,6 +37,10 @@ export interface D3EditorController {
   setDiagram(diagram: IRDiagram): void
   /** Get the current (possibly mutated) IR. */
   getDiagram(): IRDiagram
+  /** Show or hide the coordinate grid. */
+  setShowGrid(show: boolean): void
+  /** Whether the grid is currently visible. */
+  getShowGrid(): boolean
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -54,6 +60,7 @@ export function createD3Editor(
 ): D3EditorController {
   let currentDiagram = diagram
   let styleElement: HTMLStyleElement | null = null
+  let gridVisible = opts.showGrid !== false // default true
 
   function render() {
     // Clear previous content
@@ -70,6 +77,9 @@ export function createD3Editor(
     const result = renderDiagram(container, currentDiagram, svgOpts)
 
     if (!result.svgElement) return
+
+    // Insert coordinate grid
+    insertGrid(result.svgElement, gridVisible)
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
@@ -97,6 +107,19 @@ export function createD3Editor(
     },
     getDiagram() {
       return currentDiagram
+    },
+    setShowGrid(show: boolean) {
+      gridVisible = show
+      const svg = container.querySelector('svg')
+      if (svg) {
+        const gridGroup = svg.querySelector('.d3-grid') as SVGElement | null
+        if (gridGroup) {
+          gridGroup.style.display = show ? '' : 'none'
+        }
+      }
+    },
+    getShowGrid() {
+      return gridVisible
     },
     destroy() {
       container.innerHTML = ''

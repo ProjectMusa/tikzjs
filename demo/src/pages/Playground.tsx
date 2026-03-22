@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Editor } from '../components/Editor'
 import { Preview } from '../components/Preview'
-import { D3EditorPanel } from '../components/D3Editor'
+import { D3EditorPanel } from 'tikzjs'
 import { ExamplePicker } from '../components/ExamplePicker'
 import { examples } from '../lib/examples'
 import type { IRDiagram } from 'tikzjs'
@@ -109,15 +109,23 @@ export function Playground() {
     [],
   )
 
-  const buttonStyle = (active: boolean) => ({
-    background: active ? '#45475a' : 'transparent',
-    color: active ? '#cdd6f4' : '#6c7086',
-    border: '1px solid #45475a',
-    borderRadius: 4,
-    padding: '3px 10px',
-    fontSize: 12,
-    cursor: 'pointer' as const,
-  })
+  const [activeTool, setActiveTool] = useState<string>('select')
+  const [showGrid, setShowGrid] = useState(true)
+
+  const editorSvgOptions = {
+    document: window.document.implementation.createHTMLDocument(''),
+    mathRenderer: browserMathRenderer,
+    mathModeRenderer: browserMathModeRenderer,
+    scriptMathModeRenderer: browserScriptMathModeRenderer,
+  }
+
+  const toolbarItems = [
+    { id: 'select', icon: '\u25E8', title: 'Select & Move' },
+    { id: 'pan', icon: '\u2725', title: 'Pan' },
+    { id: 'zoom-in', icon: '\u2295', title: 'Zoom In' },
+    { id: 'zoom-out', icon: '\u2296', title: 'Zoom Out' },
+    { id: 'fit', icon: '\u2B1C', title: 'Fit to View' },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -133,18 +141,22 @@ export function Playground() {
         }}
       >
         <ExamplePicker onSelect={handleExample} />
-        <div style={{ display: 'flex', gap: 4 }}>
-          <button style={buttonStyle(mode === 'preview')} onClick={() => setMode('preview')}>
-            Preview
-          </button>
-          <button style={buttonStyle(mode === 'editor')} onClick={() => setMode('editor')}>
-            Editor
-          </button>
-        </div>
+        <button
+          style={{
+            background: 'transparent',
+            color: '#cdd6f4',
+            border: '1px solid #45475a',
+            borderRadius: 4,
+            padding: '3px 10px',
+            fontSize: 12,
+            cursor: 'pointer',
+          }}
+          onClick={() => setMode(mode === 'editor' ? 'preview' : 'editor')}
+        >
+          Editor
+        </button>
         <span style={{ color: '#6c7086', fontSize: 12 }}>
-          {mode === 'preview'
-            ? 'Edit TikZ code on the left, see SVG on the right'
-            : 'Drag nodes to reposition them — changes update the source'}
+          Edit TikZ code on the left, see SVG on the right
         </span>
       </div>
       <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
@@ -152,22 +164,138 @@ export function Playground() {
           <Editor value={source} onChange={handleChange} />
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
-          {mode === 'preview' ? (
-            <Preview svg={svg} error={error} />
-          ) : (
-            <D3EditorPanel
-              diagram={diagram}
-              onDiagramChange={handleDiagramChange}
-              svgOptions={{
-                document: window.document.implementation.createHTMLDocument(''),
-                mathRenderer: browserMathRenderer,
-                mathModeRenderer: browserMathModeRenderer,
-                scriptMathModeRenderer: browserScriptMathModeRenderer,
-              }}
-            />
-          )}
+          <Preview svg={svg} error={error} />
         </div>
       </div>
+
+      {/* Full-screen editor overlay */}
+      {mode === 'editor' && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 1000,
+            display: 'flex',
+            background: '#1e1e2e',
+          }}
+        >
+          {/* Main editor area */}
+          <div style={{ flex: 1, position: 'relative' }}>
+            {/* Top bar */}
+            <div
+              style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 36,
+                display: 'flex',
+                alignItems: 'center',
+                padding: '0 12px',
+                background: '#181825',
+                borderBottom: '1px solid #333',
+                zIndex: 1,
+              }}
+            >
+              <span style={{ color: '#cdd6f4', fontSize: 13, fontWeight: 500 }}>
+                Interactive Editor
+              </span>
+              <span style={{ color: '#6c7086', fontSize: 12, marginLeft: 12 }}>
+                Drag nodes to reposition — changes update the source
+              </span>
+              <button
+                onClick={() => setMode('preview')}
+                style={{
+                  marginLeft: 'auto',
+                  background: 'transparent',
+                  color: '#cdd6f4',
+                  border: '1px solid #45475a',
+                  borderRadius: 4,
+                  padding: '3px 10px',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {/* D3 editor canvas */}
+            <div style={{ position: 'absolute', top: 36, left: 0, right: 0, bottom: 0 }}>
+              <D3EditorPanel
+                diagram={diagram}
+                onDiagramChange={handleDiagramChange}
+                svgOptions={editorSvgOptions}
+                showGrid={showGrid}
+              />
+            </div>
+          </div>
+
+          {/* Right-side icon toolbar */}
+          <div
+            style={{
+              width: 44,
+              background: '#181825',
+              borderLeft: '1px solid #333',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              paddingTop: 8,
+              gap: 4,
+            }}
+          >
+            {toolbarItems.map((tool) => (
+              <button
+                key={tool.id}
+                title={tool.title}
+                onClick={() => setActiveTool(tool.id)}
+                style={{
+                  width: 32,
+                  height: 32,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  background: activeTool === tool.id ? '#45475a' : 'transparent',
+                  color: activeTool === tool.id ? '#cdd6f4' : '#6c7086',
+                  border: 'none',
+                  borderRadius: 6,
+                  fontSize: 16,
+                  cursor: 'pointer',
+                }}
+              >
+                {tool.icon}
+              </button>
+            ))}
+            {/* Separator */}
+            <div style={{ width: 24, height: 1, background: '#45475a', margin: '4px 0' }} />
+            {/* Grid toggle */}
+            <button
+              title={showGrid ? 'Hide Grid' : 'Show Grid'}
+              onClick={() => setShowGrid(!showGrid)}
+              style={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: showGrid ? '#45475a' : 'transparent',
+                color: showGrid ? '#cdd6f4' : '#6c7086',
+                border: 'none',
+                borderRadius: 6,
+                fontSize: 16,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2">
+                <line x1="0" y1="4.7" x2="14" y2="4.7" />
+                <line x1="0" y1="9.3" x2="14" y2="9.3" />
+                <line x1="4.7" y1="0" x2="4.7" y2="14" />
+                <line x1="9.3" y1="0" x2="9.3" y2="14" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
