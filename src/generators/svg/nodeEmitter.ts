@@ -331,6 +331,17 @@ function buildBorderElement(
     return el
   }
 
+  if (shape === 'diamond') {
+    // Diamond (rhombus): vertices at N, E, S, W of the bounding box
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+    el.setAttribute('points',
+      `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`)
+    el.setAttribute('stroke', stroke)
+    el.setAttribute('fill', fill)
+    if (stroke !== 'none') el.setAttribute('stroke-width', String(strokeWidth))
+    return el
+  }
+
   // Default: rectangle
   const el = document.createElementNS('http://www.w3.org/2000/svg', 'rect')
   el.setAttribute('x', String(cx - hw))

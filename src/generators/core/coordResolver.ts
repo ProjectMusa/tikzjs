@@ -53,7 +53,7 @@ export interface NodeGeometry {
   /** Full bounding box in SVG pixels. */
   bbox: BoundingBox
   /** Node shape for boundary clipping. */
-  shape?: 'circle' | 'ellipse' | 'rectangle'
+  shape?: 'circle' | 'ellipse' | 'rectangle' | 'diamond'
 }
 
 /**
@@ -125,6 +125,32 @@ export function clipToNodeBoundary(
   // For circle/ellipse shapes, clip to the ellipse boundary
   if (geo.shape === 'circle' || geo.shape === 'ellipse') {
     return clipToEllipse(from, to, centerX, centerY, halfWidth, halfHeight)
+  }
+
+  // Diamond clipping: 4 edges connecting vertices N(cx,cy-hh), E(cx+hw,cy), S(cx,cy+hh), W(cx-hw,cy)
+  if (geo.shape === 'diamond') {
+    const verts = [
+      { x: centerX, y: centerY - halfHeight },      // N
+      { x: centerX + halfWidth, y: centerY },        // E
+      { x: centerX, y: centerY + halfHeight },       // S
+      { x: centerX - halfWidth, y: centerY },        // W
+    ]
+    const dx = to.x - from.x, dy = to.y - from.y
+    let best: AbsoluteCoordinate | null = null, bestT = Infinity
+    for (let i = 0; i < 4; i++) {
+      const a = verts[i], b = verts[(i + 1) % 4]
+      // Line segment a→b: P = a + s*(b-a), Ray: Q = from + t*(to-from)
+      const ex = b.x - a.x, ey = b.y - a.y
+      const denom = dx * ey - dy * ex
+      if (Math.abs(denom) < 1e-9) continue
+      const t = ((a.x - from.x) * ey - (a.y - from.y) * ex) / denom
+      const s = ((a.x - from.x) * dy - (a.y - from.y) * dx) / denom
+      if (t > 0 && s >= -1e-9 && s <= 1 + 1e-9 && t < bestT) {
+        bestT = t
+        best = { x: from.x + t * dx, y: from.y + t * dy }
+      }
+    }
+    return best ?? to
   }
 
   // Rectangle clipping

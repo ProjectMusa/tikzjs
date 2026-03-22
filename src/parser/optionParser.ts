@@ -258,6 +258,7 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'rectangle': style.shape = 'rectangle'; break
     case 'circle':    style.shape = 'circle'; break
     case 'ellipse':   style.shape = 'ellipse'; break
+    case 'diamond':   style.shape = 'diamond'; break
     case 'shape':
       if (value) style.shape = value as string
       break
