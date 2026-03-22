@@ -94,6 +94,21 @@ export function resolveOptions(
       continue
     }
 
+    // Automata library built-in styles: expand 'state' to circle+draw+minimum size,
+    // then also apply 'every state' from the registry if defined.
+    if (opt.key === 'state' && !opt.value) {
+      style.shape = 'circle'
+      style.draw = style.draw ?? 'currentColor'
+      style.minimumWidth = style.minimumWidth ?? 15 // 15pt
+      style.minimumHeight = style.minimumHeight ?? 15
+      const everyState = registry.get('every state')
+      if (everyState && everyState.rawOptions) {
+        const expanded = resolveOptions(everyState.rawOptions, registry)
+        Object.assign(style, expanded)
+      }
+      continue
+    }
+
     applyOption(opt, style, emSizePt)
   }
 

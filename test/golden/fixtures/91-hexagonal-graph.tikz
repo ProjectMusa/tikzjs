@@ -1,0 +1,14 @@
+\begin{tikzpicture}[scale=0.7]
+    \node (a) at (0.0000,1.3333)   [draw,circle,thick,fill=gray!50] {\,};
+	\node (b) at (1.1545,0.6666)   [draw,circle,thick,fill=gray!50] {\,};
+	\node (c) at (1.1545,-0.6666)  [draw,circle,thick,fill=gray!50] {\,};
+	\node (d) at (0.0000,-1.3334)  [draw,circle,thick,fill=gray!50] {\,};
+	\node (e) at (-1.1545,-0.6666) [draw,circle,thick,fill=gray!50] {\,};
+	\node (f) at (-1.1545,0.6666)  [draw,circle,thick,fill=gray!50] {\,};
+	\draw (a) edge[->, thick] (b)
+	      (b) edge[->, thick] (c)
+	      (c) edge[->, thick] (d)
+	      (d) edge[->, thick] (e)
+	      (e) edge[->, thick] (f)
+	      (f) edge[->, thick] (a);
+\end{tikzpicture}
