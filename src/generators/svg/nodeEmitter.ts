@@ -157,6 +157,28 @@ export function emitNode(
       halfHeight = r
     }
 
+    // Regular polygon: incircle fits content, circumcircle determines border
+    // minimum size for regular polygon = circumcircle diameter (NOT bounding box)
+    if (node.style.shape === 'regular polygon') {
+      const n = node.style.regularPolygonSides ?? 5
+      // Content-based incircle radius (label + innerSep, excluding minimumWidth/Height)
+      const contentR = Math.max(
+        MIN_HALF_SIZE,
+        labelWidth / 2 + innerXSep,
+        labelHeight / 2 + innerYSep
+      )
+      // Convert content incircle to circumradius
+      const contentCircumR = contentR / Math.cos(Math.PI / n)
+      // minimum size = circumcircle diameter directly
+      const minR = Math.max(
+        node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0,
+        node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
+      )
+      const finalR = Math.max(contentCircumR, minR)
+      halfWidth = finalR
+      halfHeight = finalR
+    }
+
     // Apply node-level scale (TikZ `scale` on a node scales the entire shape)
     if (nodeScale !== 1)  halfWidth  *= nodeScale
     if (nodeScaleY !== 1) halfHeight *= nodeScaleY
@@ -367,6 +389,30 @@ function buildBorderElement(
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
     el.setAttribute('points',
       `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`)
+    el.setAttribute('stroke', stroke)
+    el.setAttribute('fill', fill)
+    if (stroke !== 'none') el.setAttribute('stroke-width', String(strokeWidth))
+    return el
+  }
+
+  if (shape === 'regular polygon') {
+    const n = style.regularPolygonSides ?? 5
+    const borderRotate = style.shapeBorderRotate ?? 0
+    const r = Math.max(hw, hh) // circumradius
+    // Default: side at bottom. First vertex offset:
+    // - odd n: first vertex at top (90°) gives flat bottom
+    // - even n: rotate by 180/n to get flat bottom
+    const startAngle = 90 + (n % 2 === 0 ? 180 / n : 0) + borderRotate
+    const points: string[] = []
+    for (let k = 0; k < n; k++) {
+      const angle = (startAngle + k * (360 / n)) * (Math.PI / 180)
+      // SVG y-axis is inverted: subtract sin for y
+      const px = cx + r * Math.cos(angle)
+      const py = cy - r * Math.sin(angle)
+      points.push(`${px},${py}`)
+    }
+    const el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
+    el.setAttribute('points', points.join(' '))
     el.setAttribute('stroke', stroke)
     el.setAttribute('fill', fill)
     if (stroke !== 'none') el.setAttribute('stroke-width', String(strokeWidth))

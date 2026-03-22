@@ -1,0 +1,9 @@
+\begin{tikzpicture}
+  \node[regular polygon, regular polygon sides=3, minimum size=2cm, draw] (tri) at (0,0) {3};
+  \node[regular polygon, regular polygon sides=5, minimum size=2cm, draw] (pent) at (3,0) {5};
+  \node[regular polygon, regular polygon sides=6, minimum size=2cm, draw, fill=blue!20] (hex) at (6,0) {6};
+  \node[regular polygon, regular polygon sides=3, shape border rotate=180, minimum size=2cm, draw] (inv) at (9,0) {$\nabla$};
+  \draw[->] (tri) -- (pent);
+  \draw[->] (pent) -- (hex);
+  \draw[->] (hex) -- (inv);
+\end{tikzpicture}

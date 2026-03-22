@@ -274,6 +274,7 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'circle':    style.shape = 'circle'; break
     case 'ellipse':   style.shape = 'ellipse'; break
     case 'diamond':   style.shape = 'diamond'; break
+    case 'regular polygon': style.shape = 'regular polygon'; break
     case 'shape':
       if (value) style.shape = value as string
       break
@@ -302,6 +303,12 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
       break
     case 'node distance':
       if (value) style.nodeDistance = parseDimension(value as string, emSizePt)
+      break
+    case 'regular polygon sides':
+      if (value) style.regularPolygonSides = parseInt(value as string, 10)
+      break
+    case 'shape border rotate':
+      if (value) style.shapeBorderRotate = parseFloat(value as string)
       break
     case 'fit': {
       // fit=(node1) (node2) (node3) — extract node names from parenthesized refs

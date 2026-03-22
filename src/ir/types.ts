@@ -138,6 +138,8 @@ export interface ResolvedStyle {
   minimumHeight?: number // pt
   minimumSize?: number // pt (sets both width and height)
   nodeDistance?: number // pt — TikZ `node distance`, for `below=of NODE` positioning
+  regularPolygonSides?: number // shapes.geometric: number of sides (default 5)
+  shapeBorderRotate?: number // degrees — rotates shape border independently of content
 
   // Text
   textColor?: string
