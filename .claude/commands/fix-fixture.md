@@ -23,10 +23,13 @@ Use this checklist to identify issues precisely:
 - [ ] **Node sizes**: circles/rectangles same size in ours vs ref?
 - [ ] **Arrowhead sizes**: arrowheads proportional (not oversized/undersized)?
 - [ ] **Edge connections**: edges touch node borders correctly, not overshooting or falling short?
+- [ ] **Orthogonal paths**: `-|` and `|-` paths clip to node borders (not node centers) and form correct L-shaped connectors?
 - [ ] **Double/stacked arrowheads**: correct count of stacked tips?
-- [ ] **Label positions**: labels at the right positions (midway, near start, above, below)?
+- [ ] **Label positions**: labels at the right positions (midway, near start, above, below)? Inline nodes on `-|`/`|-` paths at the corner point?
+- [ ] **Self-loops**: `loop above/below/left/right` have correct size and shape (narrow teardrop, not oversized circles)?
 - [ ] **Colors and opacity**: fill colors, stroke colors, opacity correct?
 - [ ] **Line styles**: dashed/dotted patterns match?
+- [ ] **Rounded corners**: nodes with `rounded corners` render as rounded rectangles, not circles or sharp rectangles?
 - [ ] **Missing elements**: any nodes, paths, or labels absent in ours that appear in ref?
 - [ ] **Extra elements**: anything rendered in ours that shouldn't be there?
 
@@ -42,6 +45,10 @@ When in doubt of some constants that control size, margin, bend, bezier curves e
 | Position shift                    | Anchor offset wrong, `yshift`/`xshift` not applied, SVG y-inversion bug |
 | Text size difference              | Font rendering gap (MathJax vs TeX CM glyphs) — WARN not FAIL           |
 | Component count mismatch          | Element missing entirely or extra group wrapper                         |
+| Edge goes through node center     | `hv-line` case in pathEmitter missing `clipToNodeBoundary()` call       |
+| Self-loop too large/small         | Wrong looseness/angles in `buildLoopPath()` in edgeEmitter.ts           |
+| Inline label at wrong position    | `resolvePending` not updating node position for `-\|`/`\|-` paths       |
+| `every node` style not applied    | `resolveNodeOpts` not prepending `every node` style from registry       |
 
 ## Pipeline stages to check
 

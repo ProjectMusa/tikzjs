@@ -243,10 +243,13 @@ Read both PNGs and check visually:
 - [ ] **Node sizes**: circles/rectangles same size as ref?
 - [ ] **Arrowhead sizes**: proportional, not too large/small?
 - [ ] **Edge connections**: edges touch node borders correctly?
+- [ ] **Orthogonal paths**: `-|`/`|-` paths clip to node borders and form correct L-shaped connectors?
 - [ ] **Double arrowheads**: stacked tips match?
-- [ ] **Label positions**: correct positions (above/below/midway)?
+- [ ] **Label positions**: correct positions (above/below/midway)? Inline nodes on `-|`/`|-` at corner point?
+- [ ] **Self-loops**: `loop above/below/left/right` correct size (narrow teardrop, not oversized)?
 - [ ] **Colors and fill**: correct?
 - [ ] **Line styles**: dashed/dotted match?
+- [ ] **Rounded corners**: nodes with `rounded corners` render as rounded rectangles?
 - [ ] **Overall layout**: positions and spacing equivalent?
 
 **If the fixture now passes** (diff ≤ 5%, or 5–8% with font-only gap, AND visual checklist passes):
@@ -310,10 +313,13 @@ Read both PNGs and apply the **visual checklist** (be strict — reject if any f
 - [ ] **Node sizes**: circles/rectangles same size as ref?
 - [ ] **Arrowhead sizes**: proportional, not too large/small?
 - [ ] **Edge connections**: edges touch node borders (not overshooting/falling short)?
+- [ ] **Orthogonal paths**: `-|`/`|-` paths clip to node borders and form correct L-shaped connectors?
 - [ ] **Double arrowheads**: stacked tips rendered correctly?
-- [ ] **Label positions**: at correct positions (above/below/midway/near start)?
+- [ ] **Label positions**: at correct positions (above/below/midway/near start)? Inline nodes on `-|`/`|-` at corner?
+- [ ] **Self-loops**: `loop above/below/left/right` correct size (narrow teardrop)?
 - [ ] **Colors and fill**: correct colors and opacity?
 - [ ] **Line styles**: dashed/dotted patterns match?
+- [ ] **Rounded corners**: nodes with `rounded corners` render as rounded rectangles?
 - [ ] **Overall layout**: positions and spacing equivalent?
 
 Decision:
