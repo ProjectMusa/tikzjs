@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+    \tikzstyle{every node}=[font=\ttfamily]
+    \draw (1.3,0.75) node[align=left] {isolated(x:list)};
+    \node[rectangle, thick, rounded corners=7, draw=black, minimum size=5mm,  double, double distance=1pt, fill=red!60, label=below:\tiny\tiny](a2) at (0,0){x};
+    \draw (1,0) node[] {$\Rightarrow$};
+    \node[rectangle, thick, rounded corners=7, draw=black, minimum size=5mm, fill=red!60, label=below:\tiny\tiny](a2) at (2,0){x};
+    \draw (3.4,1) -- (3.4,-0.5);
+    \draw (0,-0.62) -- (0,-0.62);
+    \draw[->, thick];
+    \end{tikzpicture}

@@ -1,0 +1,10 @@
+\begin{tikzpicture}[scale=0.6]
+	\node (a) at (-0.500,0.000)   [draw,circle,thick, fill=gray!50] {\,};
+	\node (b) at (1.000,0.000)   [draw,circle,thick, fill=gray!50] {\,};
+	\node (c) at (0.250,2.000)   [draw,circle,thick, fill=gray!50] {\,};
+        \node (d) at (-1.000,2.000)   [draw,circle,thick, fill=gray!50] {\,};
+	\draw (a) edge[->, thick] (b)
+              (b) edge[->, thick] (c)
+              (c) edge[->, thick] (a)
+              (d) edge[->, thick] (a);
+\end{tikzpicture}
