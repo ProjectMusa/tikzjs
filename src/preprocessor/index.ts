@@ -67,13 +67,13 @@ function extractPreambleBlocks(source: string): string {
   const lines = m[1]
     .split('\n')
     .map(line => line.replace(/^%  /, ''))
-  // Balance braces across the entire preamble (not per-line) to handle
-  // multi-line \tikzset{...} and style definitions
-  let depth = 0
-  for (const line of lines) {
+  // Balance braces per-line so each \tikzset{...} or \def is self-contained
+  const balanced = lines.map(line => {
+    let depth = 0
     for (const ch of line) { if (ch === '{') depth++; else if (ch === '}') depth-- }
-  }
-  const injected = lines.join('\n') + (depth > 0 ? '}'.repeat(depth) : '')
+    return depth > 0 ? line + '}'.repeat(depth) : line
+  })
+  const injected = balanced.join('\n')
   // Strip the preamble block and prepend the extracted definitions
   return injected + '\n' + source.replace(preambleRe, '')
 }
