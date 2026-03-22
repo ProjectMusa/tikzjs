@@ -1,7 +1,7 @@
 import { preprocess } from '../../../src/preprocessor/index.js'
 import { parseExpanded } from '../../../src/parser/index.js'
 import { generateSVG } from '../../../src/generators/svg/index.js'
-import { browserMathRenderer } from './browserMath.js'
+import { browserMathRenderer, browserMathModeRenderer, browserScriptMathModeRenderer } from './browserMath.js'
 
 /**
  * Render TikZ source to an SVG string in the browser.
@@ -13,5 +13,7 @@ export function renderTikz(source: string): string {
   return generateSVG(ir, {
     document: window.document.implementation.createHTMLDocument(''),
     mathRenderer: browserMathRenderer,
+    mathModeRenderer: browserMathModeRenderer,
+    scriptMathModeRenderer: browserScriptMathModeRenderer,
   })
 }

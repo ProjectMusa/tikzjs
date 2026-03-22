@@ -116,6 +116,19 @@ function renderMath(latex: string, display = false, mathMode = false, scale = 1)
   return { svgString, widthPx, heightPx, verticalOffsetPx }
 }
 
-// ── Exported renderer ────────────────────────────────────────────────────────
+// ── tikzcd scale constant ───────────────────────────────────────────────────
 
+/** tikzcd `every label` uses \scriptstyle (7pt at 10pt base = 0.7×). */
+const TIKZCD_LABEL_SCALE = 7 / 10
+
+// ── Exported renderers ──────────────────────────────────────────────────────
+
+/** Default renderer: plain text wrapped in \text{}, math passed through. */
 export const browserMathRenderer: MathRenderer = (latex: string) => renderMath(latex)
+
+/** Math-mode renderer: treats undelimited strings as math (italic). For tikzcd cells. */
+export const browserMathModeRenderer: MathRenderer = (latex: string) => renderMath(latex, false, true)
+
+/** Scriptstyle math-mode renderer for tikzcd arrow labels (0.7× scale). */
+export const browserScriptMathModeRenderer: MathRenderer = (latex: string) =>
+  renderMath(latex, false, true, TIKZCD_LABEL_SCALE)
