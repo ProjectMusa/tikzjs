@@ -1,15 +1,17 @@
-import { examples } from '../lib/examples'
+import { examples, goldenExamples } from '../lib/examples'
 
 interface ExamplePickerProps {
   onSelect: (source: string) => void
 }
 
 export function ExamplePicker({ onSelect }: ExamplePickerProps) {
+  const allExamples = [...examples, ...goldenExamples]
+
   return (
     <select
       onChange={(e) => {
         const idx = parseInt(e.target.value, 10)
-        if (!isNaN(idx)) onSelect(examples[idx].source)
+        if (!isNaN(idx)) onSelect(allExamples[idx].source)
         e.target.value = ''
       }}
       defaultValue=""
@@ -26,11 +28,22 @@ export function ExamplePicker({ onSelect }: ExamplePickerProps) {
       <option value="" disabled>
         Load example...
       </option>
-      {examples.map((ex, i) => (
-        <option key={i} value={i}>
-          {ex.name}
-        </option>
-      ))}
+      <optgroup label="Examples">
+        {examples.map((ex, i) => (
+          <option key={`ex-${i}`} value={i}>
+            {ex.name}
+          </option>
+        ))}
+      </optgroup>
+      {goldenExamples.length > 0 && (
+        <optgroup label="Golden Tests">
+          {goldenExamples.map((ex, i) => (
+            <option key={`gt-${i}`} value={examples.length + i}>
+              {ex.name}
+            </option>
+          ))}
+        </optgroup>
+      )}
     </select>
   )
 }

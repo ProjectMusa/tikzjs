@@ -3,6 +3,8 @@ export interface Example {
   source: string
 }
 
+// ── Curated examples ─────────────────────────────────────────────────────────
+
 export const examples: Example[] = [
   {
     name: 'Straight Lines',
@@ -77,3 +79,19 @@ export const examples: Example[] = [
 \\end{tikzpicture}`,
   },
 ]
+
+// ── Golden test fixtures (loaded at build time via Vite glob import) ─────────
+
+const fixtureModules = import.meta.glob<string>(
+  '../../../test/golden/fixtures/*.tikz',
+  { eager: true, query: '?raw', import: 'default' },
+)
+
+export const goldenExamples: Example[] = Object.entries(fixtureModules)
+  .map(([path, source]) => {
+    const filename = path.split('/').pop()!.replace('.tikz', '')
+    // "01-straight-line" → "01 Straight Line"
+    const name = filename.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())
+    return { name, source }
+  })
+  .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))

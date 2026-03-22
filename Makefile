@@ -46,7 +46,7 @@ EXTRA_BATCHES  ?= 5
 BATCH          ?= 0
 
 .PHONY: all gen build test test-unit test-golden golden \
-        cdiff cdiff-v cdiff-one cdiff-save-baseline cdiff-check-baseline \
+        cdiff cdiff-demo cdiff-v cdiff-one cdiff-save-baseline cdiff-check-baseline \
         venv serve clean install watch \
         extra-fetch extra-golden cdiff-extra cdiff-extra-v cdiff-one-extra serve-extra
 
@@ -110,6 +110,11 @@ BASELINE     := test/golden/baseline.json
 cdiff: build venv
 	@echo "→ Running golden comparison (Python/OpenCV)..."
 	$(PYTHON) -m tikzjs_compare
+
+# Generate report into gh-pages/report/ for the demo app (local dev)
+cdiff-demo: build venv
+	@echo "→ Running golden comparison → gh-pages/report/ ..."
+	TIKZJS_REPORT_DIR=./gh-pages/report $(PYTHON) -m tikzjs_compare
 
 # Verbose mode: prints per-component area ratios
 cdiff-v: build venv
