@@ -1,0 +1,10 @@
+\begin{tikzpicture}
+\node (Ps) at (0,0) [rectangle,draw] {$P_{s}(s_{t+1}|s_{1:t},a_{1:t})$};
+\node (Pm) at (-2,-1) [rectangle,draw] {$P_{m}(m_{t}|m_{1:t-1},s_{1:t})$};
+\node (Pz) at (0,-2) [rectangle,draw] {$P_{z}(z_{t}|z_{1:t-1},m_{1:t})$};
+\node (Pa) at (2,-1) [rectangle,draw] {$P_{a}(a_{t}|a_{1:t-1},z_{1:t})$};
+\draw[->] (Ps) -| node[above left] {$s_{t}$} (Pm);
+\draw[->] (Pm) |- node[below left] {$m_{t}$} (Pz);
+\draw[->] (Pz) -| node[below right] {$z_{t}$} (Pa);
+\draw[->] (Pa) |- node[above right] {$a_{t}$} (Ps);
+\end{tikzpicture}

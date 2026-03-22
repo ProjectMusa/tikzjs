@@ -284,19 +284,47 @@
     for (let i = 0; i < rawSegs.length; i++) {
       const seg = rawSegs[i];
       if (seg && seg._pendingLine !== undefined) {
-        const next = rawSegs[i + 1];
-        if (next && next.kind === 'move') {
-          const to = next.to;
+        // Skip over inline node-on-path segments to find the target coordinate
+        var lineTarget = null;
+        var lineSkip = 0;
+        for (var j = i + 1; j < rawSegs.length; j++) {
+          if (rawSegs[j] && rawSegs[j].kind === 'node-on-path') {
+            segments.push(rawSegs[j]);
+            lineSkip++;
+          } else if (rawSegs[j] && rawSegs[j].kind === 'move') {
+            lineTarget = rawSegs[j];
+            lineSkip++;
+            break;
+          } else {
+            break;
+          }
+        }
+        if (lineTarget) {
+          const to = lineTarget.to;
           if (seg._pendingLine === '--') segments.push(ft.lineSegment(to));
           else if (seg._pendingLine === '-|') segments.push(ft.hvLineSegment(to, true));
           else segments.push(ft.hvLineSegment(to, false));
-          i++;
+          i += lineSkip;
         }
       } else if (seg && seg._pendingCurve !== undefined) {
-        const next = rawSegs[i + 1];
-        if (next && next.kind === 'move') {
-          segments.push(ft.curveSegment(seg._pendingCurve, next.to));
-          i++;
+        // Skip over inline node-on-path segments to find the target coordinate
+        var curveTarget = null;
+        var curveSkip = 0;
+        for (var j = i + 1; j < rawSegs.length; j++) {
+          if (rawSegs[j] && rawSegs[j].kind === 'node-on-path') {
+            segments.push(rawSegs[j]);
+            curveSkip++;
+          } else if (rawSegs[j] && rawSegs[j].kind === 'move') {
+            curveTarget = rawSegs[j];
+            curveSkip++;
+            break;
+          } else {
+            break;
+          }
+        }
+        if (curveTarget) {
+          segments.push(ft.curveSegment(seg._pendingCurve, curveTarget.to));
+          i += curveSkip;
         }
       } else if (seg && seg._pendingRectangle) {
         const next = rawSegs[i + 1];
@@ -723,12 +751,28 @@ raw_coordinate "raw coordinate"
     { return { mode: 'absolute', coord: { cs: 'polar', angle, radius: radius * u } }; }
   / '(' ws dir:direction_name ws ':' ws radius:coord_num u:dim_unit ws ')'
     { return { mode: 'absolute', coord: { cs: 'polar', angle: dir, radius: radius * u } }; }
+  / '(' ws a:perp_operand ws '|-' ws b:perp_operand ws ')'
+    { return { mode: 'absolute', coord: { cs: 'calc', expr: { kind: 'perpendicular', a: b.expr, b: a.expr, through: a.expr } } }; }
+  / '(' ws a:perp_operand ws '-|' ws b:perp_operand ws ')'
+    { return { mode: 'absolute', coord: { cs: 'calc', expr: { kind: 'perpendicular', a: a.expr, b: b.expr, through: a.expr } } }; }
   / '($' ws e:calc_expr ws '$)'
     { return { mode: 'absolute', coord: { cs: 'calc', expr: e } }; }
   / '(' ws '[' option_content ']' ws name:node_name ws '.' ws anchor:anchor_name ws ')'
     { return ft.nodeAnchorRef(name, anchor); }
   / '(' ws '[' option_content ']' ws name:node_name ws ')'
     { return ft.nodeAnchorRef(name, 'center'); }
+
+// Operand for perpendicular intersection coordinates (A |- B) / (A -| B).
+// Returns { expr: CalcExpr } wrapping the resolved coordinate/node reference.
+perp_operand "perpendicular operand"
+  = '$' ws e:calc_expr ws '$'
+    { return { expr: e }; }
+  / x:coord_num u1:dim_unit ws ',' ws y:coord_num u2:dim_unit
+    { return { expr: { kind: 'coord', ref: { mode: 'absolute', coord: { cs: 'xy', x: x * u1, y: y * u2 } } } }; }
+  / name:node_name ws '.' ws anchor:anchor_name
+    { return { expr: { kind: 'coord', ref: ft.nodeAnchorRef(name, anchor) } }; }
+  / name:node_name
+    { return { expr: { kind: 'coord', ref: ft.nodeAnchorRef(name, 'center') } }; }
 
 direction_name "direction"
   = 'north east' { return 45; }
