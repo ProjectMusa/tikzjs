@@ -286,6 +286,57 @@ export function collectAndStripMacros(src: string, table: MacroTable): string {
         continue
       }
 
+      // Strip \matrix commands (not yet supported — consume optional parts and body)
+      // TikZ syntax: \matrix (name) [opts] at (coord) {body};
+      // or: \matrix [opts] (name) at (coord) {body};
+      // All parts except {body} are optional; order of (name) and [opts] can vary.
+      if (token === '\\matrix') {
+        // Consume optional (name), [opts], at (coord) in any order until we hit '{'
+        while (!scanner.done) {
+          scanner.skipWhitespaceAndComments()
+          const ch = scanner.peek()
+          if (ch === '(') {
+            // (name) — consume balanced parens
+            let depth = 0
+            while (!scanner.done) {
+              const c = scanner.consume()
+              if (c === '(') depth++
+              else if (c === ')') { depth--; if (depth <= 0) break }
+            }
+          } else if (ch === '[') {
+            // [options] — consume balanced brackets
+            let depth = 0
+            while (!scanner.done) {
+              const c = scanner.consume()
+              if (c === '[') depth++
+              else if (c === ']') { depth--; if (depth <= 0) break }
+            }
+          } else if (scanner.peekStr(2) === 'at') {
+            scanner.consumeN(2)
+            scanner.skipWhitespaceAndComments()
+            if (scanner.peek() === '(') {
+              let depth = 0
+              while (!scanner.done) {
+                const c = scanner.consume()
+                if (c === '(') depth++
+                else if (c === ')') { depth--; if (depth <= 0) break }
+              }
+            }
+          } else {
+            break // next token should be '{' or something else
+          }
+        }
+        scanner.skipWhitespaceAndComments()
+        // Required {body}
+        if (scanner.peek() === '{') {
+          scanner.readGroup()
+        }
+        // Optional trailing semicolon
+        scanner.skipWhitespaceAndComments()
+        if (scanner.peek() === ';') scanner.consume()
+        continue
+      }
+
       // Strip single-arg LaTeX commands that have no visual effect in TikZ
       if (token === '\\vspace' || token === '\\hspace' || token === '\\pgfmathsetmacro') {
         scanner.skipWhitespaceAndComments()
