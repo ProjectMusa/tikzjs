@@ -100,18 +100,44 @@ export function emitPath(
       }
 
       case 'hv-line': {
-        if (pendingMove) { d += `M ${pendingMove.x} ${pendingMove.y} `; pendingMove = null }
-        const to = resolver.resolve(seg.to)
+        let hvTo = resolver.resolve(seg.to)
+        // Clip endpoints to node boundaries
+        const hvToGeo = getNodeGeoForCoord(seg.to, nodeRegistry)
+        const hvFromGeo = lastCoordRef ? getNodeGeoForCoord(lastCoordRef, nodeRegistry) : null
+        let hvFrom = lastPos
         if (seg.hvFirst) {
           // horizontal then vertical: -|
-          d += `L ${to.x} ${lastPos.y} L ${to.x} ${to.y} `
-          bboxes.push(fromCorners(lastPos.x, lastPos.y, to.x, to.y))
+          // Corner point at (to.x, from.y)
+          const corner = { x: hvTo.x, y: hvFrom.y }
+          // Clip from-side: path leaves horizontally, so clip from→corner direction
+          if (hvFromGeo) {
+            hvFrom = clipToNodeBoundary(corner, hvFrom, hvFromGeo)
+          }
+          // Clip to-side: path arrives vertically, so clip corner→to direction
+          if (hvToGeo) {
+            hvTo = clipToNodeBoundary(corner, hvTo, hvToGeo)
+          }
+          if (pendingMove) { d += `M ${hvFrom.x} ${hvFrom.y} `; pendingMove = null }
+          d += `L ${corner.x} ${corner.y} L ${hvTo.x} ${hvTo.y} `
+          bboxes.push(fromCorners(hvFrom.x, hvFrom.y, hvTo.x, hvTo.y))
         } else {
           // vertical then horizontal: |-
-          d += `L ${lastPos.x} ${to.y} L ${to.x} ${to.y} `
-          bboxes.push(fromCorners(lastPos.x, lastPos.y, to.x, to.y))
+          // Corner point at (from.x, to.y)
+          const corner = { x: hvFrom.x, y: hvTo.y }
+          // Clip from-side: path leaves vertically
+          if (hvFromGeo) {
+            hvFrom = clipToNodeBoundary(corner, hvFrom, hvFromGeo)
+          }
+          // Clip to-side: path arrives horizontally
+          if (hvToGeo) {
+            hvTo = clipToNodeBoundary(corner, hvTo, hvToGeo)
+          }
+          if (pendingMove) { d += `M ${hvFrom.x} ${hvFrom.y} `; pendingMove = null }
+          d += `L ${corner.x} ${corner.y} L ${hvTo.x} ${hvTo.y} `
+          bboxes.push(fromCorners(hvFrom.x, hvFrom.y, hvTo.x, hvTo.y))
         }
-        lastPos = to
+        lastPos = hvTo
+        lastCoordRef = seg.to
         break
       }
 
