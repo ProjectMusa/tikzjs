@@ -2,18 +2,65 @@
 
 ## Pipeline Architecture
 
-This project is a three-stage TikZ → SVG pipeline. Always think in these stages:
+This project is a multi-stage TikZ → IR → output pipeline with multiple generators:
 
 ```
 TikZ source
   → Preprocessor  (macro expansion, \tikzset, \foreach, tikzcd extraction)
   → Parser        (Peggy PEG grammar → IRDiagram plain objects)
-  → SVG Generator (IRDiagram → SVG string, two-pass rendering)
+  → Generators:
+      → SVG Generator   (IRDiagram → SVG string/DOM, two-pass rendering)
+      → TikZ Generator  (IRDiagram → TikZ source, round-trip serializer)
+      → D3 Editor       (IRDiagram → interactive SVG with drag/select/inspect)
 ```
 
 Never conflate stages. Style resolution happens in the parser (via `optionParser` + `styleResolver`).
 Pixel coordinate resolution happens in the generator (`coordResolver.ts`). The IR holds
 symbolic coordinates (pt units) only — never pixels.
+
+## Source Layout
+
+```
+src/
+  index.ts                      — public API (parse, generate, exports)
+  ir/types.ts                   — all IR type definitions
+  preprocessor/                 — macro expansion, tikzcd extraction, \foreach
+  parser/                       — Peggy grammar, option/style resolution, IR factory
+  math/                         — MathJax rendering abstraction
+  generators/
+    core/                       — target-agnostic utilities shared by all generators
+      coordResolver.ts          — CoordResolver, NodeGeometryRegistry, ptToPx, anchor math
+      boundingBox.ts            — BoundingBox merge/pad/viewBox utilities
+    svg/                        — SVG string/DOM generator (two-pass rendering)
+      index.ts                  — generateSVG(), generateSVGElement(), renderPass()
+      constants.ts              — TIKZ_CONSTANTS (spec-level) + SVGRenderingConstants (tunable)
+      renderContext.ts          — RenderContext, ElementRenderResult interfaces
+      rendererRegistry.ts       — SVGRendererRegistry, per-kind handler dispatch
+      nodeEmitter.ts            — IRNode → SVG <g> with shapes, labels, anchors
+      pathEmitter.ts            — IRPath → SVG <path> with all segment kinds
+      edgeEmitter.ts            — IREdge → SVG <path> with arrow markers
+      matrixEmitter.ts          — IRMatrix → cell layout (tikzcd support)
+      knotEmitter.ts            — IRKnot → knot diagram rendering
+      styleEmitter.ts           — ResolvedStyle → SVG attributes + transforms
+      markerDefs.ts             — arrow marker deduplication registry
+      patternDefs.ts            — fill pattern definitions
+      coordResolver.ts          — re-export shim → core/coordResolver
+      boundingBox.ts            — re-export shim → core/boundingBox
+    tikz/                       — TikZ source generator (IR → TikZ round-trip)
+      index.ts                  — generateTikZ() entry point
+      coordEmitter.ts           — CoordRef → TikZ coordinate string
+      optionEmitter.ts          — RawOption[] → [key=value,...] string
+      elementEmitter.ts         — per-kind IR element → TikZ command strings
+    d3/                         — D3.js interactive editor (browser-only)
+      index.ts                  — createD3Editor() controller factory
+      renderer.ts               — renderDiagram() using generateSVGElement() (no innerHTML)
+      grid.ts                   — coordinate grid overlay (TikZ pt units)
+      highlight.ts              — SVG-native selection highlights (invert-color overlays)
+      interactions.ts           — drag, select behaviors + CSS injection
+      irMutator.ts              — safe IR mutation (moveNode, findNode, isDraggable)
+      D3EditorPanel.tsx         — React component wrapper for createD3Editor
+      IRInspector.tsx           — React IR inspector panel (Elements + Tree modes)
+```
 
 ## Build & Test Commands
 
@@ -73,8 +120,26 @@ to produce `IRMatrix` + `IRTikzcdArrow[]` directly. No intermediate TikZ emissio
   - Pass 1: render matrices and standalone nodes → populate `NodeGeometryRegistry`
   - Pass 2: render paths and edges → use registry for anchor resolution and line clipping
 - Paths are inserted BEFORE nodes in the SVG output (so nodes render on top).
+- All SVG elements carry `data-ir-id` and `data-ir-kind` attributes for D3 interactivity.
 - Arrow markers are deduplicated via `MarkerRegistry` — use `ensureMarker()`, never write `<marker>` directly.
 - Coordinate system: SVG y-axis is inverted vs TikZ. Apply `PT_TO_PX` conversion in `coordResolver.ts` only.
+- `generateSVGElement()` returns a live DOM tree (no serialization); `generateSVG()` wraps it as a string.
+
+## D3 Editor Rules
+
+- The D3 editor reuses the SVG generator's live DOM output via `generateSVGElement()` — no innerHTML roundtrip.
+- Element lookup uses `data-ir-id` attributes set by the SVG generator; no position-matching heuristics.
+- Highlight overlays use SVG-native shapes with `mix-blend-mode: difference` for invert-color visibility.
+  CSS `outline` does NOT work on SVG elements — never use it for SVG highlighting.
+- Only nodes with `cs: 'xy'` coordinates are draggable. Others show a lock indicator.
+- The `grid.ts`, `highlight.ts`, and `interactions.ts` modules are separate concerns — keep them decoupled.
+- React components (`D3EditorPanel.tsx`, `IRInspector.tsx`) are optional; the core API is `createD3Editor()`.
+
+## TikZ Generator Rules
+
+- Uses `rawOptions` (not `ResolvedStyle`) for option emission — preserves original key-value pairs.
+- IR coordinates are in pt; TikZ defaults to cm. Divide by `PT_PER_CM` (28.4528) when emitting.
+- tikzcd matrices emit `\begin{tikzcd}` with arrow direction strings reconstructed from `rowDelta`/`colDelta`.
 
 ## Testing Rules
 
