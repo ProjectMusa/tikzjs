@@ -7,6 +7,8 @@
 
 import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix } from '../../ir/types.js'
 
+export type CpRole = 'cp1' | 'cp2' | 'to'
+
 /**
  * Walk the element tree (including scope children and matrix cells)
  * and return the element with the given id.
@@ -93,6 +95,40 @@ export function getConnectedEdges(diagram: IRDiagram, nodeId: string): string[] 
   }
   walk(diagram.elements)
   return edgeIds
+}
+
+/**
+ * Update a bezier curve segment's control point or endpoint (in TeX pt).
+ * segIdx: index into path.segments.
+ * cpRole: 'cp1' (controls[0]), 'cp2' (controls[1]), or 'to' (endpoint).
+ * Only updates coords with cs === 'xy' and mode === 'absolute'. Returns true if updated.
+ */
+export function updateCurveControl(
+  diagram: IRDiagram,
+  pathId: string,
+  segIdx: number,
+  cpRole: CpRole,
+  xPt: number,
+  yPt: number,
+): boolean {
+  const el = findElement(diagram.elements, pathId)
+  if (!el || el.kind !== 'path') return false
+  const seg = el.segments[segIdx]
+  if (!seg || seg.kind !== 'curve') return false
+
+  if (cpRole === 'to') {
+    if (seg.to.mode !== 'absolute' || seg.to.coord.cs !== 'xy') return false
+    seg.to.coord.x = xPt
+    seg.to.coord.y = yPt
+    return true
+  }
+
+  const cpIdx = cpRole === 'cp1' ? 0 : 1
+  const cp = seg.controls[cpIdx]
+  if (!cp || cp.mode !== 'absolute' || cp.coord.cs !== 'xy') return false
+  cp.coord.x = xPt
+  cp.coord.y = yPt
+  return true
 }
 
 /**

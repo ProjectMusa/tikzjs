@@ -6,15 +6,29 @@
  *
  * For nodes: dashed bounding box from the NodeGeometryRegistry + anchor dots
  * For paths/edges: amber path overlay + dashed bbox via getBBox()
+ * For bezier curves (path with curve segments): control point handles + handle lines
  */
 
-import { NodeGeometryRegistry } from '../core/coordResolver.js'
+import type { IRDiagram, IRPath, CoordRef } from '../../ir/types.js'
+import { NodeGeometryRegistry, ptToPx } from '../core/coordResolver.js'
+import { findElement } from './irMutator.js'
 
 const SVG_NS = 'http://www.w3.org/2000/svg'
 export const HIGHLIGHT_CLASS = 'd3-highlight-group'
 
 const AMBER = '#f59e0b'
 const AMBER_FILL = 'rgba(245,158,11,0.08)'
+
+// ── Coord helper ─────────────────────────────────────────────────────────────
+
+/** Resolve an absolute xy CoordRef to SVG pixel coords + original pt values. */
+function resolveAbsXY(ref: CoordRef): { px: { x: number; y: number }; pt: { x: number; y: number } } | null {
+  if (ref.mode !== 'absolute' || ref.coord.cs !== 'xy') return null
+  return {
+    px: { x: ptToPx(ref.coord.x), y: -ptToPx(ref.coord.y) },
+    pt: { x: ref.coord.x, y: ref.coord.y },
+  }
+}
 
 // ── Public API ────────────────────────────────────────────────────────────────
 
@@ -27,6 +41,7 @@ export function highlightElement(
   id: string | null,
   elementMap: Map<string, SVGElement>,
   nodeRegistry: NodeGeometryRegistry,
+  diagram: IRDiagram | null,
 ): void {
   // Remove all existing highlight groups
   svg.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((el) => el.remove())
@@ -46,7 +61,7 @@ export function highlightElement(
 
   const kind = target.getAttribute('data-ir-kind')
   if (kind === 'path' || kind === 'edge') {
-    addPathHighlight(doc, group, target)
+    addPathHighlight(doc, group, target, id, diagram)
   } else {
     // node, coordinate, matrix cell
     addNodeHighlight(doc, group, target, id, nodeRegistry)
@@ -58,11 +73,6 @@ export function highlightElement(
 
 // ── Node highlight ────────────────────────────────────────────────────────────
 
-/**
- * Draw an amber dashed bounding box + anchor dots for a node.
- * Geometry comes from NodeGeometryRegistry (pre-computed in SVG Pass 1),
- * avoiding unreliable getBBox() calls.
- */
 function addNodeHighlight(
   doc: Document,
   group: Element,
@@ -75,13 +85,11 @@ function addNodeHighlight(
   let x: number, y: number, w: number, h: number
 
   if (geo) {
-    // Use pre-computed geometry — reliable, no DOM measurement needed
     x = geo.centerX - geo.halfWidth
     y = geo.centerY - geo.halfHeight
     w = geo.halfWidth * 2
     h = geo.halfHeight * 2
   } else {
-    // Fallback for elements not in the registry (e.g., coordinate nodes)
     try {
       const bbox = (target as unknown as SVGGraphicsElement).getBBox?.()
       if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
@@ -96,7 +104,6 @@ function addNodeHighlight(
 
   const pad = 4
 
-  // Dashed amber bounding box
   const rect = doc.createElementNS(SVG_NS, 'rect')
   rect.setAttribute('x', String(x - pad))
   rect.setAttribute('y', String(y - pad))
@@ -111,18 +118,17 @@ function addNodeHighlight(
   rect.setAttribute('pointer-events', 'none')
   group.appendChild(rect)
 
-  // Anchor dots at cardinal + corner positions
   const cx = x + w / 2
   const cy = y + h / 2
   const anchors = [
-    { x: cx,        y: y - pad },         // north
-    { x: cx,        y: y + h + pad },     // south
-    { x: x - pad,   y: cy },              // west
-    { x: x + w + pad, y: cy },            // east
-    { x: x - pad,   y: y - pad },         // north-west
-    { x: x + w + pad, y: y - pad },       // north-east
-    { x: x - pad,   y: y + h + pad },     // south-west
-    { x: x + w + pad, y: y + h + pad },   // south-east
+    { x: cx,          y: y - pad },
+    { x: cx,          y: y + h + pad },
+    { x: x - pad,     y: cy },
+    { x: x + w + pad, y: cy },
+    { x: x - pad,     y: y - pad },
+    { x: x + w + pad, y: y - pad },
+    { x: x - pad,     y: y + h + pad },
+    { x: x + w + pad, y: y + h + pad },
   ]
 
   const dotSize = 4
@@ -140,12 +146,13 @@ function addNodeHighlight(
 
 // ── Path / edge highlight ─────────────────────────────────────────────────────
 
-/**
- * Draw an amber overlay for a path or edge element.
- * Duplicates the path's `d` attribute with amber stroke, and adds a dashed
- * bounding box via getBBox() (path elements are in the live DOM when highlighted).
- */
-function addPathHighlight(doc: Document, group: Element, target: SVGElement): void {
+function addPathHighlight(
+  doc: Document,
+  group: Element,
+  target: SVGElement,
+  irId: string,
+  diagram: IRDiagram | null,
+): void {
   const pathEls: SVGElement[] = target.tagName.toLowerCase() === 'path'
     ? [target]
     : Array.from(target.querySelectorAll('path')) as SVGElement[]
@@ -166,8 +173,7 @@ function addPathHighlight(doc: Document, group: Element, target: SVGElement): vo
     group.appendChild(overlay)
   }
 
-  // Dashed bbox around the entire element via getBBox()
-  // Path elements are in the live browser DOM at highlight time so this works.
+  // Dashed bbox around the element
   try {
     const bbox = (target as unknown as SVGGraphicsElement).getBBox?.()
     if (bbox && bbox.width > 0 && bbox.height > 0) {
@@ -187,6 +193,133 @@ function addPathHighlight(doc: Document, group: Element, target: SVGElement): vo
       group.appendChild(rect)
     }
   } catch {
-    // getBBox can throw in non-rendered contexts — skip the bbox rect
+    // getBBox can throw in non-rendered contexts
   }
+
+  // Control point handles for editable bezier curve segments
+  if (diagram) {
+    const el = findElement(diagram.elements, irId)
+    if (el && el.kind === 'path') {
+      addControlPointHandles(doc, group, el)
+    }
+  }
+}
+
+// ── Bezier control point handles ──────────────────────────────────────────────
+
+/**
+ * Draw draggable control point handles for each CurveSegment in the path.
+ * Only handles absolute xy coords (cs === 'xy', mode === 'absolute').
+ *
+ * Visual elements per curve segment:
+ *   - Thin dashed handle lines (prevPos → cp1, to → cp2)
+ *   - Filled amber circles at cp1 / cp2 (draggable, tagged with data attrs)
+ *   - White square at endpoint (to) — non-draggable visual marker
+ */
+function addControlPointHandles(doc: Document, group: Element, irPath: IRPath): void {
+  let prevPx: { x: number; y: number } | null = null
+
+  for (let segIdx = 0; segIdx < irPath.segments.length; segIdx++) {
+    const seg = irPath.segments[segIdx]
+
+    if (seg.kind === 'curve') {
+      const cp1 = resolveAbsXY(seg.controls[0])
+      const cp2ref = seg.controls.length >= 2 ? seg.controls[1] : undefined
+      const cp2 = cp2ref ? resolveAbsXY(cp2ref) : null
+      const to = resolveAbsXY(seg.to)
+
+      // Handle lines (non-interactive, purely visual)
+      if (prevPx && cp1) {
+        addHandleLine(doc, group, prevPx.x, prevPx.y, cp1.px.x, cp1.px.y, `d3hl-${segIdx}-cp1`)
+      }
+      if (to && cp2) {
+        addHandleLine(doc, group, to.px.x, to.px.y, cp2.px.x, cp2.px.y, `d3hl-${segIdx}-cp2`)
+      }
+
+      // Control point circles (draggable)
+      if (cp1) {
+        addCPHandle(doc, group, cp1.px.x, cp1.px.y, irPath.id, segIdx, 'cp1', cp1.pt.x, cp1.pt.y, `d3hl-${segIdx}-cp1`)
+      }
+      if (cp2) {
+        addCPHandle(doc, group, cp2.px.x, cp2.px.y, irPath.id, segIdx, 'cp2', cp2.pt.x, cp2.pt.y, `d3hl-${segIdx}-cp2`)
+      }
+
+      // Endpoint marker (non-draggable square)
+      if (to) {
+        addEndpointMarker(doc, group, to.px.x, to.px.y)
+      }
+
+      prevPx = to?.px ?? null
+    } else if ('to' in seg) {
+      // Track current position for handle line start of the next curve segment
+      const toRef = (seg as { to: CoordRef }).to
+      const resolved = resolveAbsXY(toRef)
+      prevPx = resolved?.px ?? null
+    }
+    // 'close', 'node-on-path', 'circle', 'ellipse': don't update prevPx
+  }
+}
+
+function addHandleLine(
+  doc: Document,
+  group: Element,
+  x1: number, y1: number,
+  x2: number, y2: number,
+  id: string,
+): void {
+  const line = doc.createElementNS(SVG_NS, 'line')
+  line.setAttribute('id', id)
+  line.setAttribute('x1', String(x1))
+  line.setAttribute('y1', String(y1))
+  line.setAttribute('x2', String(x2))
+  line.setAttribute('y2', String(y2))
+  line.setAttribute('stroke', AMBER)
+  line.setAttribute('stroke-width', '0.8')
+  line.setAttribute('stroke-dasharray', '3 2')
+  line.setAttribute('pointer-events', 'none')
+  group.appendChild(line)
+}
+
+function addCPHandle(
+  doc: Document,
+  group: Element,
+  cx: number, cy: number,
+  pathId: string,
+  segIdx: number,
+  cpRole: string,
+  origPtX: number,
+  origPtY: number,
+  handleLineId: string,
+): void {
+  const circle = doc.createElementNS(SVG_NS, 'circle')
+  circle.setAttribute('cx', String(cx))
+  circle.setAttribute('cy', String(cy))
+  circle.setAttribute('r', '5')
+  circle.setAttribute('fill', AMBER)
+  circle.setAttribute('stroke', '#fff')
+  circle.setAttribute('stroke-width', '1.5')
+  circle.setAttribute('cursor', 'grab')
+  // Data attrs for drag handler
+  circle.setAttribute('data-d3-role', 'cp-handle')
+  circle.setAttribute('data-ir-path-id', pathId)
+  circle.setAttribute('data-seg-idx', String(segIdx))
+  circle.setAttribute('data-cp-role', cpRole)
+  circle.setAttribute('data-orig-pt-x', String(origPtX))
+  circle.setAttribute('data-orig-pt-y', String(origPtY))
+  circle.setAttribute('data-handle-line-id', handleLineId)
+  group.appendChild(circle)
+}
+
+function addEndpointMarker(doc: Document, group: Element, cx: number, cy: number): void {
+  const size = 5
+  const dot = doc.createElementNS(SVG_NS, 'rect')
+  dot.setAttribute('x', String(cx - size / 2))
+  dot.setAttribute('y', String(cy - size / 2))
+  dot.setAttribute('width', String(size))
+  dot.setAttribute('height', String(size))
+  dot.setAttribute('fill', '#fff')
+  dot.setAttribute('stroke', AMBER)
+  dot.setAttribute('stroke-width', '1.5')
+  dot.setAttribute('pointer-events', 'none')
+  group.appendChild(dot)
 }

@@ -17,7 +17,7 @@ import { NodeGeometryRegistry } from '../core/coordResolver.js'
 import { renderDiagram } from './renderer.js'
 import { insertGrid } from './grid.js'
 import { highlightElement as _highlightElement } from './highlight.js'
-import { setupDrag, setupSelection, injectStyles } from './interactions.js'
+import { setupDrag, setupSelection, setupControlPointDrag, injectStyles } from './interactions.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -69,6 +69,27 @@ export function createD3Editor(
   let gridVisible = opts.showGrid !== false // default true
   let currentElementMap: Map<string, SVGElement> = new Map()
   let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
+  let lastHighlightedId: string | null = null
+
+  /** Apply highlight overlay + control point drag to the live SVG. */
+  function applyHighlight(svg: SVGSVGElement, id: string | null) {
+    _highlightElement(svg, id, currentElementMap, currentNodeRegistry, currentDiagram)
+    if (id && !opts.readOnly) {
+      const el = currentElementMap.get(id)
+      if (el?.getAttribute('data-ir-kind') === 'path') {
+        setupControlPointDrag(svg, currentDiagram, onControlPointDragEnd)
+      }
+    }
+  }
+
+  function onControlPointDragEnd(updatedDiagram: IRDiagram) {
+    currentDiagram = updatedDiagram
+    render()
+    // Re-apply highlight at new control point positions
+    const svg = container.querySelector('svg') as SVGSVGElement | null
+    if (svg && lastHighlightedId) applyHighlight(svg, lastHighlightedId)
+    if (opts.onIRChange) opts.onIRChange(currentDiagram)
+  }
 
   function render() {
     // Clear previous content
@@ -133,9 +154,10 @@ export function createD3Editor(
       return gridVisible
     },
     highlightElement(id: string | null) {
+      lastHighlightedId = id
       const svg = container.querySelector('svg') as SVGSVGElement | null
       if (!svg) return
-      _highlightElement(svg, id, currentElementMap, currentNodeRegistry)
+      applyHighlight(svg, id)
     },
     destroy() {
       container.innerHTML = ''
