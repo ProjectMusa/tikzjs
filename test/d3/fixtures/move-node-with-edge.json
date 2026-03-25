@@ -1,0 +1,7 @@
+{
+  "description": "Move node A and verify connected edge updates",
+  "source": "\\begin{tikzpicture}\n\\node (A) at (0,0) {Start};\n\\node (B) at (3,0) {End};\n\\draw[->] (A) -- (B);\n\\draw[->] (A) to[bend left] (B);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "moveNode", "args": ["node_1", 0, 56.9056] }
+  ]
+}

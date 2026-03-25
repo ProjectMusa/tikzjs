@@ -11,6 +11,8 @@
  * - onIRChange callback notifies the parent when IR is mutated
  */
 
+import * as d3 from 'd3-selection'
+import { zoom as d3Zoom, zoomIdentity, type ZoomBehavior } from 'd3-zoom'
 import type { IRDiagram } from '../../ir/types.js'
 import type { SVGGeneratorOptions } from '../svg/index.js'
 import { NodeGeometryRegistry } from '../core/coordResolver.js'
@@ -70,6 +72,9 @@ export function createD3Editor(
   let currentElementMap: Map<string, SVGElement> = new Map()
   let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
   let lastHighlightedId: string | null = null
+  let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> | null = null
+  let currentTransform = zoomIdentity
+  let currentViewBox: string | null = null // preserve viewBox across re-renders
 
   /** Apply highlight overlay + control point drag to the live SVG. */
   function applyHighlight(svg: SVGSVGElement, id: string | null) {
@@ -85,7 +90,6 @@ export function createD3Editor(
   function onControlPointDragEnd(updatedDiagram: IRDiagram) {
     currentDiagram = updatedDiagram
     render()
-    // Re-apply highlight at new control point positions
     const svg = container.querySelector('svg') as SVGSVGElement | null
     if (svg && lastHighlightedId) applyHighlight(svg, lastHighlightedId)
     if (opts.onIRChange) opts.onIRChange(currentDiagram)
@@ -110,19 +114,75 @@ export function createD3Editor(
     currentElementMap = result.elementMap
     currentNodeRegistry = result.nodeRegistry
 
-    // Insert coordinate grid
-    insertGrid(result.svgElement, gridVisible)
+    const svgEl = result.svgElement
+    const doc = svgEl.ownerDocument
+
+    // Wrap all SVG children in a zoom group
+    const zoomGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
+    zoomGroup.setAttribute('class', 'd3-zoom-group')
+    while (svgEl.firstChild) {
+      zoomGroup.appendChild(svgEl.firstChild)
+    }
+    svgEl.appendChild(zoomGroup)
+
+    // Insert coordinate grid inside the zoom group (so it pans/zooms with content)
+    insertGrid(svgEl, gridVisible)
+    // Move the grid group into the zoom group (insertGrid appends to svgEl)
+    const gridGroup = svgEl.querySelector('.d3-grid')
+    if (gridGroup) {
+      zoomGroup.insertBefore(gridGroup, zoomGroup.firstChild)
+    }
+
+    // Set up zoom/pan — remove fixed width/height so SVG fills its container.
+    // Use xMinYMin so content anchors to top-left and doesn't shift when
+    // the container resizes (e.g., sidebar toggle).
+    svgEl.removeAttribute('width')
+    svgEl.removeAttribute('height')
+    svgEl.setAttribute('preserveAspectRatio', 'xMinYMin meet')
+
+    // Preserve viewBox across re-renders so the image doesn't shift when
+    // IR edits (control point drag, node drag) change the bounding box.
+    if (currentViewBox) {
+      svgEl.setAttribute('viewBox', currentViewBox)
+    } else {
+      currentViewBox = svgEl.getAttribute('viewBox')
+    }
+    svgEl.style.width = '100%'
+    svgEl.style.height = '100%'
+
+    zoomBehavior = d3Zoom<SVGSVGElement, unknown>()
+      .scaleExtent([0.1, 20])
+      .filter((event: any) => {
+        // Allow wheel zoom always. For mouse/touch: only pan if no element drag is active.
+        // Middle mouse button or ctrl+wheel for zoom, plain wheel for zoom too.
+        if (event.type === 'wheel') return true
+        // Right click: don't pan
+        if (event.button) return false
+        // Don't hijack drags on interactive elements
+        const target = event.target as Element
+        if (target.closest?.('.d3-draggable, [data-d3-role="cp-handle"]')) return false
+        return true
+      })
+      .on('zoom', (event) => {
+        currentTransform = event.transform
+        zoomGroup.setAttribute('transform', event.transform.toString())
+      })
+
+    d3.select(svgEl).call(zoomBehavior)
+    // Restore previous zoom transform across re-renders
+    if (currentTransform !== zoomIdentity) {
+      d3.select(svgEl).call(zoomBehavior.transform, currentTransform)
+    }
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      setupSelection(result.svgElement, result.elementMap, controller, opts.onElementSelect)
+      setupSelection(svgEl, result.elementMap, controller, opts.onElementSelect)
       setupDrag(
-        result.svgElement,
+        svgEl,
         result.elementMap,
         currentDiagram,
         controller,
         (updatedDiagram) => {
-          // On drag end: full re-render to update edges, then notify parent
           currentDiagram = updatedDiagram
           render()
           if (opts.onIRChange) opts.onIRChange(currentDiagram)
@@ -135,6 +195,8 @@ export function createD3Editor(
     render,
     setDiagram(diagram: IRDiagram) {
       currentDiagram = diagram
+      currentViewBox = null // reset viewBox for new diagram
+      currentTransform = zoomIdentity // reset zoom for new diagram
       render()
     },
     getDiagram() {

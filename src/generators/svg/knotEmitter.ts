@@ -136,7 +136,7 @@ function makeClipCircle(document: Document, cx: number, cy: number, r: number): 
 }
 
 function makeSVGPath(document: Document, d: string, stroke: string, strokeWidth: number, clipId?: string): Element {
-  const el = document.createElement('path')
+  const el = document.createElementNS(SVG_NS, 'path')
   el.setAttribute('d', d)
   el.setAttribute('stroke', stroke)
   el.setAttribute('stroke-width', String(strokeWidth))
@@ -230,5 +230,11 @@ export function emitKnot(
     }
   }
 
-  return { elements, clipDefs, bbox: mergeBBoxes(bboxes) }
+  // Wrap all elements in a group tagged for D3 interactivity
+  const g = document.createElementNS(SVG_NS, 'g')
+  g.setAttribute('data-ir-id', knot.id)
+  g.setAttribute('data-ir-kind', 'knot')
+  for (const el of elements) g.appendChild(el)
+
+  return { elements: [g], clipDefs, bbox: mergeBBoxes(bboxes) }
 }

@@ -1,7 +1,7 @@
 /**
- * D3 coordinate grid — inserts a TikZ pt unit grid into the SVG.
+ * D3 coordinate grid — inserts a TikZ coordinate grid into the SVG.
  * Grid lines at 1cm intervals (28.4528 pt) with lighter lines at 0.5cm.
- * Labels show TikZ pt values along axes.
+ * Labels show TikZ cm values (the default coordinate unit).
  */
 
 import { DEFAULT_CONSTANTS } from '../svg/constants.js'
@@ -107,12 +107,12 @@ export function insertGrid(svgElement: SVGSVGElement, visible = true): void {
   // y-axis at SVG x=0 (TikZ x=0)
   gridGroup.appendChild(originLine(0, top, 0, bottom))
 
-  // Labels on major gridlines — show TikZ pt values
+  // Labels on major gridlines — show TikZ cm values (default coordinate unit)
   const labelSize = Math.max(3, vbW * 0.012)
 
   for (let x = startXMajor; x <= right; x += cmPx) {
-    const tikzPt = Math.round(x / DEFAULT_CONSTANTS.PT_TO_PX)
-    if (tikzPt === 0) continue // skip origin label on x-axis
+    const tikzCm = Math.round(x / cmPx)
+    if (tikzCm === 0) continue // skip origin label on x-axis
     const label = doc.createElementNS(SVG_NS, 'text')
     label.setAttribute('x', String(x))
     label.setAttribute('y', String(Math.min(labelSize + 1, vbY + vbH - 1)))
@@ -120,14 +120,14 @@ export function insertGrid(svgElement: SVGSVGElement, visible = true): void {
     label.setAttribute('font-size', String(labelSize))
     label.setAttribute('text-anchor', 'middle')
     label.setAttribute('font-family', 'monospace')
-    label.textContent = String(tikzPt)
+    label.textContent = String(tikzCm)
     gridGroup.appendChild(label)
   }
 
   for (let y = startYMajor; y <= bottom; y += cmPx) {
-    // SVG y in px → TikZ y in pt: -py / PT_TO_PX (y inverted)
-    const tikzPt = Math.round(-y / DEFAULT_CONSTANTS.PT_TO_PX)
-    if (tikzPt === 0) continue
+    // SVG y in px → TikZ y in cm (y inverted)
+    const tikzCm = Math.round(-y / cmPx)
+    if (tikzCm === 0) continue
     const label = doc.createElementNS(SVG_NS, 'text')
     label.setAttribute('x', String(vbX + 2))
     label.setAttribute('y', String(y - 1))
@@ -135,7 +135,7 @@ export function insertGrid(svgElement: SVGSVGElement, visible = true): void {
     label.setAttribute('font-size', String(labelSize))
     label.setAttribute('text-anchor', 'start')
     label.setAttribute('font-family', 'monospace')
-    label.textContent = String(tikzPt)
+    label.textContent = String(tikzCm)
     gridGroup.appendChild(label)
   }
 

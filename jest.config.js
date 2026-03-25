@@ -16,5 +16,6 @@ module.exports = {
     // Stub D3 modules in Node.js tests — the D3 editor is browser-only
     '^d3-selection$': '<rootDir>/test/__mocks__/d3-stub.js',
     '^d3-drag$': '<rootDir>/test/__mocks__/d3-stub.js',
+    '^d3-zoom$': '<rootDir>/test/__mocks__/d3-stub.js',
   },
 }

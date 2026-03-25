@@ -109,7 +109,6 @@ export function Playground() {
     [],
   )
 
-  const [activeTool, setActiveTool] = useState<string>('select')
   const [showGrid, setShowGrid] = useState(true)
   const [showInspector, setShowInspector] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
@@ -120,14 +119,6 @@ export function Playground() {
     mathModeRenderer: browserMathModeRenderer,
     scriptMathModeRenderer: browserScriptMathModeRenderer,
   }
-
-  const toolbarItems = [
-    { id: 'select', icon: '\u25E8', title: 'Select & Move' },
-    { id: 'pan', icon: '\u2725', title: 'Pan' },
-    { id: 'zoom-in', icon: '\u2295', title: 'Zoom In' },
-    { id: 'zoom-out', icon: '\u2296', title: 'Zoom Out' },
-    { id: 'fit', icon: '\u2B1C', title: 'Fit to View' },
-  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -183,56 +174,14 @@ export function Playground() {
         >
           {/* Main editor area */}
           <div style={{ flex: 1, position: 'relative' }}>
-            {/* Top bar */}
-            <div
-              style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 36,
-                display: 'flex',
-                alignItems: 'center',
-                padding: '0 12px',
-                background: '#181825',
-                borderBottom: '1px solid #333',
-                zIndex: 1,
-              }}
-            >
-              <span style={{ color: '#cdd6f4', fontSize: 13, fontWeight: 500 }}>
-                Interactive Editor
-              </span>
-              <span style={{ color: '#6c7086', fontSize: 12, marginLeft: 12 }}>
-                Drag nodes to reposition — changes update the source
-              </span>
-              <button
-                onClick={() => setMode('preview')}
-                style={{
-                  marginLeft: 'auto',
-                  background: 'transparent',
-                  color: '#cdd6f4',
-                  border: '1px solid #45475a',
-                  borderRadius: 4,
-                  padding: '3px 10px',
-                  fontSize: 12,
-                  cursor: 'pointer',
-                }}
-              >
-                Close
-              </button>
-            </div>
-
-            {/* D3 editor canvas */}
-            <div style={{ position: 'absolute', top: 36, left: 0, right: 0, bottom: 0 }}>
-              <D3EditorPanel
-                diagram={diagram}
-                onDiagramChange={handleDiagramChange}
-                svgOptions={editorSvgOptions}
-                showGrid={showGrid}
-                highlightElementId={selectedElementId}
-                onElementSelect={setSelectedElementId}
-              />
-            </div>
+            <D3EditorPanel
+              diagram={diagram}
+              onDiagramChange={handleDiagramChange}
+              svgOptions={editorSvgOptions}
+              showGrid={showGrid}
+              highlightElementId={selectedElementId}
+              onElementSelect={setSelectedElementId}
+            />
           </div>
 
           {/* IR Inspector side panel */}
@@ -267,28 +216,28 @@ export function Playground() {
               gap: 4,
             }}
           >
-            {toolbarItems.map((tool) => (
-              <button
-                key={tool.id}
-                title={tool.title}
-                onClick={() => setActiveTool(tool.id)}
-                style={{
-                  width: 32,
-                  height: 32,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  background: activeTool === tool.id ? '#45475a' : 'transparent',
-                  color: activeTool === tool.id ? '#cdd6f4' : '#6c7086',
-                  border: 'none',
-                  borderRadius: 6,
-                  fontSize: 16,
-                  cursor: 'pointer',
-                }}
-              >
-                {tool.icon}
-              </button>
-            ))}
+            {/* Close editor */}
+            <button
+              title="Close Editor"
+              onClick={() => setMode('preview')}
+              style={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'transparent',
+                color: '#6c7086',
+                border: 'none',
+                borderRadius: 6,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+                <line x1="2" y1="2" x2="12" y2="12" />
+                <line x1="12" y1="2" x2="2" y2="12" />
+              </svg>
+            </button>
             {/* Separator */}
             <div style={{ width: 24, height: 1, background: '#45475a', margin: '4px 0' }} />
             {/* Grid toggle */}

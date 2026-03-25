@@ -1,0 +1,7 @@
+{
+  "description": "Update a node label text",
+  "source": "\\begin{tikzpicture}\n\\node (A) at (0,0) {Original};\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "updateNodeLabel", "args": ["node_1", "Updated"] }
+  ]
+}

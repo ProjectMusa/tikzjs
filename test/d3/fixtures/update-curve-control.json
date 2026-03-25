@@ -1,0 +1,7 @@
+{
+  "description": "Move a bezier control point",
+  "source": "\\begin{tikzpicture}\n\\draw (0,0) .. controls (1,2) and (2,2) .. (3,0);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "updateCurveControl", "args": ["path_1", 1, "cp1", 28.4528, 85.3584] }
+  ]
+}

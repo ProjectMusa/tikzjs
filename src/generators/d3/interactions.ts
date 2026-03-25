@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx } from '../core/coordResolver.js'
-import { moveNode, findNode, isDraggable, updateCurveControl, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -59,8 +59,11 @@ export function setupDrag(
     const node = findNode(diagram, irId)
     if (!node || !isDraggable(node)) continue
 
-    // Get the SVG coordinate transform (viewBox → screen pixels)
+    // Use the zoom group as the drag container so d3-drag computes
+    // coordinates in the zoom group's local (pre-zoom) coordinate space.
+    const zoomGroup = svgElement.querySelector('.d3-zoom-group') as SVGGElement | null
     const dragBehavior = d3Drag<SVGElement, unknown>()
+      .container(zoomGroup ?? svgElement as any)
       .on('start', function (event) {
         d3.select(this).classed('d3-dragging', true)
         // Store initial IR position
@@ -99,12 +102,11 @@ export function setupDrag(
         // Y is negated in SVG space
         const newPxY = -ptToPx(newYPt)
 
-        // Find existing transform and update translate
+        const translate = `translate(${newPxX.toFixed(2)}, ${newPxY.toFixed(2)})`
         const transform = (this as SVGElement).getAttribute('transform') || ''
-        const newTransform = transform.replace(
-          /translate\([^)]*\)/,
-          `translate(${newPxX.toFixed(2)}, ${newPxY.toFixed(2)})`,
-        )
+        const newTransform = /translate\([^)]*\)/.test(transform)
+          ? transform.replace(/translate\([^)]*\)/, translate)
+          : translate + (transform ? ' ' + transform : '')
         ;(this as SVGElement).setAttribute('transform', newTransform)
       })
       .on('end', function () {
@@ -146,13 +148,108 @@ interface CPDragState {
   segIdx: number
   cpRole: CpRole
   handleLineId: string
+  /** Original path `d` attribute for live preview. */
+  originalD: string
+  /** The `<path>` SVG element being previewed. */
+  pathEl: SVGPathElement | null
+  /** Parsed cubic command offsets within the `d` string for targeted replacement. */
+  cubicIndex: number
+  /** True when the curve segment has only one control point (cp1 === cp2 in SVG). */
+  singleControl: boolean
+}
+
+/**
+ * Update a point in an SVG path `d` string for live curve preview.
+ *
+ * Supports:
+ * - 'move': updates the M command (start point)
+ * - 'cp1'/'cp2'/'to': updates the Nth C command (0-indexed by `cubicIndex`)
+ *
+ * C command structure: C cx1 cy1 cx2 cy2 x y
+ *   - cp1 = positions 0,1 (cx1, cy1)
+ *   - cp2 = positions 2,3 (cx2, cy2)
+ *   - to  = positions 4,5 (x, y)
+ */
+function updatePathD(d: string, cubicIndex: number, cpRole: CpRole, newX: number, newY: number, singleControl = false): string {
+  // Move command: update M x y
+  if (cpRole === 'move') {
+    return d.replace(
+      /^M\s+([-\d.e]+)\s+([-\d.e]+)/i,
+      `M ${newX.toFixed(2)} ${newY.toFixed(2)}`,
+    )
+  }
+
+  // Cubic commands: find the Nth C command
+  const cubicRegex = /C\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)/gi
+  let match: RegExpExecArray | null
+  let idx = 0
+
+  while ((match = cubicRegex.exec(d)) !== null) {
+    if (idx === cubicIndex) {
+      const args = [match[1], match[2], match[3], match[4], match[5], match[6]]
+      if (cpRole === 'cp1') {
+        args[0] = newX.toFixed(2)
+        args[1] = newY.toFixed(2)
+        // Single-control curves use the same point for both cp1 and cp2
+        if (singleControl) {
+          args[2] = newX.toFixed(2)
+          args[3] = newY.toFixed(2)
+        }
+      } else if (cpRole === 'cp2') {
+        args[2] = newX.toFixed(2)
+        args[3] = newY.toFixed(2)
+      } else {
+        args[4] = newX.toFixed(2)
+        args[5] = newY.toFixed(2)
+      }
+      const replacement = `C ${args.join(' ')}`
+      return d.slice(0, match.index) + replacement + d.slice(match.index + match[0].length)
+    }
+    idx++
+  }
+  return d
+}
+
+/**
+ * Find the `<path>` element for a given IR path id and count which cubic command
+ * corresponds to the given segment index.
+ */
+function findPathElAndCubicIndex(
+  svg: SVGSVGElement,
+  pathId: string,
+  segIdx: number,
+  diagram: IRDiagram,
+): { pathEl: SVGPathElement | null; cubicIndex: number; singleControl: boolean } {
+  // Find the <path> element via data-ir-id
+  const container = svg.querySelector(`[data-ir-id="${pathId}"]`)
+  const pathEl = container?.tagName.toLowerCase() === 'path'
+    ? container as SVGPathElement
+    : container?.querySelector('path') as SVGPathElement | null
+
+  // Count which C command this segIdx maps to: curve segments produce C commands
+  // in order, so count how many curve segments precede this one.
+  const el = findElement(diagram.elements, pathId)
+  let cubicIndex = 0
+  let singleControl = false
+  if (el && el.kind === 'path') {
+    for (let i = 0; i < el.segments.length && i < segIdx; i++) {
+      if (el.segments[i].kind === 'curve') cubicIndex++
+    }
+    const seg = el.segments[segIdx]
+    if (seg && seg.kind === 'curve') {
+      singleControl = seg.controls.length === 1
+    }
+  }
+
+  return { pathEl, cubicIndex, singleControl }
 }
 
 /**
  * Set up drag behavior on bezier curve control point handles rendered by highlight.ts.
- * Handles are `<circle data-d3-role="cp-handle">` elements inside the highlight group.
+ * Handles are elements with `data-d3-role="cp-handle"` — circles for control points,
+ * rects for endpoints/start points.
  *
- * During drag: the circle and its handle line update for visual feedback.
+ * During drag: the handle, handle line, and curve path update for live visual feedback.
  * On drag end: the IR curve segment is mutated and onIRChange is called.
  */
 export function setupControlPointDrag(
@@ -160,7 +257,7 @@ export function setupControlPointDrag(
   diagram: IRDiagram,
   onIRChange: (diagram: IRDiagram) => void,
 ): void {
-  const handles = Array.from(svg.querySelectorAll('[data-d3-role="cp-handle"]')) as SVGCircleElement[]
+  const handles = Array.from(svg.querySelectorAll('[data-d3-role="cp-handle"]')) as SVGElement[]
 
   for (const handle of handles) {
     const pathId = handle.getAttribute('data-ir-path-id') ?? ''
@@ -169,11 +266,17 @@ export function setupControlPointDrag(
     const origPtX = parseFloat(handle.getAttribute('data-orig-pt-x') ?? '0')
     const origPtY = parseFloat(handle.getAttribute('data-orig-pt-y') ?? '0')
     const handleLineId = handle.getAttribute('data-handle-line-id') ?? ''
+    const isRect = handle.tagName.toLowerCase() === 'rect'
 
-    const dragBehavior = d3Drag<SVGCircleElement, unknown>()
+    const zoomGroup = svg.querySelector('.d3-zoom-group') as SVGGElement | null
+    const dragBehavior = d3Drag<SVGElement, unknown>()
+      .container(zoomGroup ?? svg as any)
       .on('start', function (event) {
         event.sourceEvent?.stopPropagation()
         d3.select(this).attr('cursor', 'grabbing')
+
+        const { pathEl, cubicIndex, singleControl } = findPathElAndCubicIndex(svg, pathId, segIdx, diagram)
+
         const state: CPDragState = {
           startPtX: origPtX,
           startPtY: origPtY,
@@ -183,6 +286,10 @@ export function setupControlPointDrag(
           segIdx,
           cpRole,
           handleLineId,
+          originalD: pathEl?.getAttribute('d') ?? '',
+          pathEl,
+          cubicIndex,
+          singleControl,
         }
         d3.select(this).datum(state)
       })
@@ -190,19 +297,43 @@ export function setupControlPointDrag(
         const state = d3.select(this).datum() as CPDragState
         if (!state) return
 
-        // Move the dot
         const newCx = event.x
         const newCy = event.y
-        ;(this as SVGCircleElement).setAttribute('cx', String(newCx))
-        ;(this as SVGCircleElement).setAttribute('cy', String(newCy))
 
-        // Update the handle line's moveable endpoint
+        // Move the handle (circle uses cx/cy, rect uses x/y centered)
+        if (isRect) {
+          const size = parseFloat((this as SVGElement).getAttribute('width') ?? '7')
+          ;(this as SVGElement).setAttribute('x', String(newCx - size / 2))
+          ;(this as SVGElement).setAttribute('y', String(newCy - size / 2))
+        } else {
+          ;(this as SVGElement).setAttribute('cx', String(newCx))
+          ;(this as SVGElement).setAttribute('cy', String(newCy))
+        }
+
+        // Update the handle line's moveable endpoint (for control point handles)
         if (state.handleLineId) {
           const line = svg.querySelector(`#${CSS.escape(state.handleLineId)}`)
           if (line) {
             line.setAttribute('x2', String(newCx))
             line.setAttribute('y2', String(newCy))
           }
+        }
+
+        // Update handle lines anchored at this endpoint (for move/to handles)
+        if (state.cpRole === 'move' || state.cpRole === 'to') {
+          const anchored = svg.querySelectorAll(
+            `line[data-anchor-seg="${state.segIdx}"][data-anchor-role="${state.cpRole}"]`,
+          )
+          for (const line of Array.from(anchored)) {
+            line.setAttribute('x1', String(newCx))
+            line.setAttribute('y1', String(newCy))
+          }
+        }
+
+        // Live preview: update the curve path's d attribute
+        if (state.pathEl && state.originalD) {
+          const updatedD = updatePathD(state.originalD, state.cubicIndex, state.cpRole, newCx, newCy, state.singleControl)
+          state.pathEl.setAttribute('d', updatedD)
         }
       })
       .on('end', function (event) {

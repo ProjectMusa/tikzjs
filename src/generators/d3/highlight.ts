@@ -36,6 +36,9 @@ function resolveAbsXY(ref: CoordRef): { px: { x: number; y: number }; pt: { x: n
  * Add or remove the highlight overlay on the SVG canvas.
  * Clears any existing highlight, then draws a new one for `id` (if non-null).
  */
+const TINTED_ATTR = 'data-d3-orig-stroke'
+const TINTED_LABEL_ATTR = 'data-d3-orig-color'
+
 export function highlightElement(
   svg: SVGSVGElement,
   id: string | null,
@@ -45,6 +48,32 @@ export function highlightElement(
 ): void {
   // Remove all existing highlight groups
   svg.querySelectorAll(`.${HIGHLIGHT_CLASS}`).forEach((el) => el.remove())
+  // Remove cloned tinted markers
+  for (const clone of Array.from(svg.querySelectorAll(`[id$="-d3hl"]`))) {
+    clone.remove()
+  }
+  // Restore tinted paths to original stroke color + marker refs
+  for (const el of Array.from(svg.querySelectorAll(`[${TINTED_ATTR}]`))) {
+    el.setAttribute('stroke', el.getAttribute(TINTED_ATTR) ?? '')
+    el.removeAttribute(TINTED_ATTR)
+    for (const attr of ['marker-start', 'marker-end', 'marker-mid']) {
+      const saved = el.getAttribute(TINTED_ATTR + `-${attr}`)
+      if (saved) {
+        el.setAttribute(attr, saved)
+        el.removeAttribute(TINTED_ATTR + `-${attr}`)
+      }
+    }
+  }
+  // Restore tinted labels to original fill
+  for (const el of Array.from(svg.querySelectorAll(`[${TINTED_LABEL_ATTR}]`))) {
+    const origFill = el.getAttribute(TINTED_LABEL_ATTR) ?? ''
+    if (origFill) {
+      el.setAttribute('fill', origFill)
+    } else {
+      el.removeAttribute('fill')
+    }
+    el.removeAttribute(TINTED_LABEL_ATTR)
+  }
   if (!id) return
 
   let target = elementMap.get(id)
@@ -67,8 +96,9 @@ export function highlightElement(
     addNodeHighlight(doc, group, target, id, nodeRegistry)
   }
 
-  // Render on top of everything
-  svg.appendChild(group)
+  // Render on top of everything, inside the zoom group if present
+  const zoomGroup = svg.querySelector('.d3-zoom-group')
+  ;(zoomGroup ?? svg).appendChild(group)
 }
 
 // ── Node highlight ────────────────────────────────────────────────────────────
@@ -153,24 +183,53 @@ function addPathHighlight(
   irId: string,
   diagram: IRDiagram | null,
 ): void {
+  // Tint the original path elements amber (save original stroke for restore)
   const pathEls: SVGElement[] = target.tagName.toLowerCase() === 'path'
     ? [target]
     : Array.from(target.querySelectorAll('path')) as SVGElement[]
 
   for (const pathEl of pathEls) {
-    const d = pathEl.getAttribute('d')
-    if (!d) continue
+    const origStroke = pathEl.getAttribute('stroke') ?? ''
+    pathEl.setAttribute(TINTED_ATTR, origStroke)
+    pathEl.setAttribute('stroke', AMBER)
 
-    // Amber path overlay — direct attributes, not CSS class
-    const overlay = doc.createElementNS(SVG_NS, 'path')
-    overlay.setAttribute('d', d)
-    overlay.setAttribute('fill', 'none')
-    overlay.setAttribute('stroke', AMBER)
-    overlay.setAttribute('stroke-width', '2.5')
-    overlay.setAttribute('pointer-events', 'none')
-    const transform = pathEl.getAttribute('transform')
-    if (transform) overlay.setAttribute('transform', transform)
-    group.appendChild(overlay)
+    // Tint arrow markers by cloning — markers are deduplicated so mutating
+    // the original would tint ALL edges sharing it. Instead, clone the marker,
+    // tint the clone, and point only this path element at the clone.
+    for (const attr of ['marker-start', 'marker-end', 'marker-mid'] as const) {
+      const markerUrl = pathEl.getAttribute(attr)
+      if (!markerUrl) continue
+      const idMatch = markerUrl.match(/url\(#([^)]+)\)/)
+      if (!idMatch) continue
+      const marker = doc.getElementById(idMatch[1])
+      if (!marker) continue
+
+      const clone = marker.cloneNode(true) as Element
+      const cloneId = `${idMatch[1]}-d3hl`
+      clone.setAttribute('id', cloneId)
+      clone.setAttribute(TINTED_ATTR, idMatch[1]) // store original marker id for cleanup
+      for (const mp of Array.from(clone.querySelectorAll('path'))) {
+        mp.setAttribute('stroke', AMBER)
+      }
+      marker.parentNode?.appendChild(clone)
+      pathEl.setAttribute(TINTED_ATTR + `-${attr}`, markerUrl) // save original marker ref
+      pathEl.setAttribute(attr, `url(#${cloneId})`)
+    }
+  }
+
+  // Tint inline label nodes on this path — SVG text uses `fill`, not CSS `color`
+  if (diagram) {
+    const el = findElement(diagram.elements, irId)
+    if (el && el.kind === 'path') {
+      for (const inlineNode of el.inlineNodes) {
+        const nodeEl = target.ownerDocument.querySelector(`[data-ir-id="${inlineNode.id}"]`)
+        if (!nodeEl) continue
+        // Set fill on the <g> wrapper — SVG inherits fill down the tree to <text> elements
+        const origFill = nodeEl.getAttribute('fill') ?? ''
+        nodeEl.setAttribute(TINTED_LABEL_ATTR, origFill)
+        nodeEl.setAttribute('fill', AMBER)
+      }
+    }
   }
 
   // Dashed bbox around the element
@@ -218,22 +277,47 @@ function addPathHighlight(
  */
 function addControlPointHandles(doc: Document, group: Element, irPath: IRPath): void {
   let prevPx: { x: number; y: number } | null = null
+  let prevSegIdx = -1
+  let prevRole = ''
+  let hasCurves = false
+
+  // Check if this path has any curve segments (only show handles on curve paths)
+  for (const seg of irPath.segments) {
+    if (seg.kind === 'curve') { hasCurves = true; break }
+  }
+  if (!hasCurves) return
 
   for (let segIdx = 0; segIdx < irPath.segments.length; segIdx++) {
     const seg = irPath.segments[segIdx]
 
-    if (seg.kind === 'curve') {
+    if (seg.kind === 'move') {
+      const resolved = resolveAbsXY(seg.to)
+      if (resolved) {
+        // Draggable start-point handle
+        addCPHandle(doc, group, resolved.px.x, resolved.px.y, irPath.id, segIdx, 'move',
+          resolved.pt.x, resolved.pt.y, '', 'square')
+        prevPx = resolved.px
+        prevSegIdx = segIdx
+        prevRole = 'move'
+      } else {
+        prevPx = null
+      }
+    } else if (seg.kind === 'curve') {
       const cp1 = resolveAbsXY(seg.controls[0])
       const cp2ref = seg.controls.length >= 2 ? seg.controls[1] : undefined
       const cp2 = cp2ref ? resolveAbsXY(cp2ref) : null
       const to = resolveAbsXY(seg.to)
 
       // Handle lines (non-interactive, purely visual)
+      // prevPx → cp1: anchored at the previous endpoint (move or prior to)
       if (prevPx && cp1) {
-        addHandleLine(doc, group, prevPx.x, prevPx.y, cp1.px.x, cp1.px.y, `d3hl-${segIdx}-cp1`)
+        addHandleLine(doc, group, prevPx.x, prevPx.y, cp1.px.x, cp1.px.y,
+          `d3hl-${segIdx}-cp1`, prevSegIdx, prevRole)
       }
+      // to → cp2: anchored at this segment's endpoint
       if (to && cp2) {
-        addHandleLine(doc, group, to.px.x, to.px.y, cp2.px.x, cp2.px.y, `d3hl-${segIdx}-cp2`)
+        addHandleLine(doc, group, to.px.x, to.px.y, cp2.px.x, cp2.px.y,
+          `d3hl-${segIdx}-cp2`, segIdx, 'to')
       }
 
       // Control point circles (draggable)
@@ -244,19 +328,22 @@ function addControlPointHandles(doc: Document, group: Element, irPath: IRPath): 
         addCPHandle(doc, group, cp2.px.x, cp2.px.y, irPath.id, segIdx, 'cp2', cp2.pt.x, cp2.pt.y, `d3hl-${segIdx}-cp2`)
       }
 
-      // Endpoint marker (non-draggable square)
+      // Draggable endpoint handle
       if (to) {
-        addEndpointMarker(doc, group, to.px.x, to.px.y)
+        addCPHandle(doc, group, to.px.x, to.px.y, irPath.id, segIdx, 'to',
+          to.pt.x, to.pt.y, '', 'square')
       }
 
       prevPx = to?.px ?? null
+      prevSegIdx = segIdx
+      prevRole = 'to'
     } else if ('to' in seg) {
-      // Track current position for handle line start of the next curve segment
       const toRef = (seg as { to: CoordRef }).to
       const resolved = resolveAbsXY(toRef)
       prevPx = resolved?.px ?? null
+      prevSegIdx = segIdx
+      prevRole = 'to'
     }
-    // 'close', 'node-on-path', 'circle', 'ellipse': don't update prevPx
   }
 }
 
@@ -266,6 +353,8 @@ function addHandleLine(
   x1: number, y1: number,
   x2: number, y2: number,
   id: string,
+  anchorSegIdx?: number,
+  anchorRole?: string,
 ): void {
   const line = doc.createElementNS(SVG_NS, 'line')
   line.setAttribute('id', id)
@@ -277,6 +366,11 @@ function addHandleLine(
   line.setAttribute('stroke-width', '0.8')
   line.setAttribute('stroke-dasharray', '3 2')
   line.setAttribute('pointer-events', 'none')
+  // Tag which endpoint handle anchors this line's x1/y1 end
+  if (anchorSegIdx !== undefined && anchorRole) {
+    line.setAttribute('data-anchor-seg', String(anchorSegIdx))
+    line.setAttribute('data-anchor-role', anchorRole)
+  }
   group.appendChild(line)
 }
 
@@ -290,36 +384,36 @@ function addCPHandle(
   origPtX: number,
   origPtY: number,
   handleLineId: string,
+  shape: 'circle' | 'square' = 'circle',
 ): void {
-  const circle = doc.createElementNS(SVG_NS, 'circle')
-  circle.setAttribute('cx', String(cx))
-  circle.setAttribute('cy', String(cy))
-  circle.setAttribute('r', '5')
-  circle.setAttribute('fill', AMBER)
-  circle.setAttribute('stroke', '#fff')
-  circle.setAttribute('stroke-width', '1.5')
-  circle.setAttribute('cursor', 'grab')
+  let el: Element
+  if (shape === 'square') {
+    const size = 7
+    el = doc.createElementNS(SVG_NS, 'rect')
+    el.setAttribute('x', String(cx - size / 2))
+    el.setAttribute('y', String(cy - size / 2))
+    el.setAttribute('width', String(size))
+    el.setAttribute('height', String(size))
+    el.setAttribute('fill', '#fff')
+    el.setAttribute('stroke', AMBER)
+    el.setAttribute('stroke-width', '1.5')
+  } else {
+    el = doc.createElementNS(SVG_NS, 'circle')
+    el.setAttribute('cx', String(cx))
+    el.setAttribute('cy', String(cy))
+    el.setAttribute('r', '5')
+    el.setAttribute('fill', AMBER)
+    el.setAttribute('stroke', '#fff')
+    el.setAttribute('stroke-width', '1.5')
+  }
+  el.setAttribute('cursor', 'grab')
   // Data attrs for drag handler
-  circle.setAttribute('data-d3-role', 'cp-handle')
-  circle.setAttribute('data-ir-path-id', pathId)
-  circle.setAttribute('data-seg-idx', String(segIdx))
-  circle.setAttribute('data-cp-role', cpRole)
-  circle.setAttribute('data-orig-pt-x', String(origPtX))
-  circle.setAttribute('data-orig-pt-y', String(origPtY))
-  circle.setAttribute('data-handle-line-id', handleLineId)
-  group.appendChild(circle)
-}
-
-function addEndpointMarker(doc: Document, group: Element, cx: number, cy: number): void {
-  const size = 5
-  const dot = doc.createElementNS(SVG_NS, 'rect')
-  dot.setAttribute('x', String(cx - size / 2))
-  dot.setAttribute('y', String(cy - size / 2))
-  dot.setAttribute('width', String(size))
-  dot.setAttribute('height', String(size))
-  dot.setAttribute('fill', '#fff')
-  dot.setAttribute('stroke', AMBER)
-  dot.setAttribute('stroke-width', '1.5')
-  dot.setAttribute('pointer-events', 'none')
-  group.appendChild(dot)
+  el.setAttribute('data-d3-role', 'cp-handle')
+  el.setAttribute('data-ir-path-id', pathId)
+  el.setAttribute('data-seg-idx', String(segIdx))
+  el.setAttribute('data-cp-role', cpRole)
+  el.setAttribute('data-orig-pt-x', String(origPtX))
+  el.setAttribute('data-orig-pt-y', String(origPtY))
+  el.setAttribute('data-handle-line-id', handleLineId)
+  group.appendChild(el)
 }

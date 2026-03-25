@@ -1,4 +1,4 @@
-Run one cycle of the continuous tikzjs improvement loop.
+Run one cycle of the continuous tikzjs SVG rendering improvement loop.
 
 ## Library roadmap
 
