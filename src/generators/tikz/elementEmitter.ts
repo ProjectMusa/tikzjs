@@ -71,7 +71,8 @@ function emitSegment(seg: PathSegment, inlineNodes: Map<string, IRNode>): string
       const node = inlineNodes.get(seg.nodeId)
       if (!node) return ''
       const opts = emitOptions(node.rawOptions)
-      return `node${opts} {${node.label}}`
+      const name = node.name ? ` (${node.name})` : ''
+      return `node${opts}${name} {${node.label}}`
     }
     case 'close':
       return '-- cycle'

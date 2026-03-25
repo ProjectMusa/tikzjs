@@ -1,0 +1,7 @@
+{
+  "description": "Add fill color to a node",
+  "source": "\\begin{tikzpicture}\n\\node (A) at (0,0) {Hello};\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "setStyleProp", "args": ["node_1", "fill", "#00FF00"] }
+  ]
+}

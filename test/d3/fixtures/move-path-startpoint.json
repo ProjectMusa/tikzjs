@@ -1,0 +1,7 @@
+{
+  "description": "Move a path's start point (move segment) from (0,0) to (1,1)",
+  "source": "\\begin{tikzpicture}\n\\draw (0,0) -- (2,2) -- (4,0);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "moveSegmentEndpoint", "args": ["path_1", 0, 28.4528, 28.4528] }
+  ]
+}

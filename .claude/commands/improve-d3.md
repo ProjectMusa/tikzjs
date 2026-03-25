@@ -143,13 +143,16 @@ This is the contract between the UI and the test infrastructure.
 
 | IR mutation function | UI action | Status |
 |---|---|---|
-| `moveNode(ir, id, x, y)` | Drag node | Exists |
-| `updateNodeLabel(ir, id, label)` | Edit label text | Exists |
-| `updateCurveControl(ir, pathId, segIdx, cpRole, x, y)` | Drag bezier control point | Exists |
-| `removeElement(ir, id)` | Delete selected element | To implement |
+| `moveNode(ir, id, x, y)` | Drag node | Exists + tested |
+| `updateNodeLabel(ir, id, label)` | Edit label text | Exists + tested |
+| `updateCurveControl(ir, pathId, segIdx, cpRole, x, y)` | Drag bezier control point | Exists + tested |
+| `moveSegmentEndpoint(ir, pathId, segIdx, x, y)` | Drag line/path endpoint | Exists + tested |
+| `removeElement(ir, id)` | Delete selected element | Exists + tested |
+| `setStyleProp(ir, id, key, value)` | Change style in inspector | Exists + tested |
 | `addNode(ir, pos, label)` | Click to add node | To implement |
-| `setOption(ir, id, key, value)` | Change style in inspector | To implement |
-| `moveSegmentEndpoint(ir, pathId, segIdx, x, y)` | Drag line/path endpoint | To implement |
+| `updateEdgeRouting(ir, edgeId, routing)` | Change edge bend angle | To implement |
+| `updateEdgeLabel(ir, edgeId, labelIdx, text)` | Edit edge label text | To implement |
+| `updateArcParams(ir, pathId, segIdx, ...)` | Drag arc endpoint/radius | To implement |
 
 When adding a new UI edit action:
 1. Add the mutation function to `irMutator.ts` first (pure `(IRDiagram, params) → boolean`)

@@ -1,0 +1,7 @@
+{
+  "description": "Change a path's draw color from red to blue",
+  "source": "\\begin{tikzpicture}\n\\draw[red] (0,0) -- (2,2);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "setStyleProp", "args": ["path_1", "draw", "#0000FF"] }
+  ]
+}

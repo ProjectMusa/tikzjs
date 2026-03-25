@@ -21,6 +21,9 @@ import {
   moveNode,
   updateNodeLabel,
   updateCurveControl,
+  moveSegmentEndpoint,
+  removeElement,
+  setStyleProp,
 } from '../../src/generators/d3/irMutator'
 import type { CpRole } from '../../src/generators/d3/irMutator'
 import type { IRDiagram } from '../../src/ir/types'
@@ -34,6 +37,11 @@ const mutators: Record<string, MutationFn> = {
   updateNodeLabel: (ir, nodeId: string, label: string) => updateNodeLabel(ir, nodeId, label),
   updateCurveControl: (ir, pathId: string, segIdx: number, cpRole: CpRole, x: number, y: number) =>
     updateCurveControl(ir, pathId, segIdx, cpRole, x, y),
+  moveSegmentEndpoint: (ir, pathId: string, segIdx: number, x: number, y: number) =>
+    moveSegmentEndpoint(ir, pathId, segIdx, x, y),
+  removeElement: (ir, elementId: string) => removeElement(ir, elementId),
+  setStyleProp: (ir, elementId: string, key: string, value: any) =>
+    setStyleProp(ir, elementId, key, value),
 }
 
 // ── Fixture loading ──────────────────────────────────────────────────────────

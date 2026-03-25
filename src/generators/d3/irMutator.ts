@@ -55,6 +55,8 @@ export function isDraggable(node: IRNode): boolean {
 /**
  * Move a node to a new position (in TeX points).
  * Only works for nodes with xy coordinates.
+ * Also updates the enclosing path's move segment if the node is an inline node
+ * (the parser stores the coordinate in both the node position and the move segment).
  * Returns true if the node was moved.
  */
 export function moveNode(diagram: IRDiagram, nodeId: string, newXPt: number, newYPt: number): boolean {
@@ -64,7 +66,34 @@ export function moveNode(diagram: IRDiagram, nodeId: string, newXPt: number, new
 
   node.position.coord.x = newXPt
   node.position.coord.y = newYPt
+
+  // Also update the enclosing path's move segment for inline nodes
+  updateInlineNodeMoveSegment(diagram.elements, nodeId, newXPt, newYPt)
+
   return true
+}
+
+/** Find the path containing an inline node and update its preceding move segment. */
+function updateInlineNodeMoveSegment(elements: IRElement[], nodeId: string, x: number, y: number): void {
+  for (const el of elements) {
+    if (el.kind === 'path') {
+      for (let i = 0; i < el.segments.length; i++) {
+        const seg = el.segments[i]
+        if (seg.kind === 'node-on-path' && seg.nodeId === nodeId) {
+          // Walk backwards to find the preceding move segment
+          for (let j = i - 1; j >= 0; j--) {
+            const prev = el.segments[j]
+            if (prev.kind === 'move' && prev.to.mode === 'absolute' && prev.to.coord.cs === 'xy') {
+              prev.to.coord.x = x
+              prev.to.coord.y = y
+              return
+            }
+          }
+        }
+      }
+    }
+    if (el.kind === 'scope') updateInlineNodeMoveSegment(el.children, nodeId, x, y)
+  }
 }
 
 /**
@@ -140,6 +169,83 @@ export function updateCurveControl(
   if (!cp || cp.mode !== 'absolute' || cp.coord.cs !== 'xy') return false
   cp.coord.x = xPt
   cp.coord.y = yPt
+  return true
+}
+
+// ── Segment endpoint mutations ────────────────────────────────────────────────
+
+/**
+ * Move a path segment's endpoint (line, hv-line, to) to a new position (in TeX pt).
+ * Only updates segments with absolute xy coordinates. Returns true if updated.
+ */
+export function moveSegmentEndpoint(
+  diagram: IRDiagram,
+  pathId: string,
+  segIdx: number,
+  xPt: number,
+  yPt: number,
+): boolean {
+  const el = findElement(diagram.elements, pathId)
+  if (!el || el.kind !== 'path') return false
+  const seg = el.segments[segIdx]
+  if (!seg) return false
+
+  if (seg.kind !== 'line' && seg.kind !== 'hv-line' && seg.kind !== 'to' && seg.kind !== 'move') return false
+  if (seg.to.mode !== 'absolute' || seg.to.coord.cs !== 'xy') return false
+
+  seg.to.coord.x = xPt
+  seg.to.coord.y = yPt
+  return true
+}
+
+// ── Element removal ──────────────────────────────────────────────────────────
+
+/**
+ * Remove an element from the diagram by id.
+ * Searches top-level elements, scope children, and path inline nodes.
+ * Returns true if the element was found and removed.
+ */
+export function removeElement(diagram: IRDiagram, elementId: string): boolean {
+  return removeFromList(diagram.elements, elementId)
+}
+
+function removeFromList(elements: IRElement[], id: string): boolean {
+  for (let i = 0; i < elements.length; i++) {
+    const el = elements[i]
+    if (el.kind !== 'knot' && 'id' in el && el.id === id) {
+      elements.splice(i, 1)
+      return true
+    }
+    if (el.kind === 'scope') {
+      if (removeFromList(el.children, id)) return true
+    }
+    if (el.kind === 'path') {
+      for (let j = 0; j < el.inlineNodes.length; j++) {
+        if (el.inlineNodes[j].id === id) {
+          el.inlineNodes.splice(j, 1)
+          return true
+        }
+      }
+    }
+  }
+  return false
+}
+
+// ── Style property mutations ─────────────────────────────────────────────────
+
+/**
+ * Set a style property on an element.
+ * The key must be a valid ResolvedStyle key. Returns true if updated.
+ */
+export function setStyleProp(
+  diagram: IRDiagram,
+  elementId: string,
+  key: string,
+  value: string | number | boolean | undefined,
+): boolean {
+  const el = findElement(diagram.elements, elementId)
+  if (!el || !('style' in el)) return false
+  ;(el.style as any)[key] = value
   return true
 }
 

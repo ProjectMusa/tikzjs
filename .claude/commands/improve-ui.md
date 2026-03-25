@@ -16,11 +16,12 @@ DOM event (D3)                    irMutator function              Re-render
 ─────────────────────────────────────────────────────────────────────────────
 drag node             →  moveNode(ir, id, x, y)              →  full re-render
 drag control point    →  updateCurveControl(ir, ...)          →  full re-render
+drag line endpoint    →  moveSegmentEndpoint(ir, ...)         →  full re-render
 click element         →  (selection only, no IR change)       →  highlight overlay
 click background      →  (deselection)                       →  clear overlay
+delete key            →  removeElement(ir, id)                →  full re-render
 edit label (future)   →  updateNodeLabel(ir, id, label)      →  full re-render
-delete element (fut.) →  removeElement(ir, id)                →  full re-render
-change style (fut.)   →  setOption(ir, id, key, value)        →  full re-render
+change style (future) →  setStyleProp(ir, id, key, value)    →  full re-render
 ```
 
 Key files:
@@ -150,14 +151,15 @@ If no → implement the mutation function first, write a test fixture, then wire
 
 ### 4b. Candidates for new UI actions
 
-| Action | irMutator function | UI trigger | Priority |
+| Action | irMutator function | UI trigger | Status |
 |---|---|---|---|
-| Delete element | `removeElement(ir, id)` | Delete/Backspace key on selected element | High |
-| Nudge node | `moveNode(ir, id, x±δ, y±δ)` | Arrow keys on selected node | High |
-| Edit label | `updateNodeLabel(ir, id, text)` | Double-click node → inline text input | Medium |
-| Change color | `setOption(ir, id, 'color', value)` | Color picker in inspector | Low |
-| Add node | `addNode(ir, pos, label)` | Double-click on empty canvas | Low |
-| Drag line endpoint | `moveSegmentEndpoint(ir, pathId, segIdx, x, y)` | Drag endpoint handle | Medium |
+| Delete element | `removeElement(ir, id)` | Delete/Backspace key on selected element | Mutation ready, UI not wired |
+| Drag line endpoint | `moveSegmentEndpoint(ir, pathId, segIdx, x, y)` | Drag endpoint handle on lines | Mutation ready, UI not wired |
+| Nudge node | `moveNode(ir, id, x±δ, y±δ)` | Arrow keys on selected node | Mutation ready, UI not wired |
+| Change style | `setStyleProp(ir, id, key, value)` | Inspector panel property edit | Mutation ready, UI not wired |
+| Edit label | `updateNodeLabel(ir, id, text)` | Double-click node → inline text input | Mutation ready, UI not wired |
+| Add node | `addNode(ir, pos, label)` | Double-click on empty canvas | To implement |
+| Edit edge label | `updateEdgeLabel(ir, edgeId, idx, text)` | Double-click edge label | To implement |
 
 ### 4c. Implementation pattern
 

@@ -1,0 +1,7 @@
+{
+  "description": "Move a line segment endpoint from (2,2) to (3,1)",
+  "source": "\\begin{tikzpicture}\n\\draw (0,0) -- (2,2) -- (4,0);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "moveSegmentEndpoint", "args": ["path_1", 1, 85.3584, 28.4528] }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "description": "Remove the second node (B) from a diagram with two nodes and an edge",
+  "source": "\\begin{tikzpicture}\n\\node (A) at (0,0) {A};\n\\node (B) at (2,0) {B};\n\\draw[->] (A) -- (B);\n\\end{tikzpicture}",
+  "steps": [
+    { "action": "removeElement", "args": ["path_4"] }
+  ]
+}
