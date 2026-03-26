@@ -44,12 +44,13 @@ export function Report() {
       src={`${base}report/index.html`}
       onError={() => setLoadError(true)}
       onLoad={(e) => {
-        // Detect cross-origin or 404 by checking if iframe loaded a valid page
+        // Detect SPA fallback (Vite dev) or 404 — report page won't have id="root"
         try {
           const doc = (e.target as HTMLIFrameElement).contentDocument
-          if (doc?.title === '' && doc?.body?.children.length === 0) {
-            setLoadError(true)
-          }
+          if (!doc) return
+          const isEmpty = doc.title === '' && doc.body?.children.length === 0
+          const isSpaFallback = !!doc.getElementById('root')
+          if (isEmpty || isSpaFallback) setLoadError(true)
         } catch {
           // cross-origin — report loaded successfully from a different origin
         }

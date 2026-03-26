@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from 'react'
 import type {
   IRDiagram,
@@ -18,8 +19,8 @@ const styles = {
   panel: {
     width: '100%',
     height: '100%',
-    background: '#1e1e2e',
-    color: '#cdd6f4',
+    background: 'var(--color-bg)',
+    color: 'var(--color-text)',
     fontFamily: 'monospace',
     fontSize: 12,
     overflow: 'auto',
@@ -29,11 +30,11 @@ const styles = {
   } as React.CSSProperties,
   header: {
     padding: '6px 10px',
-    borderBottom: '1px solid #333',
+    borderBottom: '1px solid var(--color-border)',
     fontSize: 13,
     fontWeight: 600,
-    color: '#cdd6f4',
-    background: '#181825',
+    color: 'var(--color-text)',
+    background: 'var(--color-panel)',
     flexShrink: 0,
     display: 'flex',
     alignItems: 'center',
@@ -43,8 +44,8 @@ const styles = {
     display: 'flex',
     gap: 2,
     padding: '4px 8px',
-    borderBottom: '1px solid #333',
-    background: '#181825',
+    borderBottom: '1px solid var(--color-border)',
+    background: 'var(--color-panel)',
     flexShrink: 0,
   } as React.CSSProperties,
   content: {
@@ -100,9 +101,10 @@ const KIND_COLORS: Record<string, string> = {
 function KindBadge({ kind }: { kind: string }) {
   return (
     <span
+      className="kind-badge"
       style={{
-        background: KIND_COLORS[kind] ?? '#6c7086',
-        color: '#181825',
+        background: KIND_COLORS[kind] ?? 'var(--color-muted)',
+        color: 'var(--color-bg)',
         borderRadius: 3,
         padding: '0 4px',
         fontSize: 10,
@@ -200,6 +202,7 @@ function ElementList({ diagram, selectedId, onSelect }: ElementListProps) {
         return (
           <div
             key={el.id}
+            className={`inspector-row${isSelected ? ' selected' : ''}`}
             onClick={() => onSelect(isSelected ? null : el.id)}
             style={{
               display: 'flex',
@@ -207,14 +210,12 @@ function ElementList({ diagram, selectedId, onSelect }: ElementListProps) {
               gap: 6,
               padding: '4px 10px',
               cursor: 'pointer',
-              background: isSelected ? '#45475a' : 'transparent',
               borderLeft: isSelected ? '3px solid #f59e0b' : '3px solid transparent',
             }}
           >
             <KindBadge kind={el.kind} />
             <span
               style={{
-                color: isSelected ? '#cdd6f4' : '#a6adc8',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
                 whiteSpace: 'nowrap',
@@ -252,13 +253,13 @@ function TreeRow({ depth, kind, summary, children, id, selectedId, onSelect }: T
   return (
     <div>
       <div
+        className={`inspector-row${isSelected ? ' selected' : ''}`}
         style={{
           display: 'flex',
           alignItems: 'baseline',
           padding: '2px 8px 2px ' + (8 + depth * 14) + 'px',
           cursor: 'pointer',
           whiteSpace: 'nowrap',
-          background: isSelected ? '#45475a' : 'transparent',
           borderLeft: isSelected ? '3px solid #f59e0b' : '3px solid transparent',
         }}
         onClick={(e) => {
@@ -271,14 +272,14 @@ function TreeRow({ depth, kind, summary, children, id, selectedId, onSelect }: T
         }}
       >
         {hasChildren ? (
-          <span style={{ width: 14, flexShrink: 0, color: '#6c7086', fontSize: 10 }}>
+          <span style={{ width: 14, flexShrink: 0, color: 'var(--color-muted)', fontSize: 10 }}>
             {open ? '\u25BC' : '\u25B6'}
           </span>
         ) : (
           <span style={{ width: 14, flexShrink: 0 }} />
         )}
         <KindBadge kind={kind} />
-        <span style={{ color: '#a6adc8', overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 6 }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', marginLeft: 6 }}>
           {summary}
         </span>
       </div>
@@ -317,7 +318,7 @@ function NodeTreeRow({
         <div
           style={{
             padding: '1px 8px 1px ' + (8 + (depth + 1) * 14 + 14) + 'px',
-            color: '#7f849c',
+            color: 'var(--color-muted)',
             fontSize: 11,
           }}
         >
@@ -419,7 +420,7 @@ function ElementTreeRow({
                 key={i}
                 style={{
                   padding: '1px 8px 1px ' + (8 + (depth + 1) * 14 + 14) + 'px',
-                  color: '#7f849c',
+                  color: 'var(--color-muted)',
                   fontSize: 11,
                 }}
               >
@@ -432,7 +433,7 @@ function ElementTreeRow({
               <div
                 style={{
                   padding: '1px 8px 1px ' + (8 + (depth + 1) * 14 + 14) + 'px',
-                  color: '#6c7086',
+                  color: 'var(--color-muted)',
                   fontSize: 10,
                   fontStyle: 'italic',
                 }}
@@ -483,7 +484,7 @@ function ElementTreeRow({
                   <div
                     style={{
                       padding: '1px 8px 1px ' + (8 + (depth + 1) * 14 + 14) + 'px',
-                      color: '#6c7086',
+                      color: 'var(--color-muted)',
                       fontSize: 10,
                     }}
                   >
@@ -517,7 +518,7 @@ function ElementTreeRow({
               key={i}
               style={{
                 padding: '1px 8px 1px ' + (8 + (depth + 1) * 14 + 14) + 'px',
-                color: '#7f849c',
+                color: 'var(--color-muted)',
                 fontSize: 11,
               }}
             >
@@ -564,7 +565,7 @@ function TreeView({
 
   return (
     <div>
-      <div style={{ padding: '4px 8px', color: '#6c7086', fontSize: 11, borderBottom: '1px solid #333' }}>
+      <div style={{ padding: '4px 8px', color: 'var(--color-muted)', fontSize: 11, borderBottom: '1px solid var(--color-border)' }}>
         {elemCount} elements, {nodeCount} named nodes
         {Object.keys(diagram.styleRegistry).length > 0 && (
           <>, {Object.keys(diagram.styleRegistry).length} styles</>
@@ -602,8 +603,8 @@ export function IRInspector({ diagram, onSelectElement, selectedElementId }: IRI
 
   const tabStyle = (active: boolean) =>
     ({
-      background: active ? '#45475a' : 'transparent',
-      color: active ? '#cdd6f4' : '#6c7086',
+      background: active ? 'var(--color-activebtn)' : 'transparent',
+      color: active ? 'var(--color-text)' : 'var(--color-muted)',
       border: 'none',
       borderRadius: 4,
       padding: '2px 10px',
@@ -615,7 +616,7 @@ export function IRInspector({ diagram, onSelectElement, selectedElementId }: IRI
     return (
       <div style={styles.panel}>
         <div style={styles.header}>IR Inspector</div>
-        <div style={{ padding: '12px 10px', color: '#6c7086' }}>No diagram loaded</div>
+        <div style={{ padding: '12px 10px', color: 'var(--color-muted)' }}>No diagram loaded</div>
       </div>
     )
   }

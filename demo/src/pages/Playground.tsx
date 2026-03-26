@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { theme } from '../theme'
 import { Editor } from '../components/Editor'
 import { Preview } from '../components/Preview'
 import { D3EditorPanel, IRInspector } from 'tikzjs'
@@ -20,7 +21,7 @@ function getInitialSource(): string {
   return examples[0].source
 }
 
-export function Playground() {
+export function Playground({ isDark }: { isDark: boolean }) {
   const [source, setSource] = useState(getInitialSource)
   const [svg, setSvg] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -128,17 +129,21 @@ export function Playground() {
           alignItems: 'center',
           gap: 12,
           padding: '6px 12px',
-          background: '#181825',
-          borderBottom: '1px solid #333',
+          background: theme.panel,
+          borderBottom: `1px solid ${theme.border}`,
           flexShrink: 0,
         }}
       >
         <ExamplePicker onSelect={handleExample} />
+        <span className="toolbar-hint" style={{ color: theme.muted, fontSize: 12, marginLeft: 12 }}>
+          Edit TikZ code on the left, see SVG on the right
+        </span>
+        <div style={{ flex: 1 }} />
         <button
           style={{
             background: 'transparent',
-            color: '#cdd6f4',
-            border: '1px solid #45475a',
+            color: theme.text,
+            border: `1px solid ${theme.border}`,
             borderRadius: 4,
             padding: '3px 10px',
             fontSize: 12,
@@ -148,13 +153,10 @@ export function Playground() {
         >
           Editor
         </button>
-        <span style={{ color: '#6c7086', fontSize: 12 }}>
-          Edit TikZ code on the left, see SVG on the right
-        </span>
       </div>
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-        <div style={{ flex: 1, overflow: 'hidden', borderRight: '1px solid #333' }}>
-          <Editor value={source} onChange={handleChange} />
+      <div className="split-panel">
+        <div style={{ flex: 1, overflow: 'hidden', borderRight: `1px solid ${theme.border}` }}>
+          <Editor value={source} onChange={handleChange} isDark={isDark} />
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <Preview svg={svg} error={error} />
@@ -164,12 +166,13 @@ export function Playground() {
       {/* Full-screen editor overlay */}
       {mode === 'editor' && (
         <div
+          className="editor-overlay"
           style={{
             position: 'fixed',
             inset: 0,
             zIndex: 1000,
             display: 'flex',
-            background: '#1e1e2e',
+            background: theme.bg,
           }}
         >
           {/* Main editor area */}
@@ -187,11 +190,9 @@ export function Playground() {
           {/* IR Inspector side panel */}
           {showInspector && (
             <div
+              className="editor-inspector"
               style={{
-                width: 320,
-                flexShrink: 0,
-                borderLeft: '1px solid #333',
-                overflow: 'hidden',
+                borderLeft: `1px solid ${theme.border}`,
               }}
             >
               <IRInspector
@@ -204,16 +205,10 @@ export function Playground() {
 
           {/* Right-side icon toolbar */}
           <div
+            className="editor-toolbar"
             style={{
-              width: 44,
-              flexShrink: 0,
-              background: '#181825',
-              borderLeft: '1px solid #333',
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              paddingTop: 8,
-              gap: 4,
+              background: theme.panel,
+              borderLeft: `1px solid ${theme.border}`,
             }}
           >
             {/* Close editor */}
@@ -227,7 +222,7 @@ export function Playground() {
                 alignItems: 'center',
                 justifyContent: 'center',
                 background: 'transparent',
-                color: '#6c7086',
+                color: theme.muted,
                 border: 'none',
                 borderRadius: 6,
                 cursor: 'pointer',
@@ -239,7 +234,6 @@ export function Playground() {
               </svg>
             </button>
             {/* Separator */}
-            <div style={{ width: 24, height: 1, background: '#45475a', margin: '4px 0' }} />
             {/* Grid toggle */}
             <button
               title={showGrid ? 'Hide Grid' : 'Show Grid'}
@@ -250,8 +244,8 @@ export function Playground() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: showGrid ? '#45475a' : 'transparent',
-                color: showGrid ? '#cdd6f4' : '#6c7086',
+                background: showGrid ? theme.activeBtn : 'transparent',
+                color: showGrid ? theme.text : theme.muted,
                 border: 'none',
                 borderRadius: 6,
                 fontSize: 16,
@@ -275,8 +269,8 @@ export function Playground() {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                background: showInspector ? '#45475a' : 'transparent',
-                color: showInspector ? '#cdd6f4' : '#6c7086',
+                background: showInspector ? theme.activeBtn : 'transparent',
+                color: showInspector ? theme.text : theme.muted,
                 border: 'none',
                 borderRadius: 6,
                 fontSize: 16,
