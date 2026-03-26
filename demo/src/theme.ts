@@ -5,6 +5,7 @@ export const theme = {
   border: '#30363d', // dividers and borders
   text: '#e6edf3', // primary text
   muted: '#8b949e', // secondary/hint text
+  accent: '#58a6ff', // accent / highlight (GitHub blue)
   activeBtn: '#21262d', // active button background
   error: '#da3633', // error text
   codeBg: '#0d1117', // code block background

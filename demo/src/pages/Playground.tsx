@@ -149,11 +149,11 @@ export function Playground() {
         >
           Editor
         </button>
-        <span style={{ color: theme.muted, fontSize: 12 }}>
+        <span className="toolbar-hint" style={{ color: theme.muted, fontSize: 12 }}>
           Edit TikZ code on the left, see SVG on the right
         </span>
       </div>
-      <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
+      <div className="split-panel">
         <div style={{ flex: 1, overflow: 'hidden', borderRight: `1px solid ${theme.border}` }}>
           <Editor value={source} onChange={handleChange} />
         </div>

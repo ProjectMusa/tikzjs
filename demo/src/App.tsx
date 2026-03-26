@@ -4,9 +4,7 @@ import { Report } from './pages/Report'
 import { theme } from './theme'
 
 const navStyle = ({ isActive }: { isActive: boolean }) => ({
-  fontWeight: isActive ? 700 : 400,
   color: isActive ? theme.text : theme.muted,
-  textDecoration: 'none' as const,
 })
 
 export function App() {
@@ -17,19 +15,19 @@ export function App() {
           style={{
             display: 'flex',
             alignItems: 'center',
-            gap: 24,
-            padding: '0 16px',
+            gap: 0,
+            padding: 0,
             height: 44,
             background: theme.bg,
             borderBottom: `1px solid ${theme.border}`,
             flexShrink: 0,
           }}
         >
-          <span style={{ fontWeight: 700, color: theme.text, fontSize: 15 }}>tikzjs</span>
-          <NavLink to="/" style={navStyle}>
+          <span style={{ fontWeight: 700, color: theme.accent, fontSize: 15, padding: '0 16px' }}>tikzjs</span>
+          <NavLink to="/" style={navStyle} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} end>
             Playground
           </NavLink>
-          <NavLink to="/report" style={navStyle}>
+          <NavLink to="/report" style={navStyle} className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
             Golden Diff
           </NavLink>
         </nav>
