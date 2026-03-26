@@ -1,13 +1,13 @@
 export const theme = {
-  bg: '#0d1117', // deepest background (nav, overlays, error bg)
-  panel: '#161b22', // panel/toolbar backgrounds
-  surface: '#21262d', // form element backgrounds
-  border: '#30363d', // dividers and borders
-  text: '#e6edf3', // primary text
-  muted: '#8b949e', // secondary/hint text
-  accent: '#58a6ff', // accent / highlight (GitHub blue)
-  activeBtn: '#21262d', // active button background
-  error: '#da3633', // error text
-  codeBg: '#0d1117', // code block background
-  preview: '#ffffff', // SVG preview pane (white for TikZ output)
+  bg: 'var(--color-bg)',
+  panel: 'var(--color-panel)',
+  surface: 'var(--color-surface)',
+  border: 'var(--color-border)',
+  text: 'var(--color-text)',
+  muted: 'var(--color-muted)',
+  accent: 'var(--color-accent)',
+  activeBtn: 'var(--color-activebtn)',
+  error: 'var(--color-error)',
+  codeBg: 'var(--color-codebg)',
+  preview: 'var(--color-preview)',
 }

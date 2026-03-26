@@ -21,7 +21,7 @@ function getInitialSource(): string {
   return examples[0].source
 }
 
-export function Playground() {
+export function Playground({ isDark }: { isDark: boolean }) {
   const [source, setSource] = useState(getInitialSource)
   const [svg, setSvg] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -135,6 +135,10 @@ export function Playground() {
         }}
       >
         <ExamplePicker onSelect={handleExample} />
+        <span className="toolbar-hint" style={{ color: theme.muted, fontSize: 12, marginLeft: 12 }}>
+          Edit TikZ code on the left, see SVG on the right
+        </span>
+        <div style={{ flex: 1 }} />
         <button
           style={{
             background: 'transparent',
@@ -149,13 +153,10 @@ export function Playground() {
         >
           Editor
         </button>
-        <span className="toolbar-hint" style={{ color: theme.muted, fontSize: 12 }}>
-          Edit TikZ code on the left, see SVG on the right
-        </span>
       </div>
       <div className="split-panel">
         <div style={{ flex: 1, overflow: 'hidden', borderRight: `1px solid ${theme.border}` }}>
-          <Editor value={source} onChange={handleChange} />
+          <Editor value={source} onChange={handleChange} isDark={isDark} />
         </div>
         <div style={{ flex: 1, overflow: 'hidden' }}>
           <Preview svg={svg} error={error} />
@@ -165,6 +166,7 @@ export function Playground() {
       {/* Full-screen editor overlay */}
       {mode === 'editor' && (
         <div
+          className="editor-overlay"
           style={{
             position: 'fixed',
             inset: 0,
@@ -188,11 +190,9 @@ export function Playground() {
           {/* IR Inspector side panel */}
           {showInspector && (
             <div
+              className="editor-inspector"
               style={{
-                width: 320,
-                flexShrink: 0,
                 borderLeft: `1px solid ${theme.border}`,
-                overflow: 'hidden',
               }}
             >
               <IRInspector
@@ -205,16 +205,10 @@ export function Playground() {
 
           {/* Right-side icon toolbar */}
           <div
+            className="editor-toolbar"
             style={{
-              width: 44,
-              flexShrink: 0,
               background: theme.panel,
               borderLeft: `1px solid ${theme.border}`,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              paddingTop: 8,
-              gap: 4,
             }}
           >
             {/* Close editor */}
@@ -240,7 +234,6 @@ export function Playground() {
               </svg>
             </button>
             {/* Separator */}
-            <div style={{ width: 24, height: 1, background: theme.border, margin: '4px 0' }} />
             {/* Grid toggle */}
             <button
               title={showGrid ? 'Hide Grid' : 'Show Grid'}
