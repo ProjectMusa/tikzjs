@@ -1,4 +1,5 @@
 import { examples, goldenExamples } from '../lib/examples'
+import { theme } from '../theme'
 
 interface ExamplePickerProps {
   onSelect: (source: string) => void
@@ -16,9 +17,9 @@ export function ExamplePicker({ onSelect }: ExamplePickerProps) {
       }}
       defaultValue=""
       style={{
-        background: '#313244',
-        color: '#cdd6f4',
-        border: '1px solid #45475a',
+        background: theme.surface,
+        color: theme.text,
+        border: `1px solid ${theme.border}`,
         borderRadius: 4,
         padding: '4px 8px',
         fontSize: 13,

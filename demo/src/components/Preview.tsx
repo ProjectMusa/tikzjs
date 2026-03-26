@@ -1,3 +1,5 @@
+import { theme } from '../theme'
+
 interface PreviewProps {
   svg: string
   error: string | null
@@ -14,8 +16,8 @@ export function Preview({ svg, error }: PreviewProps) {
           alignItems: 'center',
           justifyContent: 'center',
           padding: 24,
-          background: '#1e1e2e',
-          color: '#f38ba8',
+          background: theme.bg,
+          color: theme.error,
         }}
       >
         <div style={{ fontWeight: 600, marginBottom: 8 }}>Render Error</div>
@@ -26,8 +28,8 @@ export function Preview({ svg, error }: PreviewProps) {
             overflow: 'auto',
             whiteSpace: 'pre-wrap',
             wordBreak: 'break-word',
-            color: '#cdd6f4',
-            background: '#181825',
+            color: theme.text,
+            background: theme.codeBg,
             padding: 12,
             borderRadius: 6,
           }}
@@ -46,8 +48,8 @@ export function Preview({ svg, error }: PreviewProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#6c7086',
-          background: '#fff',
+          color: theme.muted,
+          background: theme.preview,
         }}
       >
         Type TikZ code to see the preview
@@ -63,7 +65,7 @@ export function Preview({ svg, error }: PreviewProps) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fff',
+        background: theme.preview,
         padding: 24,
       }}
       dangerouslySetInnerHTML={{ __html: svg }}

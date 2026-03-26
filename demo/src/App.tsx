@@ -1,10 +1,11 @@
 import { HashRouter, Routes, Route, NavLink } from 'react-router-dom'
 import { Playground } from './pages/Playground'
 import { Report } from './pages/Report'
+import { theme } from './theme'
 
 const navStyle = ({ isActive }: { isActive: boolean }) => ({
   fontWeight: isActive ? 700 : 400,
-  color: isActive ? '#fff' : '#aaa',
+  color: isActive ? theme.text : theme.muted,
   textDecoration: 'none' as const,
 })
 
@@ -19,12 +20,12 @@ export function App() {
             gap: 24,
             padding: '0 16px',
             height: 44,
-            background: '#1e1e2e',
-            borderBottom: '1px solid #333',
+            background: theme.bg,
+            borderBottom: `1px solid ${theme.border}`,
             flexShrink: 0,
           }}
         >
-          <span style={{ fontWeight: 700, color: '#cdd6f4', fontSize: 15 }}>tikzjs</span>
+          <span style={{ fontWeight: 700, color: theme.text, fontSize: 15 }}>tikzjs</span>
           <NavLink to="/" style={navStyle}>
             Playground
           </NavLink>
