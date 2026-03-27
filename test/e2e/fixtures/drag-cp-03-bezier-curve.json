@@ -1,0 +1,32 @@
+{
+  "description": "Drag curve control point in 03-bezier-curve",
+  "goldenFixture": "03-bezier-curve.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "updateCurveControl",
+        "target": {
+          "kind": "path",
+          "index": 0
+        },
+        "args": {
+          "segIdx": 1,
+          "cpRole": "cp1",
+          "deltaXPt": 14.2264,
+          "deltaYPt": 14.2264
+        }
+      },
+      "uiAction": {
+        "type": "drag-cp",
+        "target": {
+          "kind": "path",
+          "index": 0
+        },
+        "segIdx": 1,
+        "cpRole": "cp1",
+        "deltaXPt": 14.2264,
+        "deltaYPt": 14.2264
+      }
+    }
+  ]
+}

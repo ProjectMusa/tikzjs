@@ -9,6 +9,10 @@ module.exports = {
   testMatch: [
     '**/test/**/*.test.ts',
   ],
+  testPathIgnorePatterns: [
+    '/node_modules/',
+    '/test/e2e/',
+  ],
   moduleNameMapper: {
     // Only strip .js extension from relative imports (./foo.js, ../bar.js)
     // NOT from node_modules paths

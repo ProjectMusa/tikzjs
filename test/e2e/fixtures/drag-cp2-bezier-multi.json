@@ -1,0 +1,21 @@
+{
+  "description": "Drag control point cp2 of two-control bezier curve in bezier-multi",
+  "goldenFixture": "12-bezier-multi.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "updateCurveControl",
+        "target": { "kind": "path", "index": 0 },
+        "args": { "segIdx": 2, "cpRole": "cp2", "deltaXPt": -14.2264, "deltaYPt": 14.2264 }
+      },
+      "uiAction": {
+        "type": "drag-cp",
+        "target": { "kind": "path", "index": 0 },
+        "segIdx": 2,
+        "cpRole": "cp2",
+        "deltaXPt": -14.2264,
+        "deltaYPt": 14.2264
+      }
+    }
+  ]
+}

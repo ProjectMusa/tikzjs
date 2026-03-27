@@ -1,0 +1,28 @@
+{
+  "description": "Drag first draggable node in 70-graph-arcs-polar-foreach",
+  "goldenFixture": "70-graph-arcs-polar-foreach.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveNode",
+        "target": {
+          "kind": "node",
+          "index": 0
+        },
+        "args": {
+          "deltaXPt": 14.2264,
+          "deltaYPt": 14.2264
+        }
+      },
+      "uiAction": {
+        "type": "drag",
+        "target": {
+          "kind": "node",
+          "index": 0
+        },
+        "deltaXPt": 14.2264,
+        "deltaYPt": 14.2264
+      }
+    }
+  ]
+}
