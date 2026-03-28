@@ -6,7 +6,7 @@
  */
 
 import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix, ResolvedStyle } from '../../ir/types.js'
-import { makeNode, coordRef } from '../../parser/factory.js'
+import { makeNode, coordRef, nextId } from '../../parser/factory.js'
 
 export type CpRole = 'cp1' | 'cp2' | 'to' | 'move'
 
@@ -226,6 +226,42 @@ export function addNode(diagram: IRDiagram, xPt: number, yPt: number, label = ''
   const node = makeNode(coordRef(xPt, yPt), label, style, [])
   diagram.elements.push(node)
   return node.id
+}
+
+/**
+ * Duplicate an element in the diagram. Nodes get offset by 10pt so the copy
+ * is visually distinct. Returns the new element's id, or null if not found.
+ */
+export function duplicateElement(diagram: IRDiagram, elementId: string): string | null {
+  const el = findElement(diagram.elements, elementId)
+  if (!el) return null
+
+  // Deep clone and assign fresh ID
+  const clone = JSON.parse(JSON.stringify(el)) as IRElement
+  const newId = nextId(el.kind)
+  if ('id' in clone) (clone as any).id = newId
+
+  // Offset node position so the duplicate is visually distinct
+  if (clone.kind === 'node') {
+    const coord = clone.position.coord
+    if (coord.cs === 'xy') {
+      coord.x += 10
+      coord.y -= 10
+    }
+    // Clear name to avoid duplicate named nodes
+    clone.name = undefined
+  }
+
+  // Reassign IDs for inline nodes in paths
+  if (clone.kind === 'path') {
+    for (const n of clone.inlineNodes) {
+      n.id = nextId('node')
+      n.name = undefined
+    }
+  }
+
+  diagram.elements.push(clone)
+  return newId
 }
 
 export function removeElement(diagram: IRDiagram, elementId: string): boolean {

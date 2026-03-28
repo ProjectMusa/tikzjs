@@ -25,7 +25,7 @@ export {
   generateSVGElement, generateTikZ, DEFAULT_CONSTANTS, defaultMathRenderer,
   moveNode, findNode, isDraggable, collectNodes, findElement,
   updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel,
-  removeElement, addNode,
+  removeElement, addNode, duplicateElement,
 } from './core.js'
 
 export type {

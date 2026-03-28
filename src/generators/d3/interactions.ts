@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx, NodeGeometryRegistry } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode, duplicateElement, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -218,6 +218,21 @@ export function setupKeyboard(
         (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
       e.preventDefault()
       controller.redo()
+      return
+    }
+
+    // Ctrl+D: duplicate selected element
+    if (e.key === 'd' && (e.ctrlKey || e.metaKey) && selectedId) {
+      e.preventDefault()
+      const newId = duplicateElement(diagram, selectedId)
+      if (newId) {
+        onIRChange(diagram)
+        // Select the new duplicate after re-render
+        setTimeout(() => {
+          controller.highlightElement(newId)
+          if (onSelect) onSelect(newId)
+        }, 0)
+      }
       return
     }
 
