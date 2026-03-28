@@ -306,6 +306,7 @@ export function createD3Editor(
       currentDiagram = JSON.parse(undoStack.pop()!)
       lastHighlightedId = null
       render()
+      if (opts.onElementSelect) opts.onElementSelect(null)
       if (opts.onIRChange) opts.onIRChange(currentDiagram)
       return true
     },
@@ -315,6 +316,7 @@ export function createD3Editor(
       currentDiagram = JSON.parse(redoStack.pop()!)
       lastHighlightedId = null
       render()
+      if (opts.onElementSelect) opts.onElementSelect(null)
       if (opts.onIRChange) opts.onIRChange(currentDiagram)
       return true
     },
