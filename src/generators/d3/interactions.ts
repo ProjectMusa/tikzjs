@@ -296,6 +296,112 @@ function snapToCm(pt: number): number {
   return Math.round(pt / PT_PER_CM) * PT_PER_CM
 }
 
+// ── Guide line for axis-constrained drag ─────────────────────────────────────
+
+const GUIDE_LINE_NS = 'http://www.w3.org/2000/svg'
+
+/** Show or update a dashed guide line through the drag origin along the constrained axis. */
+function updateGuideLine(
+  state: DragState,
+  altKey: boolean,
+  currentPxX: number,
+  currentPxY: number,
+  container: SVGElement | SVGSVGElement,
+): void {
+  if (!altKey) {
+    if (state.guideLine) { state.guideLine.remove(); state.guideLine = undefined }
+    return
+  }
+
+  const startPxX = ptToPx(state.startPtX)
+  const startPxY = -ptToPx(state.startPtY)
+  const isHorizontal = currentPxY === startPxY // vertical locked → moving horizontally
+
+  if (!state.guideLine) {
+    state.guideLine = container.ownerDocument.createElementNS(GUIDE_LINE_NS, 'line')
+    state.guideLine.setAttribute('stroke', '#f59e0b')
+    state.guideLine.setAttribute('stroke-width', '0.8')
+    state.guideLine.setAttribute('stroke-dasharray', '4 3')
+    state.guideLine.setAttribute('pointer-events', 'none')
+    state.guideLine.setAttribute('opacity', '0.6')
+    container.appendChild(state.guideLine)
+  }
+
+  // Extend the line well beyond visible bounds
+  const extent = 10000
+  if (isHorizontal) {
+    state.guideLine.setAttribute('x1', String(startPxX - extent))
+    state.guideLine.setAttribute('y1', String(startPxY))
+    state.guideLine.setAttribute('x2', String(startPxX + extent))
+    state.guideLine.setAttribute('y2', String(startPxY))
+  } else {
+    state.guideLine.setAttribute('x1', String(startPxX))
+    state.guideLine.setAttribute('y1', String(startPxY - extent))
+    state.guideLine.setAttribute('x2', String(startPxX))
+    state.guideLine.setAttribute('y2', String(startPxY + extent))
+  }
+}
+
+// ── Coordinate tooltip during drag ───────────────────────────────────────────
+
+const COORD_TOOLTIP_OFFSET_X = 12  // px offset right of the dragged position
+const COORD_TOOLTIP_OFFSET_Y = -14 // px offset above the dragged position
+
+/** Format a pt value as TikZ cm (e.g. "1.50"). */
+function ptToCmStr(pt: number): string {
+  return (pt / PT_PER_CM).toFixed(2)
+}
+
+/** Show or update a coordinate tooltip near the drag position. */
+function updateCoordTooltip(
+  state: { coordTooltip?: SVGGElement },
+  xPt: number,
+  yPt: number,
+  pxX: number,
+  pxY: number,
+  container: SVGElement | SVGSVGElement,
+): void {
+  const doc = container.ownerDocument
+  if (!state.coordTooltip) {
+    state.coordTooltip = doc.createElementNS(GUIDE_LINE_NS, 'g')
+    state.coordTooltip.setAttribute('pointer-events', 'none')
+
+    const bg = doc.createElementNS(GUIDE_LINE_NS, 'rect')
+    bg.setAttribute('rx', '3')
+    bg.setAttribute('ry', '3')
+    bg.setAttribute('fill', 'rgba(0,0,0,0.75)')
+    state.coordTooltip.appendChild(bg)
+
+    const text = doc.createElementNS(GUIDE_LINE_NS, 'text')
+    text.setAttribute('fill', '#fff')
+    text.setAttribute('font-family', 'monospace')
+    text.setAttribute('font-size', '10')
+    text.setAttribute('dominant-baseline', 'middle')
+    state.coordTooltip.appendChild(text)
+
+    container.appendChild(state.coordTooltip)
+  }
+
+  const text = state.coordTooltip.querySelector('text')!
+  const bg = state.coordTooltip.querySelector('rect')!
+
+  const label = `(${ptToCmStr(xPt)}, ${ptToCmStr(yPt)})`
+  text.textContent = label
+
+  const tx = pxX + COORD_TOOLTIP_OFFSET_X
+  const ty = pxY + COORD_TOOLTIP_OFFSET_Y
+  text.setAttribute('x', String(tx + 4))
+  text.setAttribute('y', String(ty))
+
+  // Size background to text — approximate width from character count
+  const charWidth = 6.2
+  const textWidth = label.length * charWidth
+  bg.setAttribute('x', String(tx))
+  bg.setAttribute('y', String(ty - 8))
+  bg.setAttribute('width', String(textWidth + 8))
+  bg.setAttribute('height', '16')
+}
+
 // ── Drag ─────────────────────────────────────────────────────────────────────
 
 interface DragState {
@@ -304,6 +410,10 @@ interface DragState {
   startPxX: number
   startPxY: number
   hasMoved: boolean
+  /** Guide line element for Alt+drag axis constraint. */
+  guideLine?: SVGLineElement
+  /** Coordinate tooltip group (text + background rect). */
+  coordTooltip?: SVGGElement
 }
 
 export function setupDrag(
@@ -366,6 +476,16 @@ export function setupDrag(
         let newXPt = state.startPtX + dxPt
         let newYPt = state.startPtY + dyPt
 
+        // Alt+drag: constrain to dominant axis (H or V)
+        const altKey = event.sourceEvent?.altKey
+        if (altKey) {
+          if (Math.abs(dxPt) >= Math.abs(dyPt)) {
+            newYPt = state.startPtY // lock vertical
+          } else {
+            newXPt = state.startPtX // lock horizontal
+          }
+        }
+
         // Shift+drag: snap to nearest cm grid
         if (event.sourceEvent?.shiftKey) {
           newXPt = snapToCm(newXPt)
@@ -386,10 +506,18 @@ export function setupDrag(
           ? transform.replace(/translate\([^)]*\)/, translate)
           : translate + (transform ? ' ' + transform : '')
         actualEl.setAttribute('transform', newTransform)
+
+        // Show/hide guide line for Alt+drag axis constraint
+        updateGuideLine(state, altKey, newPxX, newPxY, zoomGroup ?? svgElement)
+        // Show coordinate tooltip
+        updateCoordTooltip(state, newXPt, newYPt, newPxX, newPxY, zoomGroup ?? svgElement)
       })
       .on('end', function () {
         d3.select(actualEl).classed('d3-dragging', false)
         const state = d3.select(this).datum() as DragState | null
+        // Remove guide line and tooltip on drag end
+        if (state?.guideLine) { state.guideLine.remove(); state.guideLine = undefined }
+        if (state?.coordTooltip) { state.coordTooltip.remove(); state.coordTooltip = undefined }
         // Only trigger re-render if the mouse actually moved during drag.
         // A zero-distance "drag" is just a click — re-rendering would destroy
         // DOM state needed for double-click detection.
@@ -457,25 +585,36 @@ interface CPDragState {
   originalD: string
   /** The `<path>` SVG element being previewed. */
   pathEl: SVGPathElement | null
-  /** Parsed cubic command offsets within the `d` string for targeted replacement. */
-  cubicIndex: number
+  /** Which SVG command type this segment emits: 'C' for cubic, 'L' for line. */
+  svgCommandType: 'C' | 'L'
+  /** Index of the SVG command of this type to modify. */
+  commandIndex: number
   /** True when the curve segment has only one control point (cp1 === cp2 in SVG). */
   singleControl: boolean
+  /** Coordinate tooltip group. */
+  coordTooltip?: SVGGElement
 }
 
 /**
- * Update a point in an SVG path `d` string for live curve preview.
+ * Update a point in an SVG path `d` string for live preview during drag.
  *
  * Supports:
  * - 'move': updates the M command (start point)
- * - 'cp1'/'cp2'/'to': updates the Nth C command (0-indexed by `cubicIndex`)
+ * - 'cp1'/'cp2'/'to' with svgCommandType 'C': updates the Nth C command
+ * - 'to' with svgCommandType 'L': updates the Nth L command (line endpoints)
  *
  * C command structure: C cx1 cy1 cx2 cy2 x y
- *   - cp1 = positions 0,1 (cx1, cy1)
- *   - cp2 = positions 2,3 (cx2, cy2)
- *   - to  = positions 4,5 (x, y)
+ * L command structure: L x y
  */
-function updatePathD(d: string, cubicIndex: number, cpRole: CpRole, newX: number, newY: number, singleControl = false): string {
+function updatePathD(
+  d: string,
+  commandIndex: number,
+  cpRole: CpRole,
+  newX: number,
+  newY: number,
+  singleControl = false,
+  svgCommandType: 'C' | 'L' = 'C',
+): string {
   // Move command: update M x y
   if (cpRole === 'move') {
     return d.replace(
@@ -484,13 +623,28 @@ function updatePathD(d: string, cubicIndex: number, cpRole: CpRole, newX: number
     )
   }
 
+  // Line commands: find the Nth L command
+  if (svgCommandType === 'L') {
+    const lineRegex = /L\s+([-\d.e]+)\s+([-\d.e]+)/gi
+    let match: RegExpExecArray | null
+    let idx = 0
+    while ((match = lineRegex.exec(d)) !== null) {
+      if (idx === commandIndex) {
+        const replacement = `L ${newX.toFixed(2)} ${newY.toFixed(2)}`
+        return d.slice(0, match.index) + replacement + d.slice(match.index + match[0].length)
+      }
+      idx++
+    }
+    return d
+  }
+
   // Cubic commands: find the Nth C command
   const cubicRegex = /C\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)\s+([-\d.e]+)/gi
   let match: RegExpExecArray | null
   let idx = 0
 
   while ((match = cubicRegex.exec(d)) !== null) {
-    if (idx === cubicIndex) {
+    if (idx === commandIndex) {
       const args = [match[1], match[2], match[3], match[4], match[5], match[6]]
       if (cpRole === 'cp1') {
         args[0] = newX.toFixed(2)
@@ -516,37 +670,69 @@ function updatePathD(d: string, cubicIndex: number, cpRole: CpRole, newX: number
 }
 
 /**
- * Find the `<path>` element for a given IR path id and count which cubic command
+ * Find the `<path>` element for a given IR path id and determine which SVG command
  * corresponds to the given segment index.
+ *
+ * Each IR segment kind maps to SVG commands:
+ *   - curve, sin, cos → C (cubic)
+ *   - parabola → C (1 or 2 cubics depending on explicit bend)
+ *   - line, hv-line, to → L (line-to)
+ *   - move → M (handled separately)
  */
-function findPathElAndCubicIndex(
+function findPathElAndCommandInfo(
   svg: SVGSVGElement,
   pathId: string,
   segIdx: number,
   diagram: IRDiagram,
-): { pathEl: SVGPathElement | null; cubicIndex: number; singleControl: boolean } {
+): { pathEl: SVGPathElement | null; svgCommandType: 'C' | 'L'; commandIndex: number; singleControl: boolean } {
   // Find the <path> element via data-ir-id
-  const container = svg.querySelector(`[data-ir-id="${pathId}"]`)
+  const container = svg.querySelector(`[data-ir-id="${CSS.escape(pathId)}"]`)
   const pathEl = container?.tagName.toLowerCase() === 'path'
     ? container as SVGPathElement
     : container?.querySelector('path') as SVGPathElement | null
 
-  // Count which C command this segIdx maps to: curve segments produce C commands
-  // in order, so count how many curve segments precede this one.
   const el = findElement(diagram.elements, pathId)
   let cubicIndex = 0
+  let lineIndex = 0
   let singleControl = false
+  let svgCommandType: 'C' | 'L' = 'C'
+
   if (el && el.kind === 'path') {
+    // Count SVG commands emitted by segments before segIdx
     for (let i = 0; i < el.segments.length && i < segIdx; i++) {
-      if (el.segments[i].kind === 'curve') cubicIndex++
+      const s = el.segments[i]
+      if (s.kind === 'curve' || s.kind === 'sin' || s.kind === 'cos') {
+        cubicIndex++
+      } else if (s.kind === 'parabola') {
+        cubicIndex += (s as any).bend ? 2 : 1
+      } else if (s.kind === 'line' || s.kind === 'hv-line' || s.kind === 'to') {
+        lineIndex++
+      }
     }
+
     const seg = el.segments[segIdx]
-    if (seg && seg.kind === 'curve') {
-      singleControl = seg.controls.length === 1
+    if (seg) {
+      if (seg.kind === 'curve') {
+        singleControl = seg.controls.length === 1
+        svgCommandType = 'C'
+      } else if (seg.kind === 'parabola') {
+        // For parabola with explicit bend, the endpoint is the 2nd C command
+        if ((seg as any).bend) cubicIndex++
+        svgCommandType = 'C'
+      } else if (seg.kind === 'sin' || seg.kind === 'cos') {
+        svgCommandType = 'C'
+      } else if (seg.kind === 'line' || seg.kind === 'hv-line' || seg.kind === 'to') {
+        svgCommandType = 'L'
+      }
     }
   }
 
-  return { pathEl, cubicIndex, singleControl }
+  return {
+    pathEl,
+    svgCommandType,
+    commandIndex: svgCommandType === 'L' ? lineIndex : cubicIndex,
+    singleControl,
+  }
 }
 
 /**
@@ -580,7 +766,7 @@ export function setupControlPointDrag(
         event.sourceEvent?.stopPropagation()
         d3.select(this).attr('cursor', 'grabbing')
 
-        const { pathEl, cubicIndex, singleControl } = findPathElAndCubicIndex(svg, pathId, segIdx, diagram)
+        const { pathEl, svgCommandType, commandIndex, singleControl } = findPathElAndCommandInfo(svg, pathId, segIdx, diagram)
 
         const state: CPDragState = {
           startPtX: origPtX,
@@ -593,7 +779,8 @@ export function setupControlPointDrag(
           handleLineId,
           originalD: pathEl?.getAttribute('d') ?? '',
           pathEl,
-          cubicIndex,
+          svgCommandType,
+          commandIndex,
           singleControl,
         }
         d3.select(this).datum(state)
@@ -637,14 +824,23 @@ export function setupControlPointDrag(
 
         // Live preview: update the curve path's d attribute
         if (state.pathEl && state.originalD) {
-          const updatedD = updatePathD(state.originalD, state.cubicIndex, state.cpRole, newCx, newCy, state.singleControl)
+          const updatedD = updatePathD(state.originalD, state.commandIndex, state.cpRole, newCx, newCy, state.singleControl, state.svgCommandType)
           state.pathEl.setAttribute('d', updatedD)
         }
+
+        // Show coordinate tooltip (compute current pt from px delta)
+        const dxPt = pxToPt(newCx - state.startPxX)
+        const dyPt = -pxToPt(newCy - state.startPxY)
+        const curPtX = state.startPtX + dxPt
+        const curPtY = state.startPtY + dyPt
+        const zg = svg.querySelector('.d3-zoom-group') as SVGElement | null
+        updateCoordTooltip(state, curPtX, curPtY, newCx, newCy, zg ?? svg)
       })
       .on('end', function (event) {
         d3.select(this).attr('cursor', 'grab')
         const state = d3.select(this).datum() as CPDragState
         if (!state) return
+        if (state.coordTooltip) { state.coordTooltip.remove(); state.coordTooltip = undefined }
 
         // Convert SVG px delta to TikZ pt, accounting for y-axis inversion
         const dxPt = pxToPt(event.x - state.startPxX)
@@ -652,6 +848,15 @@ export function setupControlPointDrag(
 
         let newXPt = state.startPtX + dxPt
         let newYPt = state.startPtY + dyPt
+
+        // Alt+drag: constrain to dominant axis (H or V)
+        if (event.sourceEvent?.altKey) {
+          if (Math.abs(dxPt) >= Math.abs(dyPt)) {
+            newYPt = state.startPtY
+          } else {
+            newXPt = state.startPtX
+          }
+        }
 
         // Shift+drag: snap to nearest cm grid
         if (event.sourceEvent?.shiftKey) {

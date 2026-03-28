@@ -202,7 +202,8 @@ export function moveSegmentEndpoint(
   const seg = el.segments[segIdx]
   if (!seg) return false
 
-  if (seg.kind !== 'line' && seg.kind !== 'hv-line' && seg.kind !== 'to' && seg.kind !== 'move') return false
+  if (seg.kind !== 'line' && seg.kind !== 'hv-line' && seg.kind !== 'to' && seg.kind !== 'move'
+    && seg.kind !== 'parabola' && seg.kind !== 'sin' && seg.kind !== 'cos') return false
   if (seg.to.mode !== 'absolute' || seg.to.coord.cs !== 'xy') return false
 
   seg.to.coord.x = xPt
