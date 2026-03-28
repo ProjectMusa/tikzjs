@@ -19,8 +19,8 @@ drag control point    →  updateCurveControl(ir, ...)          →  full re-ren
 drag line endpoint    →  moveSegmentEndpoint(ir, ...)         →  full re-render
 click element         →  (selection only, no IR change)       →  highlight overlay
 click background      →  (deselection)                       →  clear overlay
+double-click node     →  updateNodeLabel(ir, id, label)      →  full re-render
 delete key            →  removeElement(ir, id)                →  full re-render
-edit label (future)   →  updateNodeLabel(ir, id, label)      →  full re-render
 change style (future) →  setStyleProp(ir, id, key, value)    →  full re-render
 ```
 
@@ -28,9 +28,29 @@ Key files:
 - **`interactions.ts`** — `setupDrag()`, `setupSelection()`, `setupControlPointDrag()` — the event→mutation wiring
 - **`irMutator.ts`** — the pure mutation functions (the contract)
 - **`highlight.ts`** — visual feedback for selection (overlays, control point handles)
-- **`index.ts`** — `createD3Editor()` — orchestrates render + interactions
+- **`index.ts`** — `createD3Editor()` — orchestrates render + interactions, click zones
 - **`D3EditorPanel.tsx`** — React wrapper, passes options and callbacks
 - **`Playground.tsx`** — demo app page, owns state and round-trip (IR→TikZ source→re-parse)
+
+---
+
+## Verification: always use `/e2e-test`
+
+After **every** code change in this skill, verify correctness by running E2E tests:
+
+```bash
+npx playwright test --reporter=line          # all E2E tests
+npx playwright test --reporter=line -g "NAME" # specific fixture
+npm test                                      # Jest golden + unit tests
+```
+
+Or use the `/e2e-test` skill:
+- `/e2e-test all` — run all E2E fixtures and fix failures
+- `/e2e-test <fixture-name>` — run tests for a specific golden fixture
+
+The E2E tests verify that UI interactions (drag, control-point drag, label edit) produce the **same IR** as calling `irMutator` functions directly. If you add a new UI action, create a corresponding E2E fixture in `test/e2e/fixtures/` and run `/e2e-test` to verify it.
+
+**Do not proceed to the next step or commit without passing E2E + Jest tests.**
 
 ---
 
@@ -82,12 +102,10 @@ Verify for several golden fixtures:
 
 ### If a mapping bug is found → fix it
 
-1. Write a test in `test/d3/` that captures the bug:
-   - Parse a fixture, apply the mutation that the UI would trigger
-   - Check the resulting IR has the expected coordinates
-   - Generate SVG and compare against ref
+1. Write a test in `test/d3/` that captures the bug
 2. Fix the bug in `interactions.ts` or `irMutator.ts`
-3. Verify the test passes
+3. Run `/e2e-test all` to verify all E2E interaction tests still pass
+4. Run `npm test` to verify golden tests still pass
 
 ---
 
@@ -102,13 +120,7 @@ Common coordinate bugs:
 | PT_TO_PX mismatch | Small offset after drag | `pxToPt()`/`ptToPx()` in `coordResolver.ts` |
 | Transform regex failure | Node snaps to (0,0) on drag | `setupDrag` — `transform.replace()` regex doesn't match |
 
-To debug:
-```javascript
-// Add temporary logging in setupDrag .on('end'):
-console.log('Drag delta (px):', dxPx, dyPx)
-console.log('Drag delta (pt):', dxPt, dyPt)
-console.log('New position (pt):', newXPt, newYPt)
-```
+After fixing, run `/e2e-test all` to verify.
 
 ---
 
@@ -121,22 +133,7 @@ This can break if:
 - `generateTikZ()` emits syntax the parser doesn't handle
 - Style options are lost during TikZ emission
 
-Test the round-trip:
-```bash
-node -e "
-const { parse, generateTikZ } = require('./dist/index.js');
-const { moveNode } = require('./dist/generators/d3/irMutator.js');
-const fs = require('fs');
-const src = fs.readFileSync('test/golden/fixtures/01-simple-node.tikz', 'utf8');
-const ir = parse(src);
-moveNode(ir, ir.elements[0].id, 100, 50);
-const tikz = generateTikZ(ir);
-const ir2 = parse(tikz);
-// Compare ir.elements[0].position vs ir2.elements[0].position
-console.log('Before:', JSON.stringify(ir.elements[0].position.coord));
-console.log('After re-parse:', JSON.stringify(ir2.elements[0].position.coord));
-"
-```
+After fixing, run `/e2e-test all` to verify.
 
 ---
 
@@ -153,11 +150,11 @@ If no → implement the mutation function first, write a test fixture, then wire
 
 | Action | irMutator function | UI trigger | Status |
 |---|---|---|---|
+| Edit label | `updateNodeLabel(ir, id, text)` | Double-click node → inline text input | **Implemented + E2E tested** |
 | Delete element | `removeElement(ir, id)` | Delete/Backspace key on selected element | Mutation ready, UI not wired |
 | Drag line endpoint | `moveSegmentEndpoint(ir, pathId, segIdx, x, y)` | Drag endpoint handle on lines | Mutation ready, UI not wired |
 | Nudge node | `moveNode(ir, id, x±δ, y±δ)` | Arrow keys on selected node | Mutation ready, UI not wired |
 | Change style | `setStyleProp(ir, id, key, value)` | Inspector panel property edit | Mutation ready, UI not wired |
-| Edit label | `updateNodeLabel(ir, id, text)` | Double-click node → inline text input | Mutation ready, UI not wired |
 | Add node | `addNode(ir, pos, label)` | Double-click on empty canvas | To implement |
 | Edit edge label | `updateEdgeLabel(ir, edgeId, idx, text)` | Double-click edge label | To implement |
 
@@ -165,18 +162,9 @@ If no → implement the mutation function first, write a test fixture, then wire
 
 1. Add/verify the mutation function in `irMutator.ts`
 2. Add an edit-step fixture in `test/d3/fixtures/`
-3. Wire the DOM event in `interactions.ts`:
-   ```typescript
-   // Example: delete on keypress
-   d3.select(svgElement).on('keydown', (event: KeyboardEvent) => {
-     if (event.key === 'Delete' && selectedId) {
-       removeElement(diagram, selectedId)
-       onIRChange(diagram)
-     }
-   })
-   ```
+3. Wire the DOM event in `interactions.ts`
 4. Add visual feedback if needed (in `highlight.ts` or CSS in `injectStyles()`)
-5. Test in the demo app with at least 3 fixture types
+5. Create an E2E fixture in `test/e2e/fixtures/` and run `/e2e-test` to verify
 
 ---
 
@@ -194,6 +182,8 @@ If all mappings are correct and no new actions are needed, improve the interacti
 - **Drag constraints** — hold Shift to constrain to horizontal/vertical axis
 - **Touch support** — map touch events to the same mutation functions
 
+After implementing, run `/e2e-test all` + `npm test` to verify nothing broke.
+
 ---
 
 ## Step 6 — Commit
@@ -202,7 +192,7 @@ If all mappings are correct and no new actions are needed, improve the interacti
 git add -A && git status
 ```
 
-Only commit if there are meaningful changes:
+Only commit if there are meaningful changes and all tests pass:
 
 ```bash
 git commit -m "fix(d3): ..." # or "feat(d3): ..."
@@ -213,7 +203,7 @@ git commit -m "fix(d3): ..." # or "feat(d3): ..."
 ## Guardrails
 
 - At most ONE fix or new action per cycle
-- Always run `npm test` to verify SVG golden tests still pass
+- Always run `/e2e-test all` + `npm test` after every code change
 - Do NOT modify `irMutator.ts` function signatures without updating all callers
 - Do NOT add DOM-dependent logic to `irMutator.ts` — it must stay pure (no `document`, no `SVGElement`)
 - Do NOT add new event wiring without a corresponding `irMutator.ts` function

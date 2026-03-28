@@ -283,6 +283,34 @@ If the fixture requires a UI action type not yet supported in `e2e.spec.ts`:
 
 - `drag` — node drag via `moveNode`
 - `drag-cp` — control point drag via `updateCurveControl` (clicks path to select, then drags handle)
+- `edit-label` — node label edit via `updateNodeLabel` (double-click node, type new text, press Enter)
+
+### For label edit tests (`edit-label` type)
+
+Target a node element. Specify `newLabel` for the new text:
+
+```json
+{
+  "description": "Edit label of first node",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "updateNodeLabel",
+        "target": { "kind": "node", "index": 0 },
+        "args": { "newLabel": "Edited" }
+      },
+      "uiAction": {
+        "type": "edit-label",
+        "target": { "kind": "node", "index": 0 },
+        "newLabel": "Edited"
+      }
+    }
+  ]
+}
+```
+
+The test dispatches two rapid clicks (simulating double-click), waits for the inline input to appear, fills the new label, and presses Enter.
 
 ### Adding `drag-endpoint` (segment endpoint drag — not yet implemented)
 

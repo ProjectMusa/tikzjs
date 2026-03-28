@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, updateNodeLabel, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -398,7 +398,18 @@ export function setupControlPointDrag(
         const newXPt = state.startPtX + dxPt
         const newYPt = state.startPtY + dyPt
 
-        updateCurveControl(diagram, state.pathId, state.segIdx, state.cpRole, newXPt, newYPt)
+        // Determine which mutation to use based on segment kind and cpRole
+        const el = findElement(diagram.elements, state.pathId)
+        const seg = el && el.kind === 'path' ? el.segments[state.segIdx] : null
+        const isCurveCP = seg?.kind === 'curve' && (state.cpRole === 'cp1' || state.cpRole === 'cp2')
+        const isCurveTo = seg?.kind === 'curve' && state.cpRole === 'to'
+
+        if (isCurveCP || isCurveTo) {
+          updateCurveControl(diagram, state.pathId, state.segIdx, state.cpRole, newXPt, newYPt)
+        } else {
+          // move, line-to, hv-line-to: use moveSegmentEndpoint
+          moveSegmentEndpoint(diagram, state.pathId, state.segIdx, newXPt, newYPt)
+        }
         onIRChange(diagram)
       })
 
