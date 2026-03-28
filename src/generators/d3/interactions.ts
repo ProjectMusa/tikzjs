@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, updateNodeLabel, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -15,16 +15,48 @@ export function setupSelection(
   svgElement: SVGSVGElement,
   elementMap: Map<string, SVGElement>,
   controller: D3EditorController,
+  diagram: IRDiagram,
   onSelect?: (id: string | null) => void,
+  onLabelEdit?: (diagram: IRDiagram) => void,
+  clickZoneMap?: Map<string, SVGRectElement>,
 ): void {
-  // Click on element to select — call highlightElement immediately for instant feedback,
-  // then notify parent via onSelect (which updates React state for the inspector)
+  // Track last click time per element for double-click detection
+  // (native dblclick doesn't fire reliably when d3-drag is active)
+  const lastClickTime = new Map<string, number>()
+  const DBLCLICK_THRESHOLD = 400 // ms
+
+  function handleClick(id: string, event: MouseEvent) {
+    event.stopPropagation()
+
+    const now = Date.now()
+    const lastTime = lastClickTime.get(id) ?? 0
+
+    if (now - lastTime < DBLCLICK_THRESHOLD && onLabelEdit) {
+      // Double-click detected — open label editor for nodes
+      lastClickTime.delete(id)
+      const el = elementMap.get(id)
+      const node = findNode(diagram, id)
+      if (node && el) {
+        openLabelEditor(svgElement, el, node, id, diagram, onLabelEdit)
+        return
+      }
+    }
+
+    lastClickTime.set(id, now)
+    controller.highlightElement(id)
+    if (onSelect) onSelect(id)
+  }
+
+  // Attach click handlers to click zones (padded invisible rects)
+  if (clickZoneMap) {
+    for (const [id, zone] of clickZoneMap) {
+      d3.select(zone).on('click', (event: MouseEvent) => handleClick(id, event))
+    }
+  }
+
+  // Also attach to the elements themselves as fallback
   for (const [id, el] of elementMap) {
-    d3.select(el).on('click', (event: MouseEvent) => {
-      event.stopPropagation()
-      controller.highlightElement(id)
-      if (onSelect) onSelect(id)
-    })
+    d3.select(el).on('click', (event: MouseEvent) => handleClick(id, event))
   }
 
   // Click on background to deselect
@@ -132,6 +164,24 @@ export function injectStyles(container: HTMLElement): HTMLStyleElement {
     .d3-draggable:hover { filter: brightness(1.1); }
     .d3-dragging { cursor: grabbing !important; opacity: 0.8; }
     .d3-locked { cursor: not-allowed; opacity: 0.9; }
+    .d3-label-input {
+      position: absolute;
+      border: 1.5px solid #f59e0b;
+      border-radius: 3px;
+      background: rgba(0, 0, 0, 0.85);
+      color: #fff;
+      font-family: monospace;
+      font-size: 13px;
+      padding: 2px 6px;
+      outline: none;
+      min-width: 40px;
+      z-index: 1000;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+    .d3-label-input:focus {
+      border-color: #fbbf24;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+    }
   `
   container.prepend(style)
   return style
@@ -356,4 +406,75 @@ export function setupControlPointDrag(
     d3.select(handle).on('click', (e: MouseEvent) => e.stopPropagation())
     d3.select(handle).call(dragBehavior)
   }
+}
+
+// ── Label editing ───────────────────────────────────────────────────────────
+
+/**
+ * Open an inline text input over a node to edit its label.
+ * Called from setupSelection when a double-click is detected.
+ */
+function openLabelEditor(
+  svgElement: SVGSVGElement,
+  el: SVGElement,
+  node: IRNode,
+  id: string,
+  diagram: IRDiagram,
+  onIRChange: (diagram: IRDiagram) => void,
+): void {
+  const container = svgElement.closest('.editor-overlay') as HTMLElement
+    ?? svgElement.parentElement
+  if (!container) return
+
+  // Remove any existing label input
+  const existing = container.querySelector('.d3-label-input')
+  if (existing) existing.remove()
+
+  // Position the input over the node's bounding box
+  const bbox = (el as SVGGraphicsElement).getBoundingClientRect()
+  const containerRect = container.getBoundingClientRect()
+
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.className = 'd3-label-input'
+  input.value = node.label
+  input.style.left = `${bbox.left - containerRect.left + bbox.width / 2}px`
+  input.style.top = `${bbox.top - containerRect.top + bbox.height / 2}px`
+  input.style.transform = 'translate(-50%, -50%)'
+
+  // Size the input to fit the content
+  const charWidth = 8
+  input.style.width = `${Math.max(60, node.label.length * charWidth + 20)}px`
+
+  let committed = false
+  function commit() {
+    if (committed) return
+    committed = true
+    const newLabel = input.value
+    input.remove()
+    if (newLabel !== node.label) {
+      updateNodeLabel(diagram, id, newLabel)
+      onIRChange(diagram)
+    }
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commit()
+    } else if (e.key === 'Escape') {
+      committed = true
+      input.remove()
+    }
+  })
+  input.addEventListener('blur', commit)
+
+  // Auto-resize as user types
+  input.addEventListener('input', () => {
+    input.style.width = `${Math.max(60, input.value.length * charWidth + 20)}px`
+  })
+
+  container.appendChild(input)
+  input.focus()
+  input.select()
 }

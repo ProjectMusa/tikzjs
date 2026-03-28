@@ -26,10 +26,11 @@ interface FixtureStep {
   uiAction: {
     type: string
     target: FixtureTarget
-    deltaXPt: number
-    deltaYPt: number
+    deltaXPt?: number
+    deltaYPt?: number
     segIdx?: number
     cpRole?: string
+    newLabel?: string
   }
 }
 
@@ -121,7 +122,7 @@ async function clickElement(page: Page, selector: string): Promise<void> {
 const fixtures = loadFixtures()
 
 for (const { name, fixture } of fixtures) {
-  const supported = fixture.steps.some(s => s.uiAction.type === 'drag' || s.uiAction.type === 'drag-cp')
+  const supported = fixture.steps.some(s => s.uiAction.type === 'drag' || s.uiAction.type === 'drag-cp' || s.uiAction.type === 'edit-label')
   if (!supported) continue
 
   test(`e2e: ${name} — ${fixture.description}`, async ({ page }) => {
@@ -339,6 +340,108 @@ for (const { name, fixture } of fixtures) {
 
         expect(Math.abs(actual.x - setup.expectedX)).toBeLessThan(COORD_TOLERANCE)
         expect(Math.abs(actual.y - setup.expectedY)).toBeLessThan(COORD_TOLERANCE)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Label edit
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'edit-label') {
+        const newLabel = step.uiAction.newLabel!
+
+        // Resolve the node element and compute expected label via programmatic mutation
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const allNodes = collectAllNodes(ir.elements)
+          if (params.targetIndex >= allNodes.length) {
+            throw new Error(`Node index ${params.targetIndex} out of range (${allNodes.length} found)`)
+          }
+          const targetNode = allNodes[params.targetIndex]
+
+          // Apply programmatic mutation on a deep clone
+          const irCopy = JSON.parse(JSON.stringify(ir))
+          tikzjs.applyMutation(irCopy, params.action, { nodeId: targetNode.id, label: params.newLabel })
+
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const mutatedNode = findNodeById(irCopy.elements, targetNode.id)
+
+          return {
+            elementId: targetNode.id,
+            expectedLabel: mutatedNode.label,
+          }
+        }, {
+          targetIndex: step.mutation.target.index,
+          action: step.mutation.action,
+          newLabel,
+        })
+
+        // Find the node element and double-click it via two rapid click events
+        // (native dblclick doesn't fire through d3-drag; the editor uses click-timing detection)
+        const svgEl = page.locator(`.editor-overlay svg [data-ir-id="${setup.elementId}"]`).first()
+        await expect(svgEl).toBeVisible({ timeout: 3000 })
+        await page.evaluate((sel) => {
+          const el = document.querySelector(sel) as SVGElement
+          if (!el) throw new Error(`Click target not found: ${sel}`)
+          const rect = el.getBoundingClientRect()
+          const opts = {
+            clientX: rect.x + rect.width / 2,
+            clientY: rect.y + rect.height / 2,
+            bubbles: true, cancelable: true, button: 0, view: window,
+          }
+          el.dispatchEvent(new MouseEvent('click', opts))
+          el.dispatchEvent(new MouseEvent('click', opts))
+        }, `.editor-overlay svg [data-ir-id="${setup.elementId}"]`)
+
+        // Wait for the inline input to appear
+        const input = page.locator('.d3-label-input')
+        await expect(input).toBeVisible({ timeout: 3000 })
+
+        // Clear and type the new label
+        await input.fill(newLabel)
+        await input.press('Enter')
+
+        // Wait for re-render
+        await page.waitForTimeout(1000)
+
+        // Read resulting IR and compare
+        const actual = await page.evaluate((params) => {
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const node = findNodeById(ir.elements, params.elementId)
+          if (!node) throw new Error(`Node ${params.elementId} not found after edit`)
+          return { label: node.label }
+        }, { elementId: setup.elementId })
+
+        expect(actual.label).toBe(setup.expectedLabel)
       }
     }
   })

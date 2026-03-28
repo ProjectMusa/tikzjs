@@ -1,0 +1,18 @@
+{
+  "description": "Edit label of first node in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "updateNodeLabel",
+        "target": { "kind": "node", "index": 0 },
+        "args": { "newLabel": "Edited" }
+      },
+      "uiAction": {
+        "type": "edit-label",
+        "target": { "kind": "node", "index": 0 },
+        "newLabel": "Edited"
+      }
+    }
+  ]
+}

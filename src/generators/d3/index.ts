@@ -133,6 +133,32 @@ export function createD3Editor(
       zoomGroup.insertBefore(gridGroup, zoomGroup.firstChild)
     }
 
+    // Build click zones — invisible padded rects over each element so clicks
+    // don't fight with the zoom/pan layer.  Placed inside the zoom group so
+    // they pan/zoom together with the content.
+    const clickZoneGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
+    clickZoneGroup.setAttribute('class', 'd3-click-zones')
+    const CLICK_PADDING = 6 // px padding around each element
+    const clickZoneMap = new Map<string, SVGRectElement>()
+    for (const [id, el] of result.elementMap) {
+      try {
+        const bbox = (el as SVGGraphicsElement).getBBox()
+        if (bbox.width === 0 && bbox.height === 0) continue
+        const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
+        rect.setAttribute('x', String(bbox.x - CLICK_PADDING))
+        rect.setAttribute('y', String(bbox.y - CLICK_PADDING))
+        rect.setAttribute('width', String(bbox.width + CLICK_PADDING * 2))
+        rect.setAttribute('height', String(bbox.height + CLICK_PADDING * 2))
+        rect.setAttribute('fill', 'transparent')
+        rect.setAttribute('class', 'd3-click-zone')
+        rect.setAttribute('data-zone-id', id)
+        rect.style.cursor = 'pointer'
+        clickZoneGroup.appendChild(rect)
+        clickZoneMap.set(id, rect)
+      } catch { /* getBBox can throw for hidden elements */ }
+    }
+    zoomGroup.appendChild(clickZoneGroup)
+
     // Set up zoom/pan — remove fixed width/height so SVG fills its container.
     // Use xMinYMin so content anchors to top-left and doesn't shift when
     // the container resizes (e.g., sidebar toggle).
@@ -158,9 +184,9 @@ export function createD3Editor(
         if (event.type === 'wheel') return true
         // Right click: don't pan
         if (event.button) return false
-        // Don't hijack drags on interactive elements
+        // Don't hijack clicks/drags on interactive elements or click zones
         const target = event.target as Element
-        if (target.closest?.('.d3-draggable, [data-d3-role="cp-handle"]')) return false
+        if (target.closest?.('.d3-draggable, .d3-click-zone, [data-d3-role="cp-handle"]')) return false
         return true
       })
       .on('zoom', (event) => {
@@ -169,6 +195,8 @@ export function createD3Editor(
       })
 
     d3.select(svgEl).call(zoomBehavior)
+    // Disable d3-zoom's dblclick-to-zoom so dblclick can be used for label editing
+    d3.select(svgEl).on('dblclick.zoom', null)
     // Restore previous zoom transform across re-renders
     if (currentTransform !== zoomIdentity) {
       d3.select(svgEl).call(zoomBehavior.transform, currentTransform)
@@ -176,7 +204,12 @@ export function createD3Editor(
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      setupSelection(svgEl, result.elementMap, controller, opts.onElementSelect)
+      const onLabelEdit = (updatedDiagram: IRDiagram) => {
+        currentDiagram = updatedDiagram
+        render()
+        if (opts.onIRChange) opts.onIRChange(currentDiagram)
+      }
+      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, onLabelEdit, clickZoneMap)
       setupDrag(
         svgEl,
         result.elementMap,
