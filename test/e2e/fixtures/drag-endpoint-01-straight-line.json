@@ -1,0 +1,21 @@
+{
+  "description": "Drag line endpoint in 01-straight-line",
+  "goldenFixture": "01-straight-line.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveSegmentEndpoint",
+        "target": { "kind": "path", "index": 0 },
+        "args": { "segIdx": 1, "deltaXPt": 14.2264, "deltaYPt": 14.2264 }
+      },
+      "uiAction": {
+        "type": "drag-cp",
+        "target": { "kind": "path", "index": 0 },
+        "segIdx": 1,
+        "cpRole": "to",
+        "deltaXPt": 14.2264,
+        "deltaYPt": 14.2264
+      }
+    }
+  ]
+}

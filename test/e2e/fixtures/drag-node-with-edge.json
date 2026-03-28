@@ -1,0 +1,19 @@
+{
+  "description": "Drag node A (which has an edge) and verify edge reconnects",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveNode",
+        "target": { "kind": "node", "index": 0 },
+        "args": { "deltaXPt": 14.2264, "deltaYPt": -14.2264 }
+      },
+      "uiAction": {
+        "type": "drag",
+        "target": { "kind": "node", "index": 0 },
+        "deltaXPt": 14.2264,
+        "deltaYPt": -14.2264
+      }
+    }
+  ]
+}

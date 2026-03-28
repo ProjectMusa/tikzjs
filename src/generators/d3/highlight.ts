@@ -279,13 +279,6 @@ function addControlPointHandles(doc: Document, group: Element, irPath: IRPath): 
   let prevPx: { x: number; y: number } | null = null
   let prevSegIdx = -1
   let prevRole = ''
-  let hasCurves = false
-
-  // Check if this path has any curve segments (only show handles on curve paths)
-  for (const seg of irPath.segments) {
-    if (seg.kind === 'curve') { hasCurves = true; break }
-  }
-  if (!hasCurves) return
 
   for (let segIdx = 0; segIdx < irPath.segments.length; segIdx++) {
     const seg = irPath.segments[segIdx]
@@ -338,8 +331,13 @@ function addControlPointHandles(doc: Document, group: Element, irPath: IRPath): 
       prevSegIdx = segIdx
       prevRole = 'to'
     } else if ('to' in seg) {
+      // Line, hv-line, to — show draggable endpoint handles
       const toRef = (seg as { to: CoordRef }).to
       const resolved = resolveAbsXY(toRef)
+      if (resolved) {
+        addCPHandle(doc, group, resolved.px.x, resolved.px.y, irPath.id, segIdx, 'to',
+          resolved.pt.x, resolved.pt.y, '', 'square')
+      }
       prevPx = resolved?.px ?? null
       prevSegIdx = segIdx
       prevRole = 'to'

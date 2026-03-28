@@ -21,6 +21,10 @@ test/extra/
 # Line Counter
 .VSCodeCounter/
 
+# Playwright
+test-results/
+playwright-report/
+
 # Python bytecode / build artifacts
 __pycache__/
 *.pyc

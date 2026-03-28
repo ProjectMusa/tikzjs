@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { theme } from '../theme'
 import { Editor } from '../components/Editor'
 import { Preview } from '../components/Preview'
-import { D3EditorPanel, IRInspector } from 'tikzjs'
+import { D3EditorPanel, IRInspector, moveNode, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel } from 'tikzjs'
+import type { D3EditorPanelHandle } from 'tikzjs'
 import { ExamplePicker } from '../components/ExamplePicker'
 import { examples } from '../lib/examples'
 import type { IRDiagram } from 'tikzjs'
@@ -113,6 +114,7 @@ export function Playground({ isDark }: { isDark: boolean }) {
   const [showGrid, setShowGrid] = useState(true)
   const [showInspector, setShowInspector] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
+  const editorPanelRef = useRef<D3EditorPanelHandle>(null)
 
   const editorSvgOptions = {
     document: window.document.implementation.createHTMLDocument(''),
@@ -120,6 +122,55 @@ export function Playground({ isDark }: { isDark: boolean }) {
     mathModeRenderer: browserMathModeRenderer,
     scriptMathModeRenderer: browserScriptMathModeRenderer,
   }
+
+  // Expose test hooks for Playwright E2E tests
+  useEffect(() => {
+    const tikzjs = {
+      /** Load a golden fixture by filename, parse it, and enter editor mode. */
+      async loadFixture(filename: string) {
+        const resp = await fetch(`/tikzjs/fixtures/${filename}`)
+        if (!resp.ok) throw new Error(`Failed to fetch fixture: ${filename}`)
+        const src = await resp.text()
+        const renderer = renderRef.current
+        if (!renderer) throw new Error('Renderer not loaded')
+        const ir = renderer.parseTikz(src)
+        setSource(src)
+        setDiagram(ir)
+        setMode('editor')
+        // Return a promise that resolves after React renders
+        return new Promise<void>(resolve => setTimeout(resolve, 200))
+      },
+      /** Get the current IR from the D3 editor controller. */
+      getIR(): IRDiagram | null {
+        return editorPanelRef.current?.controller?.getDiagram() ?? diagram
+      },
+      /** Parse TikZ source to IR (for computing expected state in-browser). */
+      parseTikz(source: string): IRDiagram | null {
+        const renderer = renderRef.current
+        if (!renderer) return null
+        return renderer.parseTikz(source)
+      },
+      /** Apply a programmatic IR mutation (for comparison with UI result). */
+      applyMutation(ir: IRDiagram, action: string, args: any): boolean {
+        switch (action) {
+          case 'moveNode':
+            return moveNode(ir, args.nodeId, args.x, args.y)
+          case 'updateCurveControl':
+            return updateCurveControl(ir, args.pathId, args.segIdx, args.cpRole, args.x, args.y)
+          case 'moveSegmentEndpoint':
+            return moveSegmentEndpoint(ir, args.pathId, args.segIdx, args.x, args.y)
+          case 'updateNodeLabel':
+            return updateNodeLabel(ir, args.nodeId, args.label)
+          case 'updateEdgeLabel':
+            return updateEdgeLabel(ir, args.edgeId, args.labelIndex, args.label)
+          default:
+            return false
+        }
+      },
+    }
+    ;(window as any).__tikzjs = tikzjs
+    return () => { delete (window as any).__tikzjs }
+  }, [diagram])
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -178,6 +229,7 @@ export function Playground({ isDark }: { isDark: boolean }) {
           {/* Main editor area */}
           <div style={{ flex: 1, position: 'relative' }}>
             <D3EditorPanel
+              ref={editorPanelRef}
               diagram={diagram}
               onDiagramChange={handleDiagramChange}
               svgOptions={editorSvgOptions}

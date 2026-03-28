@@ -9,6 +9,7 @@
     "test:unit": "jest --silent=false --testPathPattern='test/unit'",
     "test:golden": "jest --silent=false --testPathPattern='test/golden'",
     "test:d3": "jest --silent=false --testPathPattern='test/d3'",
+    "test:e2e": "npx playwright test",
     "gen": "peggy -o src/parser/_tikzjs.js --cache src/parser/_tikzjs.pegjs",
     "build": "tsc",
     "clean": "rm -rf ./dist",
@@ -40,6 +41,7 @@
     }
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/d3-drag": "^3.0.7",
     "@types/d3-selection": "^3.0.11",
     "@types/jest": "^29.5.11",

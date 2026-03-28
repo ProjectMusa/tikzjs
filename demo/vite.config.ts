@@ -89,8 +89,31 @@ function requireToImport(): Plugin {
   }
 }
 
+/**
+ * Serve golden test fixtures at /tikzjs/fixtures/ for E2E tests.
+ */
+function serveFixtures(): Plugin {
+  const fixturesDir = path.resolve(__dirname, '../test/golden/fixtures')
+  return {
+    name: 'serve-fixtures',
+    configureServer(server) {
+      server.middlewares.use('/tikzjs/fixtures', (req, res, next) => {
+        const filePath = path.join(fixturesDir, req.url || '')
+        import('fs').then(fs => {
+          if (fs.existsSync(filePath)) {
+            res.setHeader('Content-Type', 'text/plain; charset=utf-8')
+            fs.createReadStream(filePath).pipe(res)
+          } else {
+            next()
+          }
+        })
+      })
+    },
+  }
+}
+
 export default defineConfig({
-  plugins: [requireToImport(), react()],
+  plugins: [requireToImport(), serveFixtures(), react()],
   base: '/tikzjs/',
   build: {
     outDir: '../gh-pages',
