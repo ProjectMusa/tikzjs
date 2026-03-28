@@ -32,6 +32,7 @@ interface FixtureStep {
     cpRole?: string
     newLabel?: string
     labelIndex?: number
+    key?: string
   }
 }
 
@@ -123,7 +124,7 @@ async function clickElement(page: Page, selector: string): Promise<void> {
 const fixtures = loadFixtures()
 
 for (const { name, fixture } of fixtures) {
-  const supported = fixture.steps.some(s => ['drag', 'drag-cp', 'edit-label', 'edit-edge-label'].includes(s.uiAction.type))
+  const supported = fixture.steps.some(s => ['drag', 'drag-cp', 'edit-label', 'edit-edge-label', 'delete', 'nudge'].includes(s.uiAction.type))
   if (!supported) continue
 
   test(`e2e: ${name} — ${fixture.description}`, async ({ page }) => {
@@ -398,8 +399,8 @@ for (const { name, fixture } of fixtures) {
           newLabel,
         })
 
-        // Find the node element and double-click it via two rapid click events
-        // (native dblclick doesn't fire through d3-drag; the editor uses click-timing detection)
+        // Find the node element and double-click it via two rapid mousedown events
+        // (the editor uses mousedown-timing detection to bypass d3-drag's click suppression)
         const svgEl = page.locator(`.editor-overlay svg [data-ir-id="${setup.elementId}"]`).first()
         await expect(svgEl).toBeVisible({ timeout: 3000 })
         await page.evaluate((sel) => {
@@ -411,8 +412,10 @@ for (const { name, fixture } of fixtures) {
             clientY: rect.y + rect.height / 2,
             bubbles: true, cancelable: true, button: 0, view: window,
           }
-          el.dispatchEvent(new MouseEvent('click', opts))
-          el.dispatchEvent(new MouseEvent('click', opts))
+          el.dispatchEvent(new MouseEvent('mousedown', opts))
+          el.dispatchEvent(new MouseEvent('mouseup', opts))
+          el.dispatchEvent(new MouseEvent('mousedown', opts))
+          el.dispatchEvent(new MouseEvent('mouseup', opts))
         }, `.editor-overlay svg [data-ir-id="${setup.elementId}"]`)
 
         // Wait for the inline input to appear
@@ -514,8 +517,10 @@ for (const { name, fixture } of fixtures) {
             clientY: rect.y + rect.height / 2,
             bubbles: true, cancelable: true, button: 0, view: window,
           }
-          el.dispatchEvent(new MouseEvent('click', opts))
-          el.dispatchEvent(new MouseEvent('click', opts))
+          el.dispatchEvent(new MouseEvent('mousedown', opts))
+          el.dispatchEvent(new MouseEvent('mouseup', opts))
+          el.dispatchEvent(new MouseEvent('mousedown', opts))
+          el.dispatchEvent(new MouseEvent('mouseup', opts))
         }, labelSelector)
 
         // Wait for the inline input to appear
@@ -545,6 +550,186 @@ for (const { name, fixture } of fixtures) {
         }, { edgeId: setup.edgeId, labelIndex })
 
         expect(actual.label).toBe(setup.expectedLabel)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Delete element
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'delete') {
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+          function collectByKind(elements: any[], kind: string): any[] {
+            const result: any[] = []
+            for (const el of elements) {
+              if (el.kind === kind) result.push(el)
+              if (el.kind === 'scope') result.push(...collectByKind(el.children, kind))
+            }
+            return result
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          let targetId: string
+          if (params.targetKind === 'node') {
+            const allNodes = collectAllNodes(ir.elements)
+            if (params.targetIndex >= allNodes.length) {
+              throw new Error(`Node index ${params.targetIndex} out of range`)
+            }
+            targetId = allNodes[params.targetIndex].id
+          } else {
+            const items = collectByKind(ir.elements, params.targetKind)
+            if (params.targetIndex >= items.length) {
+              throw new Error(`${params.targetKind} index ${params.targetIndex} out of range`)
+            }
+            targetId = items[params.targetIndex].id
+          }
+
+          // Apply programmatic mutation on a deep clone to get expected element count
+          const irCopy = JSON.parse(JSON.stringify(ir))
+          tikzjs.applyMutation(irCopy, params.action, { elementId: targetId })
+
+          return {
+            elementId: targetId,
+            expectedElementCount: irCopy.elements.length,
+          }
+        }, {
+          targetKind: step.mutation.target.kind,
+          targetIndex: step.mutation.target.index,
+          action: step.mutation.action,
+        })
+
+        // Click the element to select it
+        const selector = `.editor-overlay svg [data-ir-id="${setup.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+
+        // Press Delete key
+        await page.keyboard.press('Delete')
+        await page.waitForTimeout(1000)
+
+        // Verify the element was removed
+        const actual = await page.evaluate((params) => {
+          const ir = (window as any).__tikzjs.getIR()
+          function findById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if ('id' in el && el.id === id) return el
+              if (el.kind === 'scope') { const f = findById(el.children, id); if (f) return f }
+              if (el.kind === 'path') {
+                for (const n of el.inlineNodes) { if (n.id === id) return n }
+              }
+            }
+            return null
+          }
+          return {
+            elementCount: ir.elements.length,
+            elementStillExists: findById(ir.elements, params.elementId) !== null,
+          }
+        }, { elementId: setup.elementId })
+
+        expect(actual.elementStillExists).toBe(false)
+        expect(actual.elementCount).toBe(setup.expectedElementCount)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Nudge node (arrow keys)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'nudge') {
+        const arrowKey = step.uiAction.key!
+
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const allNodes = collectAllNodes(ir.elements)
+          if (params.targetIndex >= allNodes.length) {
+            throw new Error(`Node index ${params.targetIndex} out of range`)
+          }
+          const targetNode = allNodes[params.targetIndex]
+          if (targetNode.position.coord.cs !== 'xy') throw new Error('Not draggable')
+
+          const newX = targetNode.position.coord.x + params.deltaXPt
+          const newY = targetNode.position.coord.y + params.deltaYPt
+
+          const irCopy = JSON.parse(JSON.stringify(ir))
+          tikzjs.applyMutation(irCopy, params.action, { nodeId: targetNode.id, x: newX, y: newY })
+          const mutatedNode = findNodeById(irCopy.elements, targetNode.id)
+
+          return {
+            elementId: targetNode.id,
+            expectedX: mutatedNode.position.coord.x,
+            expectedY: mutatedNode.position.coord.y,
+          }
+        }, {
+          targetIndex: step.mutation.target.index,
+          action: step.mutation.action,
+          deltaXPt: step.mutation.args.deltaXPt,
+          deltaYPt: step.mutation.args.deltaYPt,
+        })
+
+        // Click the node to select it
+        const selector = `.editor-overlay svg [data-ir-id="${setup.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+
+        // Press the arrow key
+        await page.keyboard.press(arrowKey)
+        await page.waitForTimeout(1000)
+
+        // Read resulting IR and compare
+        const actual = await page.evaluate((params) => {
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const node = findNodeById(ir.elements, params.elementId)
+          if (!node) throw new Error(`Node ${params.elementId} not found after nudge`)
+          return { x: node.position.coord.x, y: node.position.coord.y }
+        }, { elementId: setup.elementId })
+
+        expect(Math.abs(actual.x - setup.expectedX)).toBeLessThan(COORD_TOLERANCE)
+        expect(Math.abs(actual.y - setup.expectedY)).toBeLessThan(COORD_TOLERANCE)
       }
     }
   })

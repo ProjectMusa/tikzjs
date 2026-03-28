@@ -5,7 +5,8 @@
  * The IR is the single source of truth — D3 reads from it and writes back.
  */
 
-import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix } from '../../ir/types.js'
+import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix, ResolvedStyle } from '../../ir/types.js'
+import { makeNode, coordRef } from '../../parser/factory.js'
 
 export type CpRole = 'cp1' | 'cp2' | 'to' | 'move'
 
@@ -216,6 +217,17 @@ export function moveSegmentEndpoint(
  * Searches top-level elements, scope children, and path inline nodes.
  * Returns true if the element was found and removed.
  */
+/**
+ * Add a new node to the diagram at the given position (in TikZ pt).
+ * Returns the new node's id.
+ */
+export function addNode(diagram: IRDiagram, xPt: number, yPt: number, label = ''): string {
+  const style: ResolvedStyle = {}
+  const node = makeNode(coordRef(xPt, yPt), label, style, [])
+  diagram.elements.push(node)
+  return node.id
+}
+
 export function removeElement(diagram: IRDiagram, elementId: string): boolean {
   return removeFromList(diagram.elements, elementId)
 }

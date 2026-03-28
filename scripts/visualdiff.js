@@ -33,7 +33,7 @@ function startServer() {
   Object.keys(require.cache).forEach(k => {
     if (k.includes('/dist/') || k.includes('/_tikzjs')) delete require.cache[k]
   })
-  const { generate } = require(path.join(ROOT, 'dist/index.js'))
+  const { generate } = require(path.join(ROOT, 'dist/core.js'))
 
   const server = http.createServer((req, res) => {
     const url = req.url.split('?')[0]

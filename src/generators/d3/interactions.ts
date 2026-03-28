@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx, NodeGeometryRegistry } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -21,23 +21,43 @@ export function setupSelection(
   clickZoneMap?: Map<string, SVGRectElement>,
   nodeRegistry?: NodeGeometryRegistry,
 ): void {
-  // Track last click time per element for double-click detection
-  // (native dblclick doesn't fire reliably when d3-drag is active)
-  const lastClickTime = new Map<string, number>()
   const DBLCLICK_THRESHOLD = 400 // ms
 
   function handleClick(id: string, event: MouseEvent) {
     event.stopPropagation()
 
-    const now = Date.now()
-    const lastTime = lastClickTime.get(id) ?? 0
+    // For edge labels, highlight the parent edge
+    const edgeLabelMatch = id.match(/^(.+):label:(\d+)$/)
+    const highlightId = edgeLabelMatch ? edgeLabelMatch[1] : id
+    controller.highlightElement(highlightId)
+    if (onSelect) onSelect(highlightId)
+  }
 
-    if (now - lastTime < DBLCLICK_THRESHOLD && onLabelEdit) {
-      // Double-click detected — open label editor
-      lastClickTime.delete(id)
+  // Use mousedown timing to detect double-clicks, since d3-drag may prevent
+  // native click/dblclick events from firing reliably.
+  const lastMousedownTime = new Map<string, number>()
+  const lastMousedownPos = new Map<string, { x: number; y: number }>()
+  const DBLCLICK_MOVE_THRESHOLD = 5 // px — mouse must not move more than this between clicks
+
+  function handleMousedown(id: string, event: MouseEvent) {
+    const now = Date.now()
+    const lastTime = lastMousedownTime.get(id) ?? 0
+    const lastPos = lastMousedownPos.get(id)
+
+    // Check if this is a double-click: two mousedowns within threshold,
+    // mouse didn't move much between them
+    const moved = lastPos ? Math.hypot(event.clientX - lastPos.x, event.clientY - lastPos.y) : 0
+    if (now - lastTime < DBLCLICK_THRESHOLD && moved < DBLCLICK_MOVE_THRESHOLD && onLabelEdit) {
+      lastMousedownTime.delete(id)
+      lastMousedownPos.delete(id)
+
+      // Open label editor — prevent d3-drag from starting
+      event.stopImmediatePropagation()
+      event.preventDefault()
+
       const el = elementMap.get(id)
 
-      // Check if this is an edge label (id format: "edgeId:label:index")
+      // Check if this is an edge label
       const edgeLabelMatch = id.match(/^(.+):label:(\d+)$/)
       if (edgeLabelMatch && el) {
         const edgeId = edgeLabelMatch[1]
@@ -57,15 +77,22 @@ export function setupSelection(
       }
     }
 
-    lastClickTime.set(id, now)
-    // For edge labels, highlight the parent edge
-    const edgeLabelMatch = id.match(/^(.+):label:(\d+)$/)
-    const highlightId = edgeLabelMatch ? edgeLabelMatch[1] : id
-    controller.highlightElement(highlightId)
-    if (onSelect) onSelect(highlightId)
+    lastMousedownTime.set(id, now)
+    lastMousedownPos.set(id, { x: event.clientX, y: event.clientY })
   }
 
-  // Attach click handlers to click zones (padded invisible rects)
+  // Attach mousedown handlers for double-click detection BEFORE d3-drag
+  // (uses native addEventListener to fire before d3's event handlers)
+  if (clickZoneMap) {
+    for (const [id, zone] of clickZoneMap) {
+      zone.addEventListener('mousedown', (event: MouseEvent) => handleMousedown(id, event))
+    }
+  }
+  for (const [id, el] of elementMap) {
+    (el as SVGElement).addEventListener('mousedown', (event: MouseEvent) => handleMousedown(id, event))
+  }
+
+  // Attach click handlers to click zones for single-click selection
   if (clickZoneMap) {
     for (const [id, zone] of clickZoneMap) {
       d3.select(zone).on('click', (event: MouseEvent) => handleClick(id, event))
@@ -82,6 +109,176 @@ export function setupSelection(
     controller.highlightElement(null)
     if (onSelect) onSelect(null)
   })
+
+  // Double-click on background to add a new node at that position
+  if (onLabelEdit) {
+    d3.select(svgElement).on('dblclick', (event: MouseEvent) => {
+      // Only add node if clicking on the SVG background, not on an element or click zone
+      const target = event.target as Element
+      if (target.closest?.('.d3-click-zone, [data-ir-id]')) return
+
+      // Convert screen coords to SVG user units (inside zoom group)
+      const zoomGroup = svgElement.querySelector('.d3-zoom-group') as SVGGraphicsElement | null
+      if (!zoomGroup) return
+
+      const pt = svgElement.createSVGPoint()
+      pt.x = event.clientX
+      pt.y = event.clientY
+      const ctm = zoomGroup.getScreenCTM()
+      if (!ctm) return
+      const svgPt = pt.matrixTransform(ctm.inverse())
+
+      // Convert SVG px to TikZ pt, with y-axis inversion
+      const xPt = pxToPt(svgPt.x)
+      const yPt = -pxToPt(svgPt.y) // SVG y is inverted vs TikZ
+
+      const newId = addNode(diagram, xPt, yPt)
+      onLabelEdit(diagram)
+      // Select the new node and open label editor
+      controller.highlightElement(newId)
+      if (onSelect) onSelect(newId)
+      // Wait for re-render, then open label editor on the new node
+      setTimeout(() => {
+        const newEl = svgElement.querySelector(`[data-ir-id="${CSS.escape(newId)}"]`) as SVGElement | null
+        const node = findNode(diagram, newId)
+        if (newEl && node) {
+          openLabelEditor(svgElement, newEl, node, newId, diagram, onLabelEdit, nodeRegistry)
+        }
+      }, 50)
+    })
+  }
+}
+
+// ── Keyboard ─────────────────────────────────────────────────────────────────
+
+/**
+ * Set up keyboard shortcuts for the D3 editor.
+ * - Delete/Backspace: remove selected element
+ * - Escape: deselect
+ * - Arrow keys: nudge selected node by 1pt (Shift: 5pt)
+ *
+ * Returns a cleanup function to remove the listener.
+ */
+export function setupKeyboard(
+  svgElement: SVGSVGElement,
+  diagram: IRDiagram,
+  controller: D3EditorController,
+  getSelectedId: () => string | null,
+  onIRChange: (diagram: IRDiagram) => void,
+  onSelect?: (id: string | null) => void,
+): () => void {
+  const NUDGE_PT = 1       // 1pt per arrow key press
+  const NUDGE_SHIFT_PT = 5 // 5pt with Shift held
+
+  function handleKeyDown(e: KeyboardEvent) {
+    // Don't intercept when user is typing in an input
+    if ((e.target as Element)?.tagName === 'INPUT' || (e.target as Element)?.tagName === 'TEXTAREA') return
+
+    const selectedId = getSelectedId()
+
+    // F2 or Enter: edit label of selected element (like spreadsheets)
+    if ((e.key === 'F2' || e.key === 'Enter') && selectedId) {
+      e.preventDefault()
+      // Check if it's an edge label
+      const edgeLabelMatch = selectedId.match(/^(.+):label:(\d+)$/)
+      if (edgeLabelMatch) {
+        const edgeId = edgeLabelMatch[1]
+        const labelIdx = parseInt(edgeLabelMatch[2], 10)
+        const edge = findElement(diagram.elements, edgeId)
+        const el = svgElement.querySelector(`[data-ir-id="${CSS.escape(selectedId)}"]`) as SVGElement | null
+        if (edge && edge.kind === 'edge' && labelIdx < edge.labels.length && el) {
+          openEdgeLabelEditor(svgElement, el, edge.labels[labelIdx].text, edgeId, labelIdx, diagram, onIRChange)
+          return
+        }
+      }
+      // Check if it's a node
+      const node = findNode(diagram, selectedId)
+      const el = svgElement.querySelector(`[data-ir-id="${CSS.escape(selectedId)}"]`) as SVGElement | null
+      if (node && el) {
+        openLabelEditor(svgElement, el, node, selectedId, diagram, onIRChange)
+        return
+      }
+    }
+
+    if (e.key === 'Escape') {
+      controller.highlightElement(null)
+      if (onSelect) onSelect(null)
+      return
+    }
+
+    // Undo: Ctrl+Z (or Cmd+Z on Mac)
+    if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+      e.preventDefault()
+      controller.undo()
+      return
+    }
+
+    // Redo: Ctrl+Y or Ctrl+Shift+Z (or Cmd+Shift+Z on Mac)
+    if ((e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
+        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
+      e.preventDefault()
+      controller.redo()
+      return
+    }
+
+    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+      e.preventDefault()
+      if (removeElement(diagram, selectedId)) {
+        controller.highlightElement(null)
+        if (onSelect) onSelect(null)
+        onIRChange(diagram)
+      }
+      return
+    }
+
+    // Tab: cycle selection through elements (Shift+Tab: reverse)
+    if (e.key === 'Tab') {
+      e.preventDefault()
+      const allIds = Array.from(svgElement.querySelectorAll('[data-ir-id]'))
+        .map(el => el.getAttribute('data-ir-id')!)
+        .filter(id => id && !id.includes(':label:')) // skip edge labels for Tab cycling
+      if (allIds.length === 0) return
+      const currentIdx = selectedId ? allIds.indexOf(selectedId) : -1
+      const next = e.shiftKey
+        ? (currentIdx <= 0 ? allIds.length - 1 : currentIdx - 1)
+        : (currentIdx < 0 || currentIdx >= allIds.length - 1 ? 0 : currentIdx + 1)
+      const nextId = allIds[next]
+      controller.highlightElement(nextId)
+      if (onSelect) onSelect(nextId)
+      return
+    }
+
+    // Arrow key nudge for selected nodes
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedId) {
+      const node = findNode(diagram, selectedId)
+      if (!node || !isDraggable(node)) return
+      const coord = node.position.coord
+      if (coord.cs !== 'xy') return
+
+      e.preventDefault()
+      const delta = e.shiftKey ? NUDGE_SHIFT_PT : NUDGE_PT
+      let newX = coord.x
+      let newY = coord.y
+      if (e.key === 'ArrowLeft')  newX -= delta
+      if (e.key === 'ArrowRight') newX += delta
+      if (e.key === 'ArrowUp')    newY += delta // TikZ y increases upward
+      if (e.key === 'ArrowDown')  newY -= delta
+      moveNode(diagram, selectedId, newX, newY)
+      onIRChange(diagram)
+    }
+  }
+
+  svgElement.ownerDocument.addEventListener('keydown', handleKeyDown)
+  return () => svgElement.ownerDocument.removeEventListener('keydown', handleKeyDown)
+}
+
+// ── Snap helper ──────────────────────────────────────────────────────────────
+
+const PT_PER_CM = 28.4528
+
+/** Snap a pt value to the nearest cm boundary (28.4528pt grid). */
+function snapToCm(pt: number): number {
+  return Math.round(pt / PT_PER_CM) * PT_PER_CM
 }
 
 // ── Drag ─────────────────────────────────────────────────────────────────────
@@ -91,6 +288,7 @@ interface DragState {
   startPtY: number
   startPxX: number
   startPxY: number
+  hasMoved: boolean
 }
 
 export function setupDrag(
@@ -99,6 +297,7 @@ export function setupDrag(
   diagram: IRDiagram,
   controller: D3EditorController,
   onIRChange?: (diagram: IRDiagram) => void,
+  clickZoneMap?: Map<string, SVGRectElement>,
 ): void {
   const draggables = svgElement.querySelectorAll('.d3-draggable')
 
@@ -109,13 +308,19 @@ export function setupDrag(
     const node = findNode(diagram, irId)
     if (!node || !isDraggable(node)) continue
 
+    // The drag target is the click zone (if present) since it sits on top
+    // and receives mousedown events. Visual feedback is applied to the
+    // actual element underneath.
+    const dragTarget = clickZoneMap?.get(irId) ?? el
+    const actualEl = el as SVGElement
+
     // Use the zoom group as the drag container so d3-drag computes
     // coordinates in the zoom group's local (pre-zoom) coordinate space.
     const zoomGroup = svgElement.querySelector('.d3-zoom-group') as SVGGElement | null
     const dragBehavior = d3Drag<SVGElement, unknown>()
       .container(zoomGroup ?? svgElement as any)
       .on('start', function (event) {
-        d3.select(this).classed('d3-dragging', true)
+        d3.select(actualEl).classed('d3-dragging', true)
         // Store initial IR position
         const coord = node.position.coord
         if (coord.cs === 'xy') {
@@ -124,6 +329,7 @@ export function setupDrag(
             startPtY: coord.y,
             startPxX: event.x,
             startPxY: event.y,
+            hasMoved: false,
           }
           d3.select(this).datum(state)
         }
@@ -131,6 +337,7 @@ export function setupDrag(
       .on('drag', function (event) {
         const state = d3.select(this).datum() as DragState
         if (!state) return
+        state.hasMoved = true
 
         // Compute delta in SVG coordinates (which are already in px units from the viewBox)
         const dxPx = event.x - state.startPxX
@@ -141,8 +348,14 @@ export function setupDrag(
         const dxPt = pxToPt(dxPx)
         const dyPt = -pxToPt(dyPx)
 
-        const newXPt = state.startPtX + dxPt
-        const newYPt = state.startPtY + dyPt
+        let newXPt = state.startPtX + dxPt
+        let newYPt = state.startPtY + dyPt
+
+        // Shift+drag: snap to nearest cm grid
+        if (event.sourceEvent?.shiftKey) {
+          newXPt = snapToCm(newXPt)
+          newYPt = snapToCm(newYPt)
+        }
 
         // Update IR
         moveNode(diagram, irId, newXPt, newYPt)
@@ -153,19 +366,27 @@ export function setupDrag(
         const newPxY = -ptToPx(newYPt)
 
         const translate = `translate(${newPxX.toFixed(2)}, ${newPxY.toFixed(2)})`
-        const transform = (this as SVGElement).getAttribute('transform') || ''
+        const transform = actualEl.getAttribute('transform') || ''
         const newTransform = /translate\([^)]*\)/.test(transform)
           ? transform.replace(/translate\([^)]*\)/, translate)
           : translate + (transform ? ' ' + transform : '')
-        ;(this as SVGElement).setAttribute('transform', newTransform)
+        actualEl.setAttribute('transform', newTransform)
       })
       .on('end', function () {
-        d3.select(this).classed('d3-dragging', false)
-        // Notify that IR has changed — triggers full re-render to update edges
-        if (onIRChange) onIRChange(diagram)
+        d3.select(actualEl).classed('d3-dragging', false)
+        const state = d3.select(this).datum() as DragState | null
+        // Only trigger re-render if the mouse actually moved during drag.
+        // A zero-distance "drag" is just a click — re-rendering would destroy
+        // DOM state needed for double-click detection.
+        if (state?.hasMoved && onIRChange) onIRChange(diagram)
       })
 
-    d3.select(el as SVGElement).call(dragBehavior)
+    // Attach drag to click zone (receives real user events from DOM top layer)
+    // AND to the actual element (receives E2E test dispatched events)
+    d3.select(dragTarget as SVGElement).call(dragBehavior)
+    if (dragTarget !== el) {
+      d3.select(el as SVGElement).call(dragBehavior)
+    }
   }
 }
 
@@ -414,8 +635,14 @@ export function setupControlPointDrag(
         const dxPt = pxToPt(event.x - state.startPxX)
         const dyPt = -pxToPt(event.y - state.startPxY)
 
-        const newXPt = state.startPtX + dxPt
-        const newYPt = state.startPtY + dyPt
+        let newXPt = state.startPtX + dxPt
+        let newYPt = state.startPtY + dyPt
+
+        // Shift+drag: snap to nearest cm grid
+        if (event.sourceEvent?.shiftKey) {
+          newXPt = snapToCm(newXPt)
+          newYPt = snapToCm(newYPt)
+        }
 
         // Determine which mutation to use based on segment kind and cpRole
         const el = findElement(diagram.elements, state.pathId)
