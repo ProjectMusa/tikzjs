@@ -35,6 +35,9 @@ jobs:
       - name: Install dependencies and build
         run: npm ci
 
+      - name: Install demo dependencies
+        run: cd demo && npm ci
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
