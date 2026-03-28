@@ -5,8 +5,8 @@
 import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
-import { pxToPt, ptToPx } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, type CpRole } from './irMutator.js'
+import { pxToPt, ptToPx, NodeGeometryRegistry } from '../core/coordResolver.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -19,6 +19,7 @@ export function setupSelection(
   onSelect?: (id: string | null) => void,
   onLabelEdit?: (diagram: IRDiagram) => void,
   clickZoneMap?: Map<string, SVGRectElement>,
+  nodeRegistry?: NodeGeometryRegistry,
 ): void {
   // Track last click time per element for double-click detection
   // (native dblclick doesn't fire reliably when d3-drag is active)
@@ -32,19 +33,36 @@ export function setupSelection(
     const lastTime = lastClickTime.get(id) ?? 0
 
     if (now - lastTime < DBLCLICK_THRESHOLD && onLabelEdit) {
-      // Double-click detected — open label editor for nodes
+      // Double-click detected — open label editor
       lastClickTime.delete(id)
       const el = elementMap.get(id)
+
+      // Check if this is an edge label (id format: "edgeId:label:index")
+      const edgeLabelMatch = id.match(/^(.+):label:(\d+)$/)
+      if (edgeLabelMatch && el) {
+        const edgeId = edgeLabelMatch[1]
+        const labelIdx = parseInt(edgeLabelMatch[2], 10)
+        const edge = findElement(diagram.elements, edgeId)
+        if (edge && edge.kind === 'edge' && labelIdx < edge.labels.length) {
+          openEdgeLabelEditor(svgElement, el, edge.labels[labelIdx].text, edgeId, labelIdx, diagram, onLabelEdit)
+          return
+        }
+      }
+
+      // Check if this is a node
       const node = findNode(diagram, id)
       if (node && el) {
-        openLabelEditor(svgElement, el, node, id, diagram, onLabelEdit)
+        openLabelEditor(svgElement, el, node, id, diagram, onLabelEdit, nodeRegistry)
         return
       }
     }
 
     lastClickTime.set(id, now)
-    controller.highlightElement(id)
-    if (onSelect) onSelect(id)
+    // For edge labels, highlight the parent edge
+    const edgeLabelMatch = id.match(/^(.+):label:(\d+)$/)
+    const highlightId = edgeLabelMatch ? edgeLabelMatch[1] : id
+    controller.highlightElement(highlightId)
+    if (onSelect) onSelect(highlightId)
   }
 
   // Attach click handlers to click zones (padded invisible rects)
@@ -166,21 +184,22 @@ export function injectStyles(container: HTMLElement): HTMLStyleElement {
     .d3-locked { cursor: not-allowed; opacity: 0.9; }
     .d3-label-input {
       position: absolute;
-      border: 1.5px solid #f59e0b;
-      border-radius: 3px;
-      background: rgba(0, 0, 0, 0.85);
-      color: #fff;
+      border: 2px solid #f59e0b;
+      border-radius: 2px;
+      background: rgba(255, 255, 255, 0.95);
+      color: #111;
       font-family: monospace;
       font-size: 13px;
-      padding: 2px 6px;
+      padding: 0;
       outline: none;
-      min-width: 40px;
       z-index: 1000;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+      box-shadow: 0 2px 12px rgba(0,0,0,0.25);
+      text-align: center;
+      box-sizing: border-box;
     }
     .d3-label-input:focus {
-      border-color: #fbbf24;
-      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.3);
+      border-color: #f59e0b;
+      box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 2px 12px rgba(0,0,0,0.25);
     }
   `
   container.prepend(style)
@@ -421,9 +440,13 @@ export function setupControlPointDrag(
 
 // ── Label editing ───────────────────────────────────────────────────────────
 
+const SVG_NS = 'http://www.w3.org/2000/svg'
+const XHTML_NS = 'http://www.w3.org/1999/xhtml'
+
 /**
  * Open an inline text input over a node to edit its label.
- * Called from setupSelection when a double-click is detected.
+ * Uses SVG <foreignObject> inside the zoom group so the input is positioned
+ * in the same coordinate space as the highlight bbox — no CSS/screen offset math.
  */
 function openLabelEditor(
   svgElement: SVGSVGElement,
@@ -432,41 +455,103 @@ function openLabelEditor(
   id: string,
   diagram: IRDiagram,
   onIRChange: (diagram: IRDiagram) => void,
+  nodeRegistry?: NodeGeometryRegistry,
 ): void {
-  const container = svgElement.closest('.editor-overlay') as HTMLElement
-    ?? svgElement.parentElement
-  if (!container) return
+  const doc = svgElement.ownerDocument
+  if (!doc) return
 
-  // Remove any existing label input
-  const existing = container.querySelector('.d3-label-input')
-  if (existing) existing.remove()
+  // Remove any existing label editor
+  svgElement.querySelectorAll('.d3-label-editor').forEach((e) => e.remove())
 
-  // Position the input over the node's bounding box
-  const bbox = (el as SVGGraphicsElement).getBoundingClientRect()
-  const containerRect = container.getBoundingClientRect()
+  // Compute bbox in SVG user-unit space — same logic as addNodeHighlight
+  let x: number, y: number, w: number, h: number
+  const geo = nodeRegistry?.getById(id)
+  if (geo) {
+    x = geo.centerX - geo.halfWidth
+    y = geo.centerY - geo.halfHeight
+    w = geo.halfWidth * 2
+    h = geo.halfHeight * 2
+  } else {
+    try {
+      const bbox = (el as unknown as SVGGraphicsElement).getBBox?.()
+      if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
+      x = bbox.x
+      y = bbox.y
+      w = bbox.width
+      h = bbox.height
+    } catch {
+      return
+    }
+  }
 
-  const input = document.createElement('input')
-  input.type = 'text'
-  input.className = 'd3-label-input'
-  input.value = node.label
-  input.style.left = `${bbox.left - containerRect.left + bbox.width / 2}px`
-  input.style.top = `${bbox.top - containerRect.top + bbox.height / 2}px`
-  input.style.transform = 'translate(-50%, -50%)'
+  const pad = 4
+  const minW = 80
+  const minH = 24
+  const foW = Math.max(minW, w + pad * 2)
+  const foH = Math.max(minH, h + pad * 2)
 
-  // Size the input to fit the content
-  const charWidth = 8
-  input.style.width = `${Math.max(60, node.label.length * charWidth + 20)}px`
+  // Center the foreignObject over the node bbox
+  const foX = x + w / 2 - foW / 2
+  const foY = y + h / 2 - foH / 2
+
+  const fo = doc.createElementNS(SVG_NS, 'foreignObject')
+  fo.setAttribute('class', 'd3-label-editor')
+  fo.setAttribute('x', String(foX))
+  fo.setAttribute('y', String(foY))
+  fo.setAttribute('width', String(foW))
+  fo.setAttribute('height', String(foH))
+
+  const input = doc.createElementNS(XHTML_NS, 'input') as HTMLInputElement
+  input.setAttribute('type', 'text')
+  input.setAttribute('class', 'd3-label-input')
+  input.setAttribute('value', node.label)
+  // Inline styles since CSS may not apply inside foreignObject in all browsers
+  input.style.width = '100%'
+  input.style.height = '100%'
+  input.style.border = '2px solid #f59e0b'
+  input.style.borderRadius = '2px'
+  input.style.background = 'rgba(255, 255, 255, 0.95)'
+  input.style.color = '#111'
+  input.style.fontFamily = 'monospace'
+  input.style.fontSize = '13px'
+  input.style.padding = '0'
+  input.style.outline = 'none'
+  input.style.textAlign = 'center'
+  input.style.boxSizing = 'border-box'
+  input.style.boxShadow = '0 2px 12px rgba(0,0,0,0.25)'
+
+  fo.appendChild(input)
+
+  // Append inside the zoom group so it transforms with zoom/pan
+  const zoomGroup = svgElement.querySelector('.d3-zoom-group')
+  ;(zoomGroup ?? svgElement).appendChild(fo)
 
   let committed = false
+
   function commit() {
     if (committed) return
     committed = true
+    doc.removeEventListener('mousedown', onClickOutside, true)
     const newLabel = input.value
-    input.remove()
+    fo.remove()
     if (newLabel !== node.label) {
       updateNodeLabel(diagram, id, newLabel)
       onIRChange(diagram)
     }
+  }
+
+  function cancel() {
+    if (committed) return
+    committed = true
+    doc.removeEventListener('mousedown', onClickOutside, true)
+    fo.remove()
+  }
+
+  function onClickOutside(e: MouseEvent) {
+    if (fo.contains(e.target as Node)) return
+    e.preventDefault()
+    e.stopPropagation()
+    commit()
   }
 
   input.addEventListener('keydown', (e) => {
@@ -474,18 +559,152 @@ function openLabelEditor(
       e.preventDefault()
       commit()
     } else if (e.key === 'Escape') {
-      committed = true
-      input.remove()
+      cancel()
     }
   })
-  input.addEventListener('blur', commit)
 
-  // Auto-resize as user types
-  input.addEventListener('input', () => {
-    input.style.width = `${Math.max(60, input.value.length * charWidth + 20)}px`
+  // Delay click-outside listener so the double-click that opened the editor doesn't close it
+  setTimeout(() => {
+    if (!committed) {
+      doc.addEventListener('mousedown', onClickOutside, true)
+    }
+  }, 0)
+
+  input.focus()
+  input.select()
+}
+
+/**
+ * Open an inline text input over an edge label to edit it.
+ * Similar to openLabelEditor but uses updateEdgeLabel instead of updateNodeLabel.
+ */
+function openEdgeLabelEditor(
+  svgElement: SVGSVGElement,
+  el: SVGElement,
+  currentText: string,
+  edgeId: string,
+  labelIndex: number,
+  diagram: IRDiagram,
+  onIRChange: (diagram: IRDiagram) => void,
+): void {
+  const doc = svgElement.ownerDocument
+  if (!doc) return
+
+  // Remove any existing label editor
+  svgElement.querySelectorAll('.d3-label-editor').forEach((e) => e.remove())
+
+  // Get bbox in zoom group coordinate space.
+  // Edge label <g> elements have a transform="translate(x,y)" so getBBox()
+  // returns local coordinates. We need to offset by the element's CTM.
+  let x: number, y: number, w: number, h: number
+  try {
+    const gfx = el as unknown as SVGGraphicsElement
+    const bbox = gfx.getBBox?.()
+    if (!bbox || bbox.width <= 0 || bbox.height <= 0) return
+
+    // Get the element's transform relative to the nearest viewport (SVG root)
+    const zoomGroup = svgElement.querySelector('.d3-zoom-group') as SVGGraphicsElement | null
+    const elCTM = gfx.getCTM?.()
+    const zgCTM = zoomGroup?.getCTM?.()
+    if (elCTM && zgCTM) {
+      // Compute element→zoomGroup transform
+      const inv = zgCTM.inverse()
+      const rel = inv.multiply(elCTM)
+      x = rel.a * bbox.x + rel.c * bbox.y + rel.e
+      y = rel.b * bbox.x + rel.d * bbox.y + rel.f
+      w = bbox.width * Math.abs(rel.a)
+      h = bbox.height * Math.abs(rel.d)
+    } else {
+      x = bbox.x
+      y = bbox.y
+      w = bbox.width
+      h = bbox.height
+    }
+  } catch {
+    return
+  }
+
+  const pad = 4
+  const minW = 80
+  const minH = 24
+  const foW = Math.max(minW, w + pad * 2)
+  const foH = Math.max(minH, h + pad * 2)
+  const foX = x + w / 2 - foW / 2
+  const foY = y + h / 2 - foH / 2
+
+  const fo = doc.createElementNS(SVG_NS, 'foreignObject')
+  fo.setAttribute('class', 'd3-label-editor')
+  fo.setAttribute('x', String(foX))
+  fo.setAttribute('y', String(foY))
+  fo.setAttribute('width', String(foW))
+  fo.setAttribute('height', String(foH))
+
+  const input = doc.createElementNS(XHTML_NS, 'input') as HTMLInputElement
+  input.setAttribute('type', 'text')
+  input.setAttribute('class', 'd3-label-input')
+  input.setAttribute('value', currentText)
+  input.style.width = '100%'
+  input.style.height = '100%'
+  input.style.border = '2px solid #f59e0b'
+  input.style.borderRadius = '2px'
+  input.style.background = 'rgba(255, 255, 255, 0.95)'
+  input.style.color = '#111'
+  input.style.fontFamily = 'monospace'
+  input.style.fontSize = '13px'
+  input.style.padding = '0'
+  input.style.outline = 'none'
+  input.style.textAlign = 'center'
+  input.style.boxSizing = 'border-box'
+  input.style.boxShadow = '0 2px 12px rgba(0,0,0,0.25)'
+
+  fo.appendChild(input)
+
+  const zoomGroup = svgElement.querySelector('.d3-zoom-group')
+  ;(zoomGroup ?? svgElement).appendChild(fo)
+
+  let committed = false
+
+  function commit() {
+    if (committed) return
+    committed = true
+    doc.removeEventListener('mousedown', onClickOutside, true)
+    const newLabel = input.value
+    fo.remove()
+    if (newLabel !== currentText) {
+      updateEdgeLabel(diagram, edgeId, labelIndex, newLabel)
+      onIRChange(diagram)
+    }
+  }
+
+  function cancel() {
+    if (committed) return
+    committed = true
+    doc.removeEventListener('mousedown', onClickOutside, true)
+    fo.remove()
+  }
+
+  function onClickOutside(e: MouseEvent) {
+    if (fo.contains(e.target as Node)) return
+    e.preventDefault()
+    e.stopPropagation()
+    commit()
+  }
+
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault()
+      commit()
+    } else if (e.key === 'Escape') {
+      cancel()
+    }
   })
 
-  container.appendChild(input)
+  setTimeout(() => {
+    if (!committed) {
+      doc.addEventListener('mousedown', onClickOutside, true)
+    }
+  }, 0)
+
   input.focus()
   input.select()
 }

@@ -1,0 +1,19 @@
+{
+  "description": "Edit edge label in 46-edge-node-label",
+  "goldenFixture": "46-edge-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "updateEdgeLabel",
+        "target": { "kind": "edge", "index": 0 },
+        "args": { "labelIndex": 0, "label": "\\alpha" }
+      },
+      "uiAction": {
+        "type": "edit-edge-label",
+        "target": { "kind": "edge", "index": 0 },
+        "labelIndex": 0,
+        "newLabel": "\\alpha"
+      }
+    }
+  ]
+}

@@ -133,22 +133,41 @@ export function createD3Editor(
       zoomGroup.insertBefore(gridGroup, zoomGroup.firstChild)
     }
 
-    // Build click zones — invisible padded rects over each element so clicks
-    // don't fight with the zoom/pan layer.  Placed inside the zoom group so
-    // they pan/zoom together with the content.
+    // Build click zones — invisible padded rects/paths over each element so
+    // clicks don't fight with the zoom/pan layer.  Placed inside the zoom group
+    // so they pan/zoom together with the content.
+    // Edge/path zones use thin padding (stroke only); labels/nodes use wider padding.
+    // Labels are rendered on top so they're not obscured by edge zones.
     const clickZoneGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
     clickZoneGroup.setAttribute('class', 'd3-click-zones')
-    const CLICK_PADDING = 6 // px padding around each element
+    const NODE_CLICK_PADDING = 6
+    const EDGE_CLICK_PADDING = 3 // thin — just cover the stroke + arrowheads
     const clickZoneMap = new Map<string, SVGRectElement>()
+
+    // Two passes: edges/paths first (bottom), then nodes/labels on top
+    const edgeIds: string[] = []
+    const labelIds: string[] = []
+    const nodeIds: string[] = []
     for (const [id, el] of result.elementMap) {
+      const kind = el.getAttribute('data-ir-kind')
+      if (kind === 'edge' || kind === 'path') edgeIds.push(id)
+      else if (kind === 'edge-label') labelIds.push(id)
+      else nodeIds.push(id)
+    }
+
+    for (const id of [...edgeIds, ...nodeIds, ...labelIds]) {
+      const el = result.elementMap.get(id)!
+      const kind = el.getAttribute('data-ir-kind')
+      const isEdge = kind === 'edge' || kind === 'path'
+      const pad = isEdge ? EDGE_CLICK_PADDING : NODE_CLICK_PADDING
       try {
         const bbox = (el as SVGGraphicsElement).getBBox()
         if (bbox.width === 0 && bbox.height === 0) continue
         const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
-        rect.setAttribute('x', String(bbox.x - CLICK_PADDING))
-        rect.setAttribute('y', String(bbox.y - CLICK_PADDING))
-        rect.setAttribute('width', String(bbox.width + CLICK_PADDING * 2))
-        rect.setAttribute('height', String(bbox.height + CLICK_PADDING * 2))
+        rect.setAttribute('x', String(bbox.x - pad))
+        rect.setAttribute('y', String(bbox.y - pad))
+        rect.setAttribute('width', String(bbox.width + pad * 2))
+        rect.setAttribute('height', String(bbox.height + pad * 2))
         rect.setAttribute('fill', 'transparent')
         rect.setAttribute('class', 'd3-click-zone')
         rect.setAttribute('data-zone-id', id)
@@ -209,7 +228,7 @@ export function createD3Editor(
         render()
         if (opts.onIRChange) opts.onIRChange(currentDiagram)
       }
-      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, onLabelEdit, clickZoneMap)
+      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, onLabelEdit, clickZoneMap, currentNodeRegistry)
       setupDrag(
         svgEl,
         result.elementMap,

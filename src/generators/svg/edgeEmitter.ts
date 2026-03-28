@@ -95,9 +95,15 @@ export function emitEdge(
   const labelRenderer = (edge as IRTikzcdArrow).tikzcdKind ? scriptMathModeRenderer : mathRenderer
 
   // Render labels
-  for (const label of edge.labels) {
+  for (let labelIdx = 0; labelIdx < edge.labels.length; labelIdx++) {
+    const label = edge.labels[labelIdx]
     const result = emitEdgeLabel(label, midpoint, fromCenter, toCenter, document, labelRenderer, constants)
     if (result) {
+      // Tag label elements for D3 editor interactivity
+      result.el.setAttribute('data-ir-id', `${edge.id}:label:${labelIdx}`)
+      result.el.setAttribute('data-ir-kind', 'edge-label')
+      result.el.setAttribute('data-edge-id', edge.id)
+      result.el.setAttribute('data-label-index', String(labelIdx))
       elements.push(result.el)
       bboxes.push(result.bbox)
     }

@@ -13,7 +13,7 @@ import * as path from 'path'
 const PT_TO_PX = 52 / 28.4528
 
 interface FixtureTarget {
-  kind: 'node' | 'path'
+  kind: 'node' | 'path' | 'edge'
   index: number
 }
 
@@ -31,6 +31,7 @@ interface FixtureStep {
     segIdx?: number
     cpRole?: string
     newLabel?: string
+    labelIndex?: number
   }
 }
 
@@ -122,7 +123,7 @@ async function clickElement(page: Page, selector: string): Promise<void> {
 const fixtures = loadFixtures()
 
 for (const { name, fixture } of fixtures) {
-  const supported = fixture.steps.some(s => s.uiAction.type === 'drag' || s.uiAction.type === 'drag-cp' || s.uiAction.type === 'edit-label')
+  const supported = fixture.steps.some(s => ['drag', 'drag-cp', 'edit-label', 'edit-edge-label'].includes(s.uiAction.type))
   if (!supported) continue
 
   test(`e2e: ${name} — ${fixture.description}`, async ({ page }) => {
@@ -440,6 +441,108 @@ for (const { name, fixture } of fixtures) {
           if (!node) throw new Error(`Node ${params.elementId} not found after edit`)
           return { label: node.label }
         }, { elementId: setup.elementId })
+
+        expect(actual.label).toBe(setup.expectedLabel)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Edge label edit
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'edit-edge-label') {
+        const newLabel = step.uiAction.newLabel!
+        const labelIndex = step.uiAction.labelIndex ?? 0
+
+        const setup = await page.evaluate((params) => {
+          function collectEdges(elements: any[]): any[] {
+            const edges: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'edge') edges.push(el)
+              if (el.kind === 'scope') edges.push(...collectEdges(el.children))
+            }
+            return edges
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const edges = collectEdges(ir.elements)
+          if (params.targetIndex >= edges.length) {
+            throw new Error(`Edge index ${params.targetIndex} out of range (${edges.length} found)`)
+          }
+          const targetEdge = edges[params.targetIndex]
+          if (params.labelIndex >= targetEdge.labels.length) {
+            throw new Error(`Label index ${params.labelIndex} out of range (${targetEdge.labels.length} found)`)
+          }
+
+          // Apply programmatic mutation on a deep clone
+          const irCopy = JSON.parse(JSON.stringify(ir))
+          tikzjs.applyMutation(irCopy, params.action, {
+            edgeId: targetEdge.id, labelIndex: params.labelIndex, label: params.newLabel,
+          })
+
+          function findEdgeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'edge' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findEdgeById(el.children, id); if (f) return f }
+            }
+            return null
+          }
+          const mutatedEdge = findEdgeById(irCopy.elements, targetEdge.id)
+
+          return {
+            edgeId: targetEdge.id,
+            labelId: `${targetEdge.id}:label:${params.labelIndex}`,
+            expectedLabel: mutatedEdge.labels[params.labelIndex].text,
+          }
+        }, {
+          targetIndex: step.mutation.target.index,
+          action: step.mutation.action,
+          labelIndex,
+          newLabel,
+        })
+
+        // Find the edge label element and double-click it
+        const labelSelector = `.editor-overlay svg [data-ir-id="${setup.labelId}"]`
+        await expect(page.locator(labelSelector).first()).toBeVisible({ timeout: 3000 })
+        await page.evaluate((sel) => {
+          const el = document.querySelector(sel) as SVGElement
+          if (!el) throw new Error(`Edge label not found: ${sel}`)
+          const rect = el.getBoundingClientRect()
+          const opts = {
+            clientX: rect.x + rect.width / 2,
+            clientY: rect.y + rect.height / 2,
+            bubbles: true, cancelable: true, button: 0, view: window,
+          }
+          el.dispatchEvent(new MouseEvent('click', opts))
+          el.dispatchEvent(new MouseEvent('click', opts))
+        }, labelSelector)
+
+        // Wait for the inline input to appear
+        const input = page.locator('.d3-label-input')
+        await expect(input).toBeVisible({ timeout: 3000 })
+
+        // Clear and type the new label
+        await input.fill(newLabel)
+        await input.press('Enter')
+
+        // Wait for re-render
+        await page.waitForTimeout(1000)
+
+        // Read resulting IR and compare
+        const actual = await page.evaluate((params) => {
+          function findEdgeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'edge' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findEdgeById(el.children, id); if (f) return f }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const edge = findEdgeById(ir.elements, params.edgeId)
+          if (!edge) throw new Error(`Edge ${params.edgeId} not found after edit`)
+          return { label: edge.labels[params.labelIndex].text }
+        }, { edgeId: setup.edgeId, labelIndex })
 
         expect(actual.label).toBe(setup.expectedLabel)
       }

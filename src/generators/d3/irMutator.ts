@@ -107,6 +107,17 @@ export function updateNodeLabel(diagram: IRDiagram, nodeId: string, newLabel: st
 }
 
 /**
+ * Update an edge's label text.
+ */
+export function updateEdgeLabel(diagram: IRDiagram, edgeId: string, labelIndex: number, newLabel: string): boolean {
+  const el = findElement(diagram.elements, edgeId)
+  if (!el || el.kind !== 'edge') return false
+  if (labelIndex < 0 || labelIndex >= el.labels.length) return false
+  el.labels[labelIndex].text = newLabel
+  return true
+}
+
+/**
  * Get all node IDs that are connected to a given node via edges.
  * Returns the edge IDs and connected node IDs for selective re-rendering.
  */
