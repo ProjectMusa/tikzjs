@@ -91,9 +91,19 @@ export function createD3Editor(
     redoStack.length = 0 // clear redo on new mutation
   }
 
+  // Debounce rapid mutations (e.g., arrow key nudges) into a single undo entry.
+  // The first mutation in a burst snapshots immediately; subsequent mutations within
+  // DEBOUNCE_MS reuse the same snapshot (no new undo entry).
+  const UNDO_DEBOUNCE_MS = 300
+  let lastMutationTime = 0
+
   /** Common handler for IR mutations: snapshot, update, re-render, notify. */
   function handleMutation(updatedDiagram: IRDiagram) {
-    snapshotForUndo()
+    const now = Date.now()
+    if (now - lastMutationTime > UNDO_DEBOUNCE_MS) {
+      snapshotForUndo()
+    }
+    lastMutationTime = now
     currentDiagram = updatedDiagram
     render()
     if (opts.onIRChange) opts.onIRChange(currentDiagram)
