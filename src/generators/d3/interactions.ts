@@ -198,6 +198,16 @@ export function setupKeyboard(
         openLabelEditor(svgElement, el, node, selectedId, diagram, onIRChange)
         return
       }
+      // Check if it's an edge with labels — open the first label for editing
+      const edgeEl = findElement(diagram.elements, selectedId)
+      if (edgeEl && edgeEl.kind === 'edge' && edgeEl.labels.length > 0) {
+        const labelId = `${selectedId}:label:0`
+        const labelEl = svgElement.querySelector(`[data-ir-id="${CSS.escape(labelId)}"]`) as SVGElement | null
+        if (labelEl) {
+          openEdgeLabelEditor(svgElement, labelEl, edgeEl.labels[0].text, selectedId, 0, diagram, onIRChange)
+          return
+        }
+      }
     }
 
     if (e.key === 'Escape') {
