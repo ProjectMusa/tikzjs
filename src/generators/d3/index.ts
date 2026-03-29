@@ -53,6 +53,8 @@ export interface D3EditorController {
   undo(): boolean
   /** Redo the last undone mutation. Returns true if redo was performed. */
   redo(): boolean
+  /** Reset zoom/pan to fit the content in the viewport. */
+  resetZoom(): void
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -320,6 +322,12 @@ export function createD3Editor(
       if (opts.onElementSelect) opts.onElementSelect(null)
       if (opts.onIRChange) opts.onIRChange(currentDiagram)
       return true
+    },
+    resetZoom() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      currentTransform = zoomIdentity
+      d3.select(svg).call(zoomBehavior.transform, zoomIdentity)
     },
     destroy() {
       if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }

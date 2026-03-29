@@ -166,6 +166,7 @@ export function setupSelection(
  * Set up keyboard shortcuts for the D3 editor.
  * - Delete/Backspace: remove selected element
  * - Escape: deselect
+ * - Home/0: reset zoom to fit content
  * - Arrow keys: nudge selected node by 1pt (Shift: 5pt)
  *
  * Returns a cleanup function to remove the listener.
@@ -225,6 +226,13 @@ export function setupKeyboard(
     if (e.key === 'Escape') {
       controller.highlightElement(null)
       if (onSelect) onSelect(null)
+      return
+    }
+
+    // Home or 0: reset zoom to fit content
+    if (e.key === 'Home' || (e.key === '0' && !e.ctrlKey && !e.metaKey && !selectedId)) {
+      e.preventDefault()
+      controller.resetZoom()
       return
     }
 
