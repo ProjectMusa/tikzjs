@@ -301,6 +301,14 @@ function removeFromList(elements: IRElement[], id: string): boolean {
       for (let j = 0; j < el.inlineNodes.length; j++) {
         if (el.inlineNodes[j].id === id) {
           el.inlineNodes.splice(j, 1)
+          // Also remove the corresponding node-on-path segment
+          for (let k = 0; k < el.segments.length; k++) {
+            const seg = el.segments[k]
+            if (seg.kind === 'node-on-path' && seg.nodeId === id) {
+              el.segments.splice(k, 1)
+              break
+            }
+          }
           return true
         }
       }
