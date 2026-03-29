@@ -167,6 +167,7 @@ export function setupSelection(
  * - Delete/Backspace: remove selected element
  * - Escape: deselect
  * - Home/0: reset zoom to fit content
+ * - +/=: zoom in, -: zoom out
  * - Arrow keys: nudge selected node by 1pt (Shift: 5pt)
  *
  * Returns a cleanup function to remove the listener.
@@ -233,6 +234,18 @@ export function setupKeyboard(
     if (e.key === 'Home' || (e.key === '0' && !e.ctrlKey && !e.metaKey && !selectedId)) {
       e.preventDefault()
       controller.resetZoom()
+      return
+    }
+
+    // +/= to zoom in, - to zoom out
+    if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      controller.zoomIn()
+      return
+    }
+    if (e.key === '-' && !e.ctrlKey && !e.metaKey) {
+      e.preventDefault()
+      controller.zoomOut()
       return
     }
 

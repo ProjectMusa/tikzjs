@@ -55,6 +55,10 @@ export interface D3EditorController {
   redo(): boolean
   /** Reset zoom/pan to fit the content in the viewport. */
   resetZoom(): void
+  /** Zoom in by a fixed step. */
+  zoomIn(): void
+  /** Zoom out by a fixed step. */
+  zoomOut(): void
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -333,6 +337,16 @@ export function createD3Editor(
       if (!svg || !zoomBehavior) return
       currentTransform = zoomIdentity
       d3.select(svg).call(zoomBehavior.transform, zoomIdentity)
+    },
+    zoomIn() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      zoomBehavior.scaleBy(d3.select(svg), 1.3)
+    },
+    zoomOut() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      zoomBehavior.scaleBy(d3.select(svg), 1 / 1.3)
     },
     destroy() {
       if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
