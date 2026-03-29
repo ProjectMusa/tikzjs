@@ -75,6 +75,17 @@ export function setupSelection(
         openLabelEditor(svgElement, el, node, id, diagram, onLabelEdit, nodeRegistry)
         return
       }
+
+      // Check if this is an edge with labels — open the first label
+      const edgeEl = findElement(diagram.elements, id)
+      if (edgeEl && edgeEl.kind === 'edge' && edgeEl.labels.length > 0) {
+        const labelId = `${id}:label:0`
+        const labelSvg = svgElement.querySelector(`[data-ir-id="${CSS.escape(labelId)}"]`) as SVGElement | null
+        if (labelSvg) {
+          openEdgeLabelEditor(svgElement, labelSvg, edgeEl.labels[0].text, id, 0, diagram, onLabelEdit)
+          return
+        }
+      }
     }
 
     lastMousedownTime.set(id, now)
