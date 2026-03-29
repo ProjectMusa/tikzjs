@@ -339,24 +339,19 @@ export function setupKeyboard(
 const HELP_CLASS = 'd3-shortcut-help'
 
 function toggleShortcutHelp(svg: SVGSVGElement): void {
-  const existing = svg.querySelector(`.${HELP_CLASS}`)
+  const container = svg.parentElement
+  if (!container) return
+  const existing = container.querySelector(`.${HELP_CLASS}`)
   if (existing) { existing.remove(); return }
 
   const doc = svg.ownerDocument
-  const fo = doc.createElementNS('http://www.w3.org/2000/svg', 'foreignObject')
-  fo.setAttribute('class', HELP_CLASS)
-  fo.setAttribute('x', '0')
-  fo.setAttribute('y', '0')
-  fo.setAttribute('width', '100%')
-  fo.setAttribute('height', '100%')
-  fo.style.pointerEvents = 'none'
-
   const div = doc.createElement('div')
+  div.className = HELP_CLASS
   div.style.cssText = `
     position: absolute; bottom: 12px; right: 12px;
     background: rgba(0,0,0,0.85); color: #e5e5e5;
     font: 11px/1.7 monospace; padding: 10px 14px;
-    border-radius: 6px; pointer-events: auto; max-width: 260px;
+    border-radius: 6px; max-width: 260px; z-index: 100;
   `
   div.innerHTML = `
     <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#f59e0b">Keyboard Shortcuts</div>
@@ -375,10 +370,12 @@ function toggleShortcutHelp(svg: SVGSVGElement): void {
     <div><kbd>Alt+drag</kbd> Axis constraint</div>
     <div style="margin-top:4px;color:#888;font-size:10px">Press <kbd>?</kbd> to close</div>
   `
-  // Close on click
-  div.addEventListener('click', () => fo.remove())
-  fo.appendChild(div)
-  svg.appendChild(fo)
+  div.addEventListener('click', () => div.remove())
+  // Ensure container has position for absolute positioning to work
+  if (getComputedStyle(container).position === 'static') {
+    container.style.position = 'relative'
+  }
+  container.appendChild(div)
 }
 
 // ── Snap helper ──────────────────────────────────────────────────────────────
