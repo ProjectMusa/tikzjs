@@ -342,11 +342,19 @@ export function setupKeyboard(
 
 const HELP_CLASS = 'd3-shortcut-help'
 
-function toggleShortcutHelp(svg: SVGSVGElement): void {
+/** Show or hide the keyboard shortcut help overlay. */
+export function setShortcutHelp(svg: SVGSVGElement, show: boolean): void {
   const container = svg.parentElement
   if (!container) return
   const existing = container.querySelector(`.${HELP_CLASS}`)
-  if (existing) { existing.remove(); return }
+
+  if (!show) {
+    if (existing) existing.remove()
+    return
+  }
+
+  // Already showing
+  if (existing) return
 
   const doc = svg.ownerDocument
   const div = doc.createElement('div')
@@ -380,6 +388,13 @@ function toggleShortcutHelp(svg: SVGSVGElement): void {
     container.style.position = 'relative'
   }
   container.appendChild(div)
+}
+
+function toggleShortcutHelp(svg: SVGSVGElement): void {
+  const container = svg.parentElement
+  if (!container) return
+  const existing = container.querySelector(`.${HELP_CLASS}`)
+  setShortcutHelp(svg, !existing)
 }
 
 // ── Snap helper ──────────────────────────────────────────────────────────────

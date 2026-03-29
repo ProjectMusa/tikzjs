@@ -112,6 +112,7 @@ export function Playground({ isDark }: { isDark: boolean }) {
   )
 
   const [showGrid, setShowGrid] = useState(true)
+  const [showHelp, setShowHelp] = useState(false)
   const [showInspector, setShowInspector] = useState(false)
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const editorPanelRef = useRef<D3EditorPanelHandle>(null)
@@ -238,6 +239,7 @@ export function Playground({ isDark }: { isDark: boolean }) {
               onDiagramChange={handleDiagramChange}
               svgOptions={editorSvgOptions}
               showGrid={showGrid}
+              showHelp={showHelp}
               highlightElementId={selectedElementId}
               onElementSelect={setSelectedElementId}
             />
@@ -313,6 +315,30 @@ export function Playground({ isDark }: { isDark: boolean }) {
                 <line x1="0" y1="9.3" x2="14" y2="9.3" />
                 <line x1="4.7" y1="0" x2="4.7" y2="14" />
                 <line x1="9.3" y1="0" x2="9.3" y2="14" />
+              </svg>
+            </button>
+            {/* Help / keyboard shortcuts toggle */}
+            <button
+              title={showHelp ? 'Hide Shortcuts' : 'Show Shortcuts'}
+              onClick={() => setShowHelp(!showHelp)}
+              style={{
+                width: 32,
+                height: 32,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: showHelp ? theme.activeBtn : 'transparent',
+                color: showHelp ? theme.text : theme.muted,
+                border: 'none',
+                borderRadius: 6,
+                fontSize: 16,
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4">
+                <circle cx="7" cy="7" r="6" />
+                <path d="M5.2 5.4a1.8 1.8 0 0 1 3.4.8c0 1.2-1.6 1.4-1.6 2.4" strokeLinecap="round" />
+                <circle cx="7" cy="10.8" r="0.5" fill="currentColor" stroke="none" />
               </svg>
             </button>
             {/* IR Inspector toggle */}

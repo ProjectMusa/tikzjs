@@ -9,6 +9,8 @@ export interface D3EditorPanelProps {
   onDiagramChange: (diagram: IRDiagram) => void
   svgOptions?: SVGGeneratorOptions
   showGrid?: boolean
+  /** Show the keyboard shortcut help overlay. */
+  showHelp?: boolean
   highlightElementId?: string | null
   /** Called when user clicks an element on the canvas. */
   onElementSelect?: (elementId: string | null) => void
@@ -19,7 +21,7 @@ export interface D3EditorPanelHandle {
 }
 
 export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>(
-  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, highlightElementId, onElementSelect }, ref) {
+  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, showHelp, highlightElementId, onElementSelect }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const controllerRef = useRef<D3EditorController | null>(null)
     // Keep stable refs to callbacks so we don't recreate the controller
@@ -67,6 +69,13 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
         controllerRef.current.setShowGrid(showGrid !== false)
       }
     }, [showGrid])
+
+    // Toggle help overlay
+    useEffect(() => {
+      if (controllerRef.current) {
+        controllerRef.current.setShowHelp(!!showHelp)
+      }
+    }, [showHelp])
 
     // Highlight element on canvas
     useEffect(() => {

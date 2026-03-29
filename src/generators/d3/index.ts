@@ -19,7 +19,7 @@ import { NodeGeometryRegistry } from '../core/coordResolver.js'
 import { renderDiagram } from './renderer.js'
 import { insertGrid } from './grid.js'
 import { highlightElement as _highlightElement } from './highlight.js'
-import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles } from './interactions.js'
+import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles, setShortcutHelp } from './interactions.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -59,6 +59,10 @@ export interface D3EditorController {
   zoomIn(): void
   /** Zoom out by a fixed step. */
   zoomOut(): void
+  /** Show or hide the keyboard shortcut help overlay. */
+  setShowHelp(show: boolean): void
+  /** Whether the help overlay is currently visible. */
+  getShowHelp(): boolean
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -338,6 +342,14 @@ export function createD3Editor(
       const svg = container.querySelector('svg') as SVGSVGElement | null
       if (!svg || !zoomBehavior) return
       zoomBehavior.scaleBy(d3.select(svg), 1 / 1.3)
+    },
+    setShowHelp(show: boolean) {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg) return
+      setShortcutHelp(svg, show)
+    },
+    getShowHelp() {
+      return !!container.querySelector('.d3-shortcut-help')
     },
     destroy() {
       if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
