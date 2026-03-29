@@ -148,12 +148,16 @@ export function setupSelection(
       // Select the new node and open label editor
       controller.highlightElement(newId)
       if (onSelect) onSelect(newId)
-      // Wait for re-render, then open label editor on the new node
+      // Wait for re-render, then open label editor on the new node.
+      // Must query the container for the current SVG since render() replaces it.
+      const container = svgElement.parentElement
       setTimeout(() => {
-        const newEl = svgElement.querySelector(`[data-ir-id="${CSS.escape(newId)}"]`) as SVGElement | null
+        const currentSvg = container?.querySelector('svg') as SVGSVGElement | null
+        if (!currentSvg) return
+        const newEl = currentSvg.querySelector(`[data-ir-id="${CSS.escape(newId)}"]`) as SVGElement | null
         const node = findNode(diagram, newId)
         if (newEl && node) {
-          openLabelEditor(svgElement, newEl, node, newId, diagram, onLabelEdit, nodeRegistry)
+          openLabelEditor(currentSvg, newEl, node, newId, diagram, onLabelEdit, nodeRegistry)
         }
       }, 50)
     })
