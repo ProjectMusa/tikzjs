@@ -104,9 +104,9 @@ export function createD3Editor(
   let lastMutationTime = 0
 
   /** Common handler for IR mutations: snapshot, update, re-render, notify. */
-  function handleMutation(updatedDiagram: IRDiagram) {
+  function handleMutation(updatedDiagram: IRDiagram, forceSnapshot = false) {
     const now = Date.now()
-    if (now - lastMutationTime > UNDO_DEBOUNCE_MS) {
+    if (forceSnapshot || now - lastMutationTime > UNDO_DEBOUNCE_MS) {
       snapshotForUndo()
     }
     lastMutationTime = now
@@ -126,18 +126,9 @@ export function createD3Editor(
     if (id && !opts.readOnly) {
       const el = currentElementMap.get(id)
       if (el?.getAttribute('data-ir-kind') === 'path') {
-        setupControlPointDrag(svg, currentDiagram, onControlPointDragEnd)
+        setupControlPointDrag(svg, currentDiagram, (d) => handleMutation(d, true))
       }
     }
-  }
-
-  function onControlPointDragEnd(updatedDiagram: IRDiagram) {
-    snapshotForUndo()
-    currentDiagram = updatedDiagram
-    render()
-    const svg = container.querySelector('svg') as SVGSVGElement | null
-    if (svg && lastHighlightedId) applyHighlight(svg, lastHighlightedId)
-    if (opts.onIRChange) opts.onIRChange(currentDiagram)
   }
 
   function render() {
