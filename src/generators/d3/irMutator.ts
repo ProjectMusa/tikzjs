@@ -266,6 +266,14 @@ export function duplicateElement(diagram: IRDiagram, elementId: string): string 
 }
 
 export function removeElement(diagram: IRDiagram, elementId: string): boolean {
+  // Check if the element is a node — if so, also remove connected edges
+  const el = findElement(diagram.elements, elementId)
+  if (el && el.kind === 'node') {
+    const connectedEdgeIds = getConnectedEdges(diagram, elementId)
+    for (const edgeId of connectedEdgeIds) {
+      removeFromList(diagram.elements, edgeId)
+    }
+  }
   return removeFromList(diagram.elements, elementId)
 }
 
