@@ -108,6 +108,11 @@ export function createD3Editor(
     lastMutationTime = now
     currentDiagram = updatedDiagram
     render()
+    // Re-apply highlight after re-render so selection persists visually
+    if (lastHighlightedId) {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (svg) applyHighlight(svg, lastHighlightedId)
+    }
     if (opts.onIRChange) opts.onIRChange(currentDiagram)
   }
 
