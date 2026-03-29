@@ -237,6 +237,12 @@ export function setupKeyboard(
       return
     }
 
+    // ? — toggle keyboard shortcut help overlay
+    if (e.key === '?') {
+      toggleShortcutHelp(svgElement)
+      return
+    }
+
     // +/= to zoom in, - to zoom out
     if ((e.key === '+' || e.key === '=') && !e.ctrlKey && !e.metaKey) {
       e.preventDefault()
@@ -328,6 +334,51 @@ export function setupKeyboard(
 
   svgElement.ownerDocument.addEventListener('keydown', handleKeyDown)
   return () => svgElement.ownerDocument.removeEventListener('keydown', handleKeyDown)
+}
+
+const HELP_CLASS = 'd3-shortcut-help'
+
+function toggleShortcutHelp(svg: SVGSVGElement): void {
+  const existing = svg.querySelector(`.${HELP_CLASS}`)
+  if (existing) { existing.remove(); return }
+
+  const doc = svg.ownerDocument
+  const fo = doc.createElementNS('http://www.w3.org/2000/svg', 'foreignObject')
+  fo.setAttribute('class', HELP_CLASS)
+  fo.setAttribute('x', '0')
+  fo.setAttribute('y', '0')
+  fo.setAttribute('width', '100%')
+  fo.setAttribute('height', '100%')
+  fo.style.pointerEvents = 'none'
+
+  const div = doc.createElement('div')
+  div.style.cssText = `
+    position: absolute; bottom: 12px; right: 12px;
+    background: rgba(0,0,0,0.85); color: #e5e5e5;
+    font: 11px/1.7 monospace; padding: 10px 14px;
+    border-radius: 6px; pointer-events: auto; max-width: 260px;
+  `
+  div.innerHTML = `
+    <div style="font-size:12px;font-weight:600;margin-bottom:4px;color:#f59e0b">Keyboard Shortcuts</div>
+    <div><kbd>Click</kbd> Select element</div>
+    <div><kbd>Dbl-click</kbd> Edit label / Add node</div>
+    <div><kbd>Drag</kbd> Move node / control point</div>
+    <div><kbd>Del</kbd> Delete selected</div>
+    <div><kbd>F2</kbd> Edit label</div>
+    <div><kbd>Tab</kbd> Cycle selection</div>
+    <div><kbd>Arrows</kbd> Nudge 1pt (<kbd>⇧</kbd> 5pt)</div>
+    <div><kbd>Ctrl+D</kbd> Duplicate</div>
+    <div><kbd>Ctrl+Z</kbd> Undo &nbsp;<kbd>Ctrl+Y</kbd> Redo</div>
+    <div><kbd>+ / −</kbd> Zoom in/out</div>
+    <div><kbd>Home</kbd> Reset zoom</div>
+    <div><kbd>⇧+drag</kbd> Snap to cm grid</div>
+    <div><kbd>Alt+drag</kbd> Axis constraint</div>
+    <div style="margin-top:4px;color:#888;font-size:10px">Press <kbd>?</kbd> to close</div>
+  `
+  // Close on click
+  div.addEventListener('click', () => fo.remove())
+  fo.appendChild(div)
+  svg.appendChild(fo)
 }
 
 // ── Snap helper ──────────────────────────────────────────────────────────────
