@@ -587,6 +587,11 @@ export function injectStyles(container: HTMLElement): HTMLStyleElement {
       border-color: #f59e0b;
       box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.25), 0 2px 12px rgba(0,0,0,0.25);
     }
+    .d3-click-zone:hover {
+      fill: rgba(245, 158, 11, 0.06);
+      stroke: rgba(245, 158, 11, 0.3);
+      stroke-width: 1;
+    }
   `
   container.prepend(style)
   return style
