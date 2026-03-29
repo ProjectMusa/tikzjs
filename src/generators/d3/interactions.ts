@@ -177,6 +177,7 @@ export function setupKeyboard(
   getSelectedId: () => string | null,
   onIRChange: (diagram: IRDiagram) => void,
   onSelect?: (id: string | null) => void,
+  nodeRegistry?: NodeGeometryRegistry,
 ): () => void {
   const NUDGE_PT = 1       // 1pt per arrow key press
   const NUDGE_SHIFT_PT = 5 // 5pt with Shift held
@@ -206,7 +207,7 @@ export function setupKeyboard(
       const node = findNode(diagram, selectedId)
       const el = svgElement.querySelector(`[data-ir-id="${CSS.escape(selectedId)}"]`) as SVGElement | null
       if (node && el) {
-        openLabelEditor(svgElement, el, node, selectedId, diagram, onIRChange)
+        openLabelEditor(svgElement, el, node, selectedId, diagram, onIRChange, nodeRegistry)
         return
       }
       // Check if it's an edge with labels — open the first label for editing

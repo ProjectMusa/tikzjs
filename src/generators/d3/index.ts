@@ -266,6 +266,7 @@ export function createD3Editor(
       keyboardCleanup = setupKeyboard(
         svgEl, currentDiagram, controller,
         () => lastHighlightedId, handleMutation, opts.onElementSelect,
+        currentNodeRegistry,
       )
     }
   }
