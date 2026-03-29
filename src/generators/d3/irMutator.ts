@@ -253,11 +253,21 @@ export function duplicateElement(diagram: IRDiagram, elementId: string): string 
     clone.name = undefined
   }
 
-  // Reassign IDs for inline nodes in paths
+  // Reassign IDs for inline nodes in paths, updating segment references
   if (clone.kind === 'path') {
+    const idMap = new Map<string, string>()
     for (const n of clone.inlineNodes) {
-      n.id = nextId('node')
+      const oldId = n.id
+      const newNodeId = nextId('node')
+      idMap.set(oldId, newNodeId)
+      n.id = newNodeId
       n.name = undefined
+    }
+    // Update node-on-path segment references to use new IDs
+    for (const seg of clone.segments) {
+      if (seg.kind === 'node-on-path' && idMap.has(seg.nodeId)) {
+        seg.nodeId = idMap.get(seg.nodeId)!
+      }
     }
   }
 
