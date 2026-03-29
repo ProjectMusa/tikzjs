@@ -1,0 +1,17 @@
+{
+  "description": "Delete first node in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "removeElement",
+        "target": { "kind": "node", "index": 0 },
+        "args": {}
+      },
+      "uiAction": {
+        "type": "delete",
+        "target": { "kind": "node", "index": 0 }
+      }
+    }
+  ]
+}

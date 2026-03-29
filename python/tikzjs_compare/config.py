@@ -16,7 +16,7 @@ FIXTURES_DIR = Path(os.environ.get('TIKZJS_FIXTURES_DIR',
                     str(PROJECT_ROOT / 'test' / 'golden' / 'fixtures')))
 REFS_DIR     = Path(os.environ.get('TIKZJS_REFS_DIR',
                     str(PROJECT_ROOT / 'test' / 'golden' / 'refs')))
-DIST_INDEX   = PROJECT_ROOT / 'dist' / 'index.js'
+DIST_INDEX   = PROJECT_ROOT / 'dist' / 'core.js'
 
 # ── Comparison thresholds ──────────────────────────────────────────────────────
 

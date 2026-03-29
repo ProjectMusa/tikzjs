@@ -167,10 +167,10 @@ function buildMarkerSpec(spec: ArrowTipSpec, id: string, color: string, lineWidt
       return {
         id,
         pathData: spec.reversed
-          ? `<path d="M 10 5 C 7 5, 3.5 3.5, 0 0 L 2 5 L 0 10 C 3.5 6.5, 7 5, 10 5 Z" fill="${color}"/>`
-          : `<path d="M 0 5 C 3 5, 6.5 3.5, 10 0 L 8 5 L 10 10 C 6.5 6.5, 3 5, 0 5 Z" fill="${color}"/>`,
+          ? `<path d="M 0 5 C 3 5, 6.5 3.5, 10 0 L 8 5 L 10 10 C 6.5 6.5, 3 5, 0 5 Z" fill="${color}"/>`
+          : `<path d="M 10 5 C 7 5, 3.5 3.5, 0 0 L 2 5 L 0 10 C 3.5 6.5, 7 5, 10 5 Z" fill="${color}"/>`,
         viewBox: '0 0 10 10',
-        refX: spec.reversed ? 0 : 10,
+        refX: spec.reversed ? 10 : 0,
         refY: 5,
         markerWidth: latexLengthPx,
         markerHeight: latexWidthPx,

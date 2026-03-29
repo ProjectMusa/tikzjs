@@ -15,7 +15,7 @@
 const fs = require('fs')
 const path = require('path')
 const { execSync } = require('child_process')
-const { generate } = require('../dist/index.js')
+const { generate } = require('../dist/core.js')
 
 const FIXTURES_DIR = path.join(__dirname, '../test/golden/fixtures')
 const OUT = '/tmp/tikzjs-preview.svg'

@@ -36,7 +36,7 @@ function renderTikzjs(name) {
   Object.keys(require.cache).forEach(k => {
     if (k.includes('/dist/') || k.includes('/_tikzjs')) delete require.cache[k]
   })
-  const { generate } = require(path.join(ROOT, 'dist/index.js'))
+  const { generate } = require(path.join(ROOT, 'dist/core.js'))
   const src = fs.readFileSync(path.join(FIXTURES_DIR, name + '.tikz'), 'utf8')
   return generate(src)
 }

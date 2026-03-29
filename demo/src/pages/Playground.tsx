@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { theme } from '../theme'
 import { Editor } from '../components/Editor'
 import { Preview } from '../components/Preview'
-import { D3EditorPanel, IRInspector, moveNode, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel } from 'tikzjs'
+import { D3EditorPanel, IRInspector, moveNode, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode } from 'tikzjs'
 import type { D3EditorPanelHandle } from 'tikzjs'
 import { ExamplePicker } from '../components/ExamplePicker'
 import { examples } from '../lib/examples'
@@ -163,6 +163,10 @@ export function Playground({ isDark }: { isDark: boolean }) {
             return updateNodeLabel(ir, args.nodeId, args.label)
           case 'updateEdgeLabel':
             return updateEdgeLabel(ir, args.edgeId, args.labelIndex, args.label)
+          case 'removeElement':
+            return removeElement(ir, args.elementId)
+          case 'addNode':
+            return !!addNode(ir, args.x, args.y, args.label)
           default:
             return false
         }

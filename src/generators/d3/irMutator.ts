@@ -5,7 +5,8 @@
  * The IR is the single source of truth — D3 reads from it and writes back.
  */
 
-import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix } from '../../ir/types.js'
+import type { IRDiagram, IRElement, IRNode, IRScope, IRMatrix, ResolvedStyle } from '../../ir/types.js'
+import { makeNode, coordRef, nextId } from '../../parser/factory.js'
 
 export type CpRole = 'cp1' | 'cp2' | 'to' | 'move'
 
@@ -201,7 +202,8 @@ export function moveSegmentEndpoint(
   const seg = el.segments[segIdx]
   if (!seg) return false
 
-  if (seg.kind !== 'line' && seg.kind !== 'hv-line' && seg.kind !== 'to' && seg.kind !== 'move') return false
+  if (seg.kind !== 'line' && seg.kind !== 'hv-line' && seg.kind !== 'to' && seg.kind !== 'move'
+    && seg.kind !== 'parabola' && seg.kind !== 'sin' && seg.kind !== 'cos') return false
   if (seg.to.mode !== 'absolute' || seg.to.coord.cs !== 'xy') return false
 
   seg.to.coord.x = xPt
@@ -216,7 +218,72 @@ export function moveSegmentEndpoint(
  * Searches top-level elements, scope children, and path inline nodes.
  * Returns true if the element was found and removed.
  */
+/**
+ * Add a new node to the diagram at the given position (in TikZ pt).
+ * Returns the new node's id.
+ */
+export function addNode(diagram: IRDiagram, xPt: number, yPt: number, label = ''): string {
+  const style: ResolvedStyle = {}
+  const node = makeNode(coordRef(xPt, yPt), label, style, [])
+  diagram.elements.push(node)
+  return node.id
+}
+
+/**
+ * Duplicate an element in the diagram. Nodes get offset by 10pt so the copy
+ * is visually distinct. Returns the new element's id, or null if not found.
+ */
+export function duplicateElement(diagram: IRDiagram, elementId: string): string | null {
+  const el = findElement(diagram.elements, elementId)
+  if (!el) return null
+
+  // Deep clone and assign fresh ID
+  const clone = JSON.parse(JSON.stringify(el)) as IRElement
+  const newId = nextId(el.kind)
+  if ('id' in clone) (clone as any).id = newId
+
+  // Offset node position so the duplicate is visually distinct
+  if (clone.kind === 'node') {
+    const coord = clone.position.coord
+    if (coord.cs === 'xy') {
+      coord.x += 10
+      coord.y -= 10
+    }
+    // Clear name to avoid duplicate named nodes
+    clone.name = undefined
+  }
+
+  // Reassign IDs for inline nodes in paths, updating segment references
+  if (clone.kind === 'path') {
+    const idMap = new Map<string, string>()
+    for (const n of clone.inlineNodes) {
+      const oldId = n.id
+      const newNodeId = nextId('node')
+      idMap.set(oldId, newNodeId)
+      n.id = newNodeId
+      n.name = undefined
+    }
+    // Update node-on-path segment references to use new IDs
+    for (const seg of clone.segments) {
+      if (seg.kind === 'node-on-path' && idMap.has(seg.nodeId)) {
+        seg.nodeId = idMap.get(seg.nodeId)!
+      }
+    }
+  }
+
+  diagram.elements.push(clone)
+  return newId
+}
+
 export function removeElement(diagram: IRDiagram, elementId: string): boolean {
+  // Check if the element is a node — if so, also remove connected edges
+  const el = findElement(diagram.elements, elementId)
+  if (el && el.kind === 'node') {
+    const connectedEdgeIds = getConnectedEdges(diagram, elementId)
+    for (const edgeId of connectedEdgeIds) {
+      removeFromList(diagram.elements, edgeId)
+    }
+  }
   return removeFromList(diagram.elements, elementId)
 }
 
@@ -234,6 +301,14 @@ function removeFromList(elements: IRElement[], id: string): boolean {
       for (let j = 0; j < el.inlineNodes.length; j++) {
         if (el.inlineNodes[j].id === id) {
           el.inlineNodes.splice(j, 1)
+          // Also remove the corresponding node-on-path segment
+          for (let k = 0; k < el.segments.length; k++) {
+            const seg = el.segments[k]
+            if (seg.kind === 'node-on-path' && seg.nodeId === id) {
+              el.segments.splice(k, 1)
+              break
+            }
+          }
           return true
         }
       }

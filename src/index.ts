@@ -2,7 +2,7 @@
  * tikzjs public API.
  *
  * This module provides the main entry points for parsing TikZ source
- * and generating output. It replaces src/main.ts.
+ * and generating output.
  *
  * Usage:
  *   import { parse, generate, roundTrip } from 'tikzjs'
@@ -18,98 +18,30 @@
  *   const svg = generateFromIR(ir)
  */
 
-import { IRDiagram, IRElement } from './ir/types.js'
-import { preprocess, ExpandedDoc } from './preprocessor/index.js'
-import { parseExpanded, parseRaw } from './parser/index.js'
-import { generateSVG, generateSVGElement, SVGGeneratorOptions } from './generators/svg/index.js'
-import { generateTikZ, TikZGeneratorOptions } from './generators/tikz/index.js'
+// Re-export everything from the CJS-safe core module
+export {
+  parse, generate, generateFromIR, generateTikZFromIR,
+  runWorker, Generate, serializeIR, deserializeIR,
+  generateSVGElement, generateTikZ, DEFAULT_CONSTANTS, defaultMathRenderer,
+  moveNode, findNode, isDraggable, collectNodes, findElement,
+  updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel,
+  removeElement, addNode, duplicateElement, setStyleProp,
+} from './core.js'
 
-export type { IRDiagram, IRElement } from './ir/types.js'
-export type { ExpandedDoc } from './preprocessor/index.js'
-export { generateSVGElement } from './generators/svg/index.js'
-export type { SVGGeneratorOptions, SVGElementResult } from './generators/svg/index.js'
-export { generateTikZ } from './generators/tikz/index.js'
-export type { TikZGeneratorOptions } from './generators/tikz/index.js'
+export type {
+  IRDiagram, IRElement, ExpandedDoc,
+  SVGGeneratorOptions, SVGElementResult,
+  TikZGeneratorOptions, SVGRenderingConstants,
+  SVGRendererRegistry, RenderContext, ElementRenderResult,
+  MathRenderer, MathResult,
+} from './core.js'
+
+// D3 editor exports — browser-only (depend on ESM-only d3-selection/d3-zoom).
+// These work in bundler environments (Vite, webpack) but will fail with Node.js CJS require().
+// For Node.js CJS scripts, use require('./dist/core.js') instead.
 export { createD3Editor } from './generators/d3/index.js'
 export type { D3EditorController, D3EditorOptions } from './generators/d3/index.js'
 export { D3EditorPanel } from './generators/d3/D3EditorPanel.js'
 export type { D3EditorPanelProps, D3EditorPanelHandle } from './generators/d3/D3EditorPanel.js'
 export { IRInspector } from './generators/d3/IRInspector.js'
 export type { IRInspectorProps } from './generators/d3/IRInspector.js'
-export { moveNode, findNode, isDraggable, collectNodes, findElement, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel } from './generators/d3/irMutator.js'
-export type { SVGRenderingConstants } from './generators/svg/constants.js'
-export { DEFAULT_CONSTANTS } from './generators/svg/constants.js'
-export type { SVGRendererRegistry } from './generators/svg/rendererRegistry.js'
-export type { RenderContext, ElementRenderResult } from './generators/svg/renderContext.js'
-export type { MathRenderer, MathResult } from './math/index.js'
-export { defaultMathRenderer } from './math/index.js'
-
-// ── Core pipeline ─────────────────────────────────────────────────────────────
-
-/**
- * Parse TikZ source through the full pipeline (preprocess → parse) and
- * return an IRDiagram ready for rendering or manipulation.
- */
-export function parse(tikzSource: string): IRDiagram {
-  const doc = preprocess(tikzSource)
-  return parseExpanded(doc)
-}
-
-/**
- * Generate an SVG string from TikZ source.
- * This is the main entry point for rendering.
- */
-export function generate(tikzSource: string, opts?: SVGGeneratorOptions): string {
-  const diagram = parse(tikzSource)
-  return generateSVG(diagram, opts)
-}
-
-/**
- * Generate SVG from a pre-parsed IRDiagram.
- * Useful when you want to inspect or modify the IR before rendering.
- */
-export function generateFromIR(diagram: IRDiagram, opts?: SVGGeneratorOptions): string {
-  return generateSVG(diagram, opts)
-}
-
-/**
- * Generate standardized TikZ source from an IRDiagram.
- * Useful for round-tripping or pretty-printing.
- */
-export function generateTikZFromIR(diagram: IRDiagram, opts?: TikZGeneratorOptions): string {
-  return generateTikZ(diagram, opts)
-}
-
-// ── Backward-compatibility exports (matching old main.ts API) ─────────────────
-
-/**
- * @deprecated Use parse() instead. Returns the IRDiagram.
- */
-export function runWorker(tikzSource: string): IRDiagram {
-  return parse(tikzSource)
-}
-
-/**
- * @deprecated Use generate() instead.
- * Returns the SVG as an outerHTML string.
- */
-export function Generate(tikzSource: string): string {
-  return generate(tikzSource)
-}
-
-// ── IR utilities ──────────────────────────────────────────────────────────────
-
-/**
- * Serialize an IRDiagram to a JSON string.
- * The IR is fully JSON-serializable — no class instances or circular refs.
- */
-export function serializeIR(diagram: IRDiagram): string {
-  return JSON.stringify(diagram, null, 2)
-}
-
-/**
- * Deserialize an IRDiagram from a JSON string.
- */
-export function deserializeIR(json: string): IRDiagram {
-  return JSON.parse(json) as IRDiagram
-}

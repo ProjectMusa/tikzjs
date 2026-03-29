@@ -1,0 +1,18 @@
+{
+  "description": "Nudge first node right by 1pt in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveNode",
+        "target": { "kind": "node", "index": 0 },
+        "args": { "deltaXPt": 1, "deltaYPt": 0 }
+      },
+      "uiAction": {
+        "type": "nudge",
+        "target": { "kind": "node", "index": 0 },
+        "key": "ArrowRight"
+      }
+    }
+  ]
+}

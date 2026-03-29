@@ -19,7 +19,7 @@ import { NodeGeometryRegistry } from '../core/coordResolver.js'
 import { renderDiagram } from './renderer.js'
 import { insertGrid } from './grid.js'
 import { highlightElement as _highlightElement } from './highlight.js'
-import { setupDrag, setupSelection, setupControlPointDrag, injectStyles } from './interactions.js'
+import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles } from './interactions.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -49,6 +49,16 @@ export interface D3EditorController {
   getShowGrid(): boolean
   /** Highlight an element on the canvas by its IR id. */
   highlightElement(id: string | null): void
+  /** Undo the last IR mutation. Returns true if undo was performed. */
+  undo(): boolean
+  /** Redo the last undone mutation. Returns true if redo was performed. */
+  redo(): boolean
+  /** Reset zoom/pan to fit the content in the viewport. */
+  resetZoom(): void
+  /** Zoom in by a fixed step. */
+  zoomIn(): void
+  /** Zoom out by a fixed step. */
+  zoomOut(): void
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -75,6 +85,40 @@ export function createD3Editor(
   let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> | null = null
   let currentTransform = zoomIdentity
   let currentViewBox: string | null = null // preserve viewBox across re-renders
+  let keyboardCleanup: (() => void) | null = null
+  const undoStack: string[] = [] // JSON snapshots of IRDiagram
+  const redoStack: string[] = []
+  const MAX_UNDO = 50
+
+  /** Push current IR to undo stack before a mutation. */
+  function snapshotForUndo() {
+    undoStack.push(JSON.stringify(currentDiagram))
+    if (undoStack.length > MAX_UNDO) undoStack.shift()
+    redoStack.length = 0 // clear redo on new mutation
+  }
+
+  // Debounce rapid mutations (e.g., arrow key nudges) into a single undo entry.
+  // The first mutation in a burst snapshots immediately; subsequent mutations within
+  // DEBOUNCE_MS reuse the same snapshot (no new undo entry).
+  const UNDO_DEBOUNCE_MS = 300
+  let lastMutationTime = 0
+
+  /** Common handler for IR mutations: snapshot, update, re-render, notify. */
+  function handleMutation(updatedDiagram: IRDiagram, forceSnapshot = false) {
+    const now = Date.now()
+    if (forceSnapshot || now - lastMutationTime > UNDO_DEBOUNCE_MS) {
+      snapshotForUndo()
+    }
+    lastMutationTime = now
+    currentDiagram = updatedDiagram
+    render()
+    // Re-apply highlight after re-render so selection persists visually
+    if (lastHighlightedId) {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (svg) applyHighlight(svg, lastHighlightedId)
+    }
+    if (opts.onIRChange) opts.onIRChange(currentDiagram)
+  }
 
   /** Apply highlight overlay + control point drag to the live SVG. */
   function applyHighlight(svg: SVGSVGElement, id: string | null) {
@@ -82,20 +126,15 @@ export function createD3Editor(
     if (id && !opts.readOnly) {
       const el = currentElementMap.get(id)
       if (el?.getAttribute('data-ir-kind') === 'path') {
-        setupControlPointDrag(svg, currentDiagram, onControlPointDragEnd)
+        setupControlPointDrag(svg, currentDiagram, (d) => handleMutation(d, true))
       }
     }
   }
 
-  function onControlPointDragEnd(updatedDiagram: IRDiagram) {
-    currentDiagram = updatedDiagram
-    render()
-    const svg = container.querySelector('svg') as SVGSVGElement | null
-    if (svg && lastHighlightedId) applyHighlight(svg, lastHighlightedId)
-    if (opts.onIRChange) opts.onIRChange(currentDiagram)
-  }
-
   function render() {
+    // Clean up previous keyboard listener
+    if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
+
     // Clear previous content
     container.innerHTML = ''
 
@@ -159,6 +198,7 @@ export function createD3Editor(
       const el = result.elementMap.get(id)!
       const kind = el.getAttribute('data-ir-kind')
       const isEdge = kind === 'edge' || kind === 'path'
+
       const pad = isEdge ? EDGE_CLICK_PADDING : NODE_CLICK_PADDING
       try {
         const bbox = (el as SVGGraphicsElement).getBBox()
@@ -223,22 +263,12 @@ export function createD3Editor(
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      const onLabelEdit = (updatedDiagram: IRDiagram) => {
-        currentDiagram = updatedDiagram
-        render()
-        if (opts.onIRChange) opts.onIRChange(currentDiagram)
-      }
-      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, onLabelEdit, clickZoneMap, currentNodeRegistry)
-      setupDrag(
-        svgEl,
-        result.elementMap,
-        currentDiagram,
-        controller,
-        (updatedDiagram) => {
-          currentDiagram = updatedDiagram
-          render()
-          if (opts.onIRChange) opts.onIRChange(currentDiagram)
-        },
+      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, handleMutation, clickZoneMap, currentNodeRegistry)
+      setupDrag(svgEl, result.elementMap, currentDiagram, controller, handleMutation, clickZoneMap)
+      keyboardCleanup = setupKeyboard(
+        svgEl, currentDiagram, controller,
+        () => lastHighlightedId, handleMutation, opts.onElementSelect,
+        currentNodeRegistry,
       )
     }
   }
@@ -273,7 +303,44 @@ export function createD3Editor(
       if (!svg) return
       applyHighlight(svg, id)
     },
+    undo() {
+      if (undoStack.length === 0) return false
+      redoStack.push(JSON.stringify(currentDiagram))
+      currentDiagram = JSON.parse(undoStack.pop()!)
+      lastHighlightedId = null
+      render()
+      if (opts.onElementSelect) opts.onElementSelect(null)
+      if (opts.onIRChange) opts.onIRChange(currentDiagram)
+      return true
+    },
+    redo() {
+      if (redoStack.length === 0) return false
+      undoStack.push(JSON.stringify(currentDiagram))
+      currentDiagram = JSON.parse(redoStack.pop()!)
+      lastHighlightedId = null
+      render()
+      if (opts.onElementSelect) opts.onElementSelect(null)
+      if (opts.onIRChange) opts.onIRChange(currentDiagram)
+      return true
+    },
+    resetZoom() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      currentTransform = zoomIdentity
+      d3.select(svg).call(zoomBehavior.transform, zoomIdentity)
+    },
+    zoomIn() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      zoomBehavior.scaleBy(d3.select(svg), 1.3)
+    },
+    zoomOut() {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg || !zoomBehavior) return
+      zoomBehavior.scaleBy(d3.select(svg), 1 / 1.3)
+    },
     destroy() {
+      if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
       container.innerHTML = ''
       styleElement = null
     },
