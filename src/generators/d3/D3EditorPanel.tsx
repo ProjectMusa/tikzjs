@@ -3,6 +3,7 @@ import type { IRDiagram } from '../../ir/types.js'
 import type { SVGGeneratorOptions } from '../svg/index.js'
 import type { D3EditorController } from './index.js'
 import { createD3Editor } from './index.js'
+import { EditorStore } from './editorStore.js'
 
 export interface D3EditorPanelProps {
   diagram: IRDiagram | null
@@ -24,6 +25,9 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
   function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, showHelp, highlightElementId, onElementSelect }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const controllerRef = useRef<D3EditorController | null>(null)
+    // EditorStore persists across editor destroy/recreate cycles,
+    // preserving undo/redo history, zoom transform, and selection.
+    const storeRef = useRef<EditorStore | null>(null)
     // Keep stable refs to callbacks so we don't recreate the controller
     const onDiagramChangeRef = useRef(onDiagramChange)
     onDiagramChangeRef.current = onDiagramChange
@@ -31,6 +35,9 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
     onElementSelectRef.current = onElementSelect
     const svgOptionsRef = useRef(svgOptions)
     svgOptionsRef.current = svgOptions
+    // Track whether the diagram change originated from the editor itself
+    // so we can skip setDiagram (which would wipe undo/redo).
+    const internalChangeRef = useRef(false)
 
     useImperativeHandle(ref, () => ({
       get controller() {
@@ -38,15 +45,41 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
       },
     }))
 
-    // Create or recreate editor when diagram becomes available
+    // Destroy controller on unmount
+    useEffect(() => {
+      return () => {
+        controllerRef.current?.destroy()
+        controllerRef.current = null
+      }
+    }, [])
+
+    // Create editor when diagram first becomes available, and handle updates.
     useEffect(() => {
       if (!containerRef.current || !diagram) return
 
-      // Destroy previous controller if any
-      controllerRef.current?.destroy()
+      // Skip internal changes — the editor already has the updated diagram
+      if (internalChangeRef.current) {
+        internalChangeRef.current = false
+        return
+      }
+
+      if (controllerRef.current) {
+        // Editor exists — external change (e.g., text editor). Update via setDiagram.
+        controllerRef.current.setDiagram(diagram)
+        return
+      }
+
+      // First time: create the store and editor
+      if (!storeRef.current) {
+        storeRef.current = new EditorStore(diagram, showGrid !== false)
+      }
 
       controllerRef.current = createD3Editor(containerRef.current, diagram, {
-        onIRChange: (d) => onDiagramChangeRef.current(d),
+        store: storeRef.current,
+        onIRChange: (d) => {
+          internalChangeRef.current = true
+          onDiagramChangeRef.current(d)
+        },
         onElementSelect: (id) => onElementSelectRef.current?.(id),
         svgOptions: svgOptionsRef.current,
         showGrid: showGrid !== false,
@@ -55,11 +88,6 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
       // Re-apply highlight if there was one
       if (highlightElementId) {
         controllerRef.current.highlightElement(highlightElementId)
-      }
-
-      return () => {
-        controllerRef.current?.destroy()
-        controllerRef.current = null
       }
     }, [diagram]) // eslint-disable-line react-hooks/exhaustive-deps
 
