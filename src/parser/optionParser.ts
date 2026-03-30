@@ -154,6 +154,8 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
         const color = resolveColor(value as string)
         // Store as the inherited current color (used to resolve 'currentColor' slots).
         style.color = color
+        // In TikZ, `color=X` also sets the text color.
+        style.textColor = color
         // Also immediately resolve any 'currentColor' slots set by the implied draw/fill option.
         // This prevents \draw[color=red] from getting fill="#FF0000".
         if (style.draw === 'currentColor') style.draw = color

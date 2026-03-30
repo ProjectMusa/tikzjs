@@ -262,6 +262,9 @@ export function emitNode(
     } else {
       foreignG.setAttribute('transform', `translate(${tx},${ty})`)
     }
+    if (node.style.textColor) {
+      foreignG.setAttribute('color', node.style.textColor)
+    }
     foreignG.innerHTML = svgContent
     g.appendChild(foreignG)
   }
@@ -316,6 +319,9 @@ export function emitNode(
     }
     const lg = document.createElementNS('http://www.w3.org/2000/svg', 'g')
     lg.setAttribute('transform', `translate(${tx},${ty})`)
+    if (node.style.textColor) {
+      lg.setAttribute('color', node.style.textColor)
+    }
     lg.innerHTML = lblResult.svgString
     g.appendChild(lg)
     extraBBoxes.push(fromCorners(tx, ty, tx + lblResult.widthPx, ty + lblResult.heightPx))

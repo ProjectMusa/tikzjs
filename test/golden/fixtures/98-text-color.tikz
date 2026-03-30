@@ -1,0 +1,11 @@
+\begin{tikzpicture}
+  % text= option sets only text color
+  \node[draw, text=red] at (0,2) {Red text};
+  \node[draw, text=blue] at (3,2) {Blue text};
+  % color= option sets both draw and text color
+  \node[draw, color=green!50!black] at (0,0) {Green node};
+  % text= overrides color= for text only
+  \node[draw=black, fill=yellow!20, text=purple] at (3,0) {Purple text};
+  % Edge with colored label
+  \draw[->, thick] (0,2) -- node[above, text=orange] {colored label} (3,2);
+\end{tikzpicture}

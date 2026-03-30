@@ -385,6 +385,9 @@ function emitEdgeLabel(
     const tly = cy - heightPx / 2
 
     g.setAttribute('transform', `translate(${tlx},${tly})`)
+    if (label.style?.textColor) {
+      g.setAttribute('color', label.style.textColor)
+    }
 
     if (label.description) {
       // White background rectangle in g's local coordinate space (origin = top-left of label)
