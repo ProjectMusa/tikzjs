@@ -479,6 +479,8 @@ interface DragState {
   startPxX: number
   startPxY: number
   hasMoved: boolean
+  /** Original transform attribute before drag started. */
+  origTransform?: string
   /** Guide line element for Alt+drag axis constraint. */
   guideLine?: SVGLineElement
   /** Coordinate tooltip group (text + background rect). */
@@ -564,17 +566,23 @@ export function setupDrag(
         // Update IR
         moveNode(diagram, irId, newXPt, newYPt)
 
-        // Update SVG transform directly for immediate visual feedback
-        const newPxX = ptToPx(newXPt)
-        // Y is negated in SVG space
-        const newPxY = -ptToPx(newYPt)
+        // Update SVG transform directly for immediate visual feedback.
+        // The node's children are drawn at absolute px coordinates (the
+        // original center), so we translate by the DELTA, not the absolute
+        // new position — otherwise the original center is double-counted.
+        const dxPxFeedback = ptToPx(newXPt - state.startPtX)
+        const dyPxFeedback = -ptToPx(newYPt - state.startPtY) // SVG y inverted
 
-        const translate = `translate(${newPxX.toFixed(2)}, ${newPxY.toFixed(2)})`
-        const transform = actualEl.getAttribute('transform') || ''
-        const newTransform = /translate\([^)]*\)/.test(transform)
-          ? transform.replace(/translate\([^)]*\)/, translate)
-          : translate + (transform ? ' ' + transform : '')
-        actualEl.setAttribute('transform', newTransform)
+        // Store original transform on first drag move
+        if (state.origTransform === undefined) {
+          state.origTransform = actualEl.getAttribute('transform') || ''
+        }
+        const deltaTranslate = `translate(${dxPxFeedback.toFixed(2)}, ${dyPxFeedback.toFixed(2)})`
+        actualEl.setAttribute('transform', deltaTranslate + (state.origTransform ? ' ' + state.origTransform : ''))
+
+        // Absolute position in SVG px for guide lines and tooltip
+        const newPxX = ptToPx(newXPt)
+        const newPxY = -ptToPx(newYPt)
 
         // Show/hide guide line for Alt+drag axis constraint
         updateGuideLine(state, altKey, newPxX, newPxY, zoomGroup ?? svgElement)
