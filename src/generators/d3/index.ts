@@ -9,6 +9,8 @@
  * - D3 adds interactivity (drag, select, hover) on top
  * - Drag end triggers full re-render to update connected edges
  * - onIRChange callback notifies the parent when IR is mutated
+ * - EditorStore holds persistent state (undo/redo, zoom, selection) that
+ *   survives full SVG re-renders
  */
 
 import * as d3 from 'd3-selection'
@@ -19,7 +21,8 @@ import { NodeGeometryRegistry } from '../core/coordResolver.js'
 import { renderDiagram } from './renderer.js'
 import { insertGrid } from './grid.js'
 import { highlightElement as _highlightElement } from './highlight.js'
-import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles } from './interactions.js'
+import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles, setShortcutHelp } from './interactions.js'
+import { EditorStore } from './editorStore.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -34,6 +37,8 @@ export interface D3EditorOptions {
   svgOptions?: SVGGeneratorOptions
   /** Show coordinate grid on initial render (default: true). */
   showGrid?: boolean
+  /** Provide an external EditorStore to persist state across editor recreations. */
+  store?: EditorStore
 }
 
 export interface D3EditorController {
@@ -59,6 +64,12 @@ export interface D3EditorController {
   zoomIn(): void
   /** Zoom out by a fixed step. */
   zoomOut(): void
+  /** Show or hide the keyboard shortcut help overlay. */
+  setShowHelp(show: boolean): void
+  /** Whether the help overlay is currently visible. */
+  getShowHelp(): boolean
+  /** The backing store (undo/redo, zoom, diagram state). */
+  store: EditorStore
   /** Clean up event listeners and DOM elements. */
   destroy(): void
 }
@@ -76,57 +87,38 @@ export function createD3Editor(
   diagram: IRDiagram,
   opts: D3EditorOptions = {},
 ): D3EditorController {
-  let currentDiagram = diagram
-  let styleElement: HTMLStyleElement | null = null
-  let gridVisible = opts.showGrid !== false // default true
-  let currentElementMap: Map<string, SVGElement> = new Map()
-  let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
-  let lastHighlightedId: string | null = null
-  let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> | null = null
-  let currentTransform = zoomIdentity
-  let currentViewBox: string | null = null // preserve viewBox across re-renders
-  let keyboardCleanup: (() => void) | null = null
-  const undoStack: string[] = [] // JSON snapshots of IRDiagram
-  const redoStack: string[] = []
-  const MAX_UNDO = 50
-
-  /** Push current IR to undo stack before a mutation. */
-  function snapshotForUndo() {
-    undoStack.push(JSON.stringify(currentDiagram))
-    if (undoStack.length > MAX_UNDO) undoStack.shift()
-    redoStack.length = 0 // clear redo on new mutation
+  const store = opts.store ?? new EditorStore(diagram, opts.showGrid !== false)
+  // If no external store was provided, initialize with the given diagram.
+  // If an external store was provided, it already has the correct state.
+  if (!opts.store) {
+    store.diagram = diagram
   }
 
-  // Debounce rapid mutations (e.g., arrow key nudges) into a single undo entry.
-  // The first mutation in a burst snapshots immediately; subsequent mutations within
-  // DEBOUNCE_MS reuse the same snapshot (no new undo entry).
-  const UNDO_DEBOUNCE_MS = 300
-  let lastMutationTime = 0
+  let styleElement: HTMLStyleElement | null = null
+  let currentElementMap: Map<string, SVGElement> = new Map()
+  let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
+  let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> | null = null
+  let keyboardCleanup: (() => void) | null = null
 
   /** Common handler for IR mutations: snapshot, update, re-render, notify. */
   function handleMutation(updatedDiagram: IRDiagram, forceSnapshot = false) {
-    const now = Date.now()
-    if (forceSnapshot || now - lastMutationTime > UNDO_DEBOUNCE_MS) {
-      snapshotForUndo()
-    }
-    lastMutationTime = now
-    currentDiagram = updatedDiagram
+    store.applyMutation(updatedDiagram, forceSnapshot)
     render()
     // Re-apply highlight after re-render so selection persists visually
-    if (lastHighlightedId) {
+    if (store.highlightedId) {
       const svg = container.querySelector('svg') as SVGSVGElement | null
-      if (svg) applyHighlight(svg, lastHighlightedId)
+      if (svg) applyHighlight(svg, store.highlightedId)
     }
-    if (opts.onIRChange) opts.onIRChange(currentDiagram)
+    if (opts.onIRChange) opts.onIRChange(store.diagram)
   }
 
   /** Apply highlight overlay + control point drag to the live SVG. */
   function applyHighlight(svg: SVGSVGElement, id: string | null) {
-    _highlightElement(svg, id, currentElementMap, currentNodeRegistry, currentDiagram)
+    _highlightElement(svg, id, currentElementMap, currentNodeRegistry, store.diagram)
     if (id && !opts.readOnly) {
       const el = currentElementMap.get(id)
       if (el?.getAttribute('data-ir-kind') === 'path') {
-        setupControlPointDrag(svg, currentDiagram, (d) => handleMutation(d, true))
+        setupControlPointDrag(svg, store.diagram, (d) => handleMutation(d, true))
       }
     }
   }
@@ -146,7 +138,7 @@ export function createD3Editor(
       document: container.ownerDocument,
       ...opts.svgOptions,
     }
-    const result = renderDiagram(container, currentDiagram, svgOpts)
+    const result = renderDiagram(container, store.diagram, svgOpts)
 
     if (!result.svgElement) return
 
@@ -165,7 +157,7 @@ export function createD3Editor(
     svgEl.appendChild(zoomGroup)
 
     // Insert coordinate grid inside the zoom group (so it pans/zooms with content)
-    insertGrid(svgEl, gridVisible)
+    insertGrid(svgEl, store.gridVisible)
     // Move the grid group into the zoom group (insertGrid appends to svgEl)
     const gridGroup = svgEl.querySelector('.d3-grid')
     if (gridGroup) {
@@ -180,8 +172,8 @@ export function createD3Editor(
     const clickZoneGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
     clickZoneGroup.setAttribute('class', 'd3-click-zones')
     const NODE_CLICK_PADDING = 6
-    const EDGE_CLICK_PADDING = 3 // thin — just cover the stroke + arrowheads
-    const clickZoneMap = new Map<string, SVGRectElement>()
+    const EDGE_CLICK_STROKE = 12 // transparent stroke width for path/edge click zones
+    const clickZoneMap = new Map<string, SVGElement>()
 
     // Two passes: edges/paths first (bottom), then nodes/labels on top
     const edgeIds: string[] = []
@@ -199,21 +191,45 @@ export function createD3Editor(
       const kind = el.getAttribute('data-ir-kind')
       const isEdge = kind === 'edge' || kind === 'path'
 
-      const pad = isEdge ? EDGE_CLICK_PADDING : NODE_CLICK_PADDING
       try {
-        const bbox = (el as SVGGraphicsElement).getBBox()
-        if (bbox.width === 0 && bbox.height === 0) continue
-        const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
-        rect.setAttribute('x', String(bbox.x - pad))
-        rect.setAttribute('y', String(bbox.y - pad))
-        rect.setAttribute('width', String(bbox.width + pad * 2))
-        rect.setAttribute('height', String(bbox.height + pad * 2))
-        rect.setAttribute('fill', 'transparent')
-        rect.setAttribute('class', 'd3-click-zone')
-        rect.setAttribute('data-zone-id', id)
-        rect.style.cursor = 'pointer'
-        clickZoneGroup.appendChild(rect)
-        clickZoneMap.set(id, rect)
+        if (isEdge) {
+          // For edges/paths: clone <path> elements with a thick transparent stroke
+          // so the click zone follows the curve shape instead of a large bbox rect
+          const paths = el.querySelectorAll('path')
+          if (paths.length === 0) continue
+          const g = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
+          g.setAttribute('class', 'd3-click-zone')
+          g.setAttribute('data-zone-id', id)
+          g.style.cursor = 'pointer'
+          for (const p of Array.from(paths)) {
+            const clone = p.cloneNode(false) as SVGPathElement
+            clone.setAttribute('stroke', 'transparent')
+            clone.setAttribute('stroke-width', String(EDGE_CLICK_STROKE))
+            clone.setAttribute('fill', 'none')
+            clone.removeAttribute('marker-start')
+            clone.removeAttribute('marker-end')
+            clone.removeAttribute('stroke-dasharray')
+            g.appendChild(clone)
+          }
+          clickZoneGroup.appendChild(g)
+          clickZoneMap.set(id, g)
+        } else {
+          // For nodes/labels: use bbox rect as before
+          const pad = NODE_CLICK_PADDING
+          const bbox = (el as SVGGraphicsElement).getBBox()
+          if (bbox.width === 0 && bbox.height === 0) continue
+          const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
+          rect.setAttribute('x', String(bbox.x - pad))
+          rect.setAttribute('y', String(bbox.y - pad))
+          rect.setAttribute('width', String(bbox.width + pad * 2))
+          rect.setAttribute('height', String(bbox.height + pad * 2))
+          rect.setAttribute('fill', 'transparent')
+          rect.setAttribute('class', 'd3-click-zone')
+          rect.setAttribute('data-zone-id', id)
+          rect.style.cursor = 'pointer'
+          clickZoneGroup.appendChild(rect)
+          clickZoneMap.set(id, rect)
+        }
       } catch { /* getBBox can throw for hidden elements */ }
     }
     zoomGroup.appendChild(clickZoneGroup)
@@ -227,10 +243,10 @@ export function createD3Editor(
 
     // Preserve viewBox across re-renders so the image doesn't shift when
     // IR edits (control point drag, node drag) change the bounding box.
-    if (currentViewBox) {
-      svgEl.setAttribute('viewBox', currentViewBox)
+    if (store.viewBox) {
+      svgEl.setAttribute('viewBox', store.viewBox)
     } else {
-      currentViewBox = svgEl.getAttribute('viewBox')
+      store.viewBox = svgEl.getAttribute('viewBox')
     }
     svgEl.style.width = '100%'
     svgEl.style.height = '100%'
@@ -249,7 +265,7 @@ export function createD3Editor(
         return true
       })
       .on('zoom', (event) => {
-        currentTransform = event.transform
+        store.zoomTransform = event.transform
         zoomGroup.setAttribute('transform', event.transform.toString())
       })
 
@@ -257,17 +273,17 @@ export function createD3Editor(
     // Disable d3-zoom's dblclick-to-zoom so dblclick can be used for label editing
     d3.select(svgEl).on('dblclick.zoom', null)
     // Restore previous zoom transform across re-renders
-    if (currentTransform !== zoomIdentity) {
-      d3.select(svgEl).call(zoomBehavior.transform, currentTransform)
+    if (store.zoomTransform !== zoomIdentity) {
+      d3.select(svgEl).call(zoomBehavior.transform, store.zoomTransform)
     }
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      setupSelection(svgEl, result.elementMap, controller, currentDiagram, opts.onElementSelect, handleMutation, clickZoneMap, currentNodeRegistry)
-      setupDrag(svgEl, result.elementMap, currentDiagram, controller, handleMutation, clickZoneMap)
+      setupSelection(svgEl, result.elementMap, controller, store.diagram, opts.onElementSelect, handleMutation, clickZoneMap, currentNodeRegistry)
+      setupDrag(svgEl, result.elementMap, store.diagram, controller, handleMutation, clickZoneMap)
       keyboardCleanup = setupKeyboard(
-        svgEl, currentDiagram, controller,
-        () => lastHighlightedId, handleMutation, opts.onElementSelect,
+        svgEl, store.diagram, controller,
+        () => store.highlightedId, handleMutation, opts.onElementSelect,
         currentNodeRegistry,
       )
     }
@@ -276,16 +292,14 @@ export function createD3Editor(
   const controller: D3EditorController = {
     render,
     setDiagram(diagram: IRDiagram) {
-      currentDiagram = diagram
-      currentViewBox = null // reset viewBox for new diagram
-      currentTransform = zoomIdentity // reset zoom for new diagram
+      store.setDiagram(diagram)
       render()
     },
     getDiagram() {
-      return currentDiagram
+      return store.diagram
     },
     setShowGrid(show: boolean) {
-      gridVisible = show
+      store.gridVisible = show
       const svg = container.querySelector('svg')
       if (svg) {
         const gridGroup = svg.querySelector('.d3-grid') as SVGElement | null
@@ -295,38 +309,34 @@ export function createD3Editor(
       }
     },
     getShowGrid() {
-      return gridVisible
+      return store.gridVisible
     },
     highlightElement(id: string | null) {
-      lastHighlightedId = id
+      store.highlightedId = id
       const svg = container.querySelector('svg') as SVGSVGElement | null
       if (!svg) return
       applyHighlight(svg, id)
     },
     undo() {
-      if (undoStack.length === 0) return false
-      redoStack.push(JSON.stringify(currentDiagram))
-      currentDiagram = JSON.parse(undoStack.pop()!)
-      lastHighlightedId = null
+      const restored = store.undo()
+      if (!restored) return false
       render()
       if (opts.onElementSelect) opts.onElementSelect(null)
-      if (opts.onIRChange) opts.onIRChange(currentDiagram)
+      if (opts.onIRChange) opts.onIRChange(store.diagram)
       return true
     },
     redo() {
-      if (redoStack.length === 0) return false
-      undoStack.push(JSON.stringify(currentDiagram))
-      currentDiagram = JSON.parse(redoStack.pop()!)
-      lastHighlightedId = null
+      const restored = store.redo()
+      if (!restored) return false
       render()
       if (opts.onElementSelect) opts.onElementSelect(null)
-      if (opts.onIRChange) opts.onIRChange(currentDiagram)
+      if (opts.onIRChange) opts.onIRChange(store.diagram)
       return true
     },
     resetZoom() {
       const svg = container.querySelector('svg') as SVGSVGElement | null
       if (!svg || !zoomBehavior) return
-      currentTransform = zoomIdentity
+      store.zoomTransform = zoomIdentity
       d3.select(svg).call(zoomBehavior.transform, zoomIdentity)
     },
     zoomIn() {
@@ -339,6 +349,15 @@ export function createD3Editor(
       if (!svg || !zoomBehavior) return
       zoomBehavior.scaleBy(d3.select(svg), 1 / 1.3)
     },
+    setShowHelp(show: boolean) {
+      const svg = container.querySelector('svg') as SVGSVGElement | null
+      if (!svg) return
+      setShortcutHelp(svg, show)
+    },
+    getShowHelp() {
+      return !!container.querySelector('.d3-shortcut-help')
+    },
+    store,
     destroy() {
       if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
       container.innerHTML = ''

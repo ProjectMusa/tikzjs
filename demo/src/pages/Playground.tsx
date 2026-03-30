@@ -31,6 +31,11 @@ export function Playground({ isDark }: { isDark: boolean }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const renderRef = useRef<typeof import('../lib/tikzBrowser') | null>(null)
   const tikzGenRef = useRef<typeof import('../lib/tikzGenBrowser') | null>(null)
+  // When set, any CodeMirror onChange whose value matches this string skips
+  // the debounced re-parse, because the source change originated from the D3
+  // editor (not user typing). Using the actual string instead of a boolean
+  // flag avoids races if CodeMirror fires onChange more than once per update.
+  const suppressReparseSourceRef = useRef<string | null>(null)
 
   // Lazy-load the tikz renderer and generator
   useEffect(() => {
@@ -67,6 +72,14 @@ export function Playground({ isDark }: { isDark: boolean }) {
       try {
         localStorage.setItem(STORAGE_KEY, value)
       } catch {}
+      // Skip re-parse if this change came from the D3 editor — it already
+      // has the correct IR and re-parsing would wipe the undo stack.
+      if (suppressReparseSourceRef.current !== null && value === suppressReparseSourceRef.current) {
+        suppressReparseSourceRef.current = null
+        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+        return
+      }
+      suppressReparseSourceRef.current = null
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => doRender(value), DEBOUNCE_MS)
     },
@@ -84,14 +97,18 @@ export function Playground({ isDark }: { isDark: boolean }) {
     [doRender],
   )
 
-  // Called when D3 editor mutates the IR (e.g., node drag)
+  // Called when D3 editor mutates the IR (e.g., node drag, undo, redo)
   const handleDiagramChange = useCallback(
     (updatedDiagram: IRDiagram) => {
+      // Cancel any pending debounced re-parse from the text editor —
+      // the D3 editor is the source of truth now.
+      if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
       setDiagram(updatedDiagram)
       // Generate TikZ source from the mutated IR
       if (tikzGenRef.current) {
         try {
           const newSource = tikzGenRef.current.generateTikZSource(updatedDiagram)
+          suppressReparseSourceRef.current = newSource
           setSource(newSource)
           try {
             localStorage.setItem(STORAGE_KEY, newSource)
@@ -107,14 +124,41 @@ export function Playground({ isDark }: { isDark: boolean }) {
           setError(e.message || String(e))
         }
       }
+      // Sync undo/redo button state
+      const store = editorPanelRef.current?.controller?.store
+      if (store) {
+        setCanUndo(store.canUndo)
+        setCanRedo(store.canRedo)
+      }
     },
     [],
   )
 
   const [showGrid, setShowGrid] = useState(true)
+  const [showHelp, setShowHelp] = useState(false)
   const [showInspector, setShowInspector] = useState(false)
+  const [canUndo, setCanUndo] = useState(false)
+  const [canRedo, setCanRedo] = useState(false)
+
+  const syncUndoRedo = useCallback(() => {
+    const store = editorPanelRef.current?.controller?.store
+    if (store) {
+      setCanUndo(store.canUndo)
+      setCanRedo(store.canRedo)
+    }
+  }, [])
   const [selectedElementId, setSelectedElementId] = useState<string | null>(null)
   const editorPanelRef = useRef<D3EditorPanelHandle>(null)
+
+  const handleUndo = useCallback(() => {
+    editorPanelRef.current?.controller?.undo()
+    syncUndoRedo()
+  }, [syncUndoRedo])
+
+  const handleRedo = useCallback(() => {
+    editorPanelRef.current?.controller?.redo()
+    syncUndoRedo()
+  }, [syncUndoRedo])
 
   const editorSvgOptions = {
     document: window.document.implementation.createHTMLDocument(''),
@@ -238,6 +282,7 @@ export function Playground({ isDark }: { isDark: boolean }) {
               onDiagramChange={handleDiagramChange}
               svgOptions={editorSvgOptions}
               showGrid={showGrid}
+              showHelp={showHelp}
               highlightElementId={selectedElementId}
               onElementSelect={setSelectedElementId}
             />
@@ -267,45 +312,30 @@ export function Playground({ isDark }: { isDark: boolean }) {
               borderLeft: `1px solid ${theme.border}`,
             }}
           >
-            {/* Close editor */}
+            {/* Close editor — always on top */}
             <button
+              className="toolbar-btn"
               title="Close Editor"
               onClick={() => setMode('preview')}
-              style={{
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: 'transparent',
-                color: theme.muted,
-                border: 'none',
-                borderRadius: 6,
-                cursor: 'pointer',
-              }}
+              style={{ color: theme.muted }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
                 <line x1="2" y1="2" x2="12" y2="12" />
                 <line x1="12" y1="2" x2="2" y2="12" />
               </svg>
             </button>
+
             {/* Separator */}
+            <div className="toolbar-sep" style={{ borderColor: theme.border }} />
+
             {/* Grid toggle */}
             <button
+              className="toolbar-btn"
               title={showGrid ? 'Hide Grid' : 'Show Grid'}
               onClick={() => setShowGrid(!showGrid)}
               style={{
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: showGrid ? theme.activeBtn : 'transparent',
+                background: showGrid ? theme.activeBtn : undefined,
                 color: showGrid ? theme.text : theme.muted,
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 16,
-                cursor: 'pointer',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2">
@@ -315,22 +345,30 @@ export function Playground({ isDark }: { isDark: boolean }) {
                 <line x1="9.3" y1="0" x2="9.3" y2="14" />
               </svg>
             </button>
+            {/* Help / keyboard shortcuts toggle */}
+            <button
+              className="toolbar-btn"
+              title={showHelp ? 'Hide Shortcuts' : 'Show Shortcuts'}
+              onClick={() => setShowHelp(!showHelp)}
+              style={{
+                background: showHelp ? theme.activeBtn : undefined,
+                color: showHelp ? theme.text : theme.muted,
+              }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4">
+                <circle cx="7" cy="7" r="6" />
+                <path d="M5.2 5.4a1.8 1.8 0 0 1 3.4.8c0 1.2-1.6 1.4-1.6 2.4" strokeLinecap="round" />
+                <circle cx="7" cy="10.8" r="0.5" fill="currentColor" stroke="none" />
+              </svg>
+            </button>
             {/* IR Inspector toggle */}
             <button
+              className="toolbar-btn"
               title={showInspector ? 'Hide IR Inspector' : 'Show IR Inspector'}
               onClick={() => setShowInspector(!showInspector)}
               style={{
-                width: 32,
-                height: 32,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                background: showInspector ? theme.activeBtn : 'transparent',
+                background: showInspector ? theme.activeBtn : undefined,
                 color: showInspector ? theme.text : theme.muted,
-                border: 'none',
-                borderRadius: 6,
-                fontSize: 16,
-                cursor: 'pointer',
               }}
             >
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2">
@@ -339,6 +377,39 @@ export function Playground({ isDark }: { isDark: boolean }) {
                 <line x1="9.5" y1="4" x2="12" y2="4" />
                 <line x1="9.5" y1="6.5" x2="12" y2="6.5" />
                 <line x1="9.5" y1="9" x2="12" y2="9" />
+              </svg>
+            </button>
+
+            {/* Spacer pushes undo/redo to bottom */}
+            <div style={{ flex: 1 }} />
+
+            {/* Separator */}
+            <div className="toolbar-sep" style={{ borderColor: theme.border }} />
+
+            {/* Undo */}
+            <button
+              className="toolbar-btn"
+              title="Undo (Ctrl+Z)"
+              disabled={!canUndo}
+              onClick={handleUndo}
+              style={{ color: canUndo ? theme.text : theme.muted, opacity: canUndo ? 1 : 0.35 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M3 5.5h6a3 3 0 0 1 0 6H7" />
+                <path d="M5.5 3L3 5.5 5.5 8" />
+              </svg>
+            </button>
+            {/* Redo */}
+            <button
+              className="toolbar-btn"
+              title="Redo (Ctrl+Y)"
+              disabled={!canRedo}
+              onClick={handleRedo}
+              style={{ color: canRedo ? theme.text : theme.muted, opacity: canRedo ? 1 : 0.35 }}
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5.5H5a3 3 0 0 0 0 6h2" />
+                <path d="M8.5 3L11 5.5 8.5 8" />
               </svg>
             </button>
           </div>

@@ -6,7 +6,7 @@ import * as d3 from 'd3-selection'
 import { drag as d3Drag } from 'd3-drag'
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx, NodeGeometryRegistry } from '../core/coordResolver.js'
-import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode, duplicateElement, type CpRole } from './irMutator.js'
+import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, duplicateElement, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ export function setupSelection(
   diagram: IRDiagram,
   onSelect?: (id: string | null) => void,
   onLabelEdit?: (diagram: IRDiagram) => void,
-  clickZoneMap?: Map<string, SVGRectElement>,
+  clickZoneMap?: Map<string, SVGElement>,
   nodeRegistry?: NodeGeometryRegistry,
 ): void {
   const DBLCLICK_THRESHOLD = 400 // ms
@@ -121,47 +121,6 @@ export function setupSelection(
     if (onSelect) onSelect(null)
   })
 
-  // Double-click on background to add a new node at that position
-  if (onLabelEdit) {
-    d3.select(svgElement).on('dblclick', (event: MouseEvent) => {
-      // Only add node if clicking on the SVG background, not on an element or click zone
-      const target = event.target as Element
-      if (target.closest?.('.d3-click-zone, [data-ir-id]')) return
-
-      // Convert screen coords to SVG user units (inside zoom group)
-      const zoomGroup = svgElement.querySelector('.d3-zoom-group') as SVGGraphicsElement | null
-      if (!zoomGroup) return
-
-      const pt = svgElement.createSVGPoint()
-      pt.x = event.clientX
-      pt.y = event.clientY
-      const ctm = zoomGroup.getScreenCTM()
-      if (!ctm) return
-      const svgPt = pt.matrixTransform(ctm.inverse())
-
-      // Convert SVG px to TikZ pt, with y-axis inversion
-      const xPt = pxToPt(svgPt.x)
-      const yPt = -pxToPt(svgPt.y) // SVG y is inverted vs TikZ
-
-      const newId = addNode(diagram, xPt, yPt)
-      onLabelEdit(diagram)
-      // Select the new node and open label editor
-      controller.highlightElement(newId)
-      if (onSelect) onSelect(newId)
-      // Wait for re-render, then open label editor on the new node.
-      // Must query the container for the current SVG since render() replaces it.
-      const container = svgElement.parentElement
-      setTimeout(() => {
-        const currentSvg = container?.querySelector('svg') as SVGSVGElement | null
-        if (!currentSvg) return
-        const newEl = currentSvg.querySelector(`[data-ir-id="${CSS.escape(newId)}"]`) as SVGElement | null
-        const node = findNode(diagram, newId)
-        if (newEl && node) {
-          openLabelEditor(currentSvg, newEl, node, newId, diagram, onLabelEdit, nodeRegistry)
-        }
-      }, 50)
-    })
-  }
 }
 
 // ── Keyboard ─────────────────────────────────────────────────────────────────
@@ -342,11 +301,19 @@ export function setupKeyboard(
 
 const HELP_CLASS = 'd3-shortcut-help'
 
-function toggleShortcutHelp(svg: SVGSVGElement): void {
+/** Show or hide the keyboard shortcut help overlay. */
+export function setShortcutHelp(svg: SVGSVGElement, show: boolean): void {
   const container = svg.parentElement
   if (!container) return
   const existing = container.querySelector(`.${HELP_CLASS}`)
-  if (existing) { existing.remove(); return }
+
+  if (!show) {
+    if (existing) existing.remove()
+    return
+  }
+
+  // Already showing
+  if (existing) return
 
   const doc = svg.ownerDocument
   const div = doc.createElement('div')
@@ -380,6 +347,13 @@ function toggleShortcutHelp(svg: SVGSVGElement): void {
     container.style.position = 'relative'
   }
   container.appendChild(div)
+}
+
+function toggleShortcutHelp(svg: SVGSVGElement): void {
+  const container = svg.parentElement
+  if (!container) return
+  const existing = container.querySelector(`.${HELP_CLASS}`)
+  setShortcutHelp(svg, !existing)
 }
 
 // ── Snap helper ──────────────────────────────────────────────────────────────
@@ -505,6 +479,8 @@ interface DragState {
   startPxX: number
   startPxY: number
   hasMoved: boolean
+  /** Original transform attribute before drag started. */
+  origTransform?: string
   /** Guide line element for Alt+drag axis constraint. */
   guideLine?: SVGLineElement
   /** Coordinate tooltip group (text + background rect). */
@@ -517,7 +493,7 @@ export function setupDrag(
   diagram: IRDiagram,
   controller: D3EditorController,
   onIRChange?: (diagram: IRDiagram) => void,
-  clickZoneMap?: Map<string, SVGRectElement>,
+  clickZoneMap?: Map<string, SVGElement>,
 ): void {
   const draggables = svgElement.querySelectorAll('.d3-draggable')
 
@@ -590,17 +566,23 @@ export function setupDrag(
         // Update IR
         moveNode(diagram, irId, newXPt, newYPt)
 
-        // Update SVG transform directly for immediate visual feedback
-        const newPxX = ptToPx(newXPt)
-        // Y is negated in SVG space
-        const newPxY = -ptToPx(newYPt)
+        // Update SVG transform directly for immediate visual feedback.
+        // The node's children are drawn at absolute px coordinates (the
+        // original center), so we translate by the DELTA, not the absolute
+        // new position — otherwise the original center is double-counted.
+        const dxPxFeedback = ptToPx(newXPt - state.startPtX)
+        const dyPxFeedback = -ptToPx(newYPt - state.startPtY) // SVG y inverted
 
-        const translate = `translate(${newPxX.toFixed(2)}, ${newPxY.toFixed(2)})`
-        const transform = actualEl.getAttribute('transform') || ''
-        const newTransform = /translate\([^)]*\)/.test(transform)
-          ? transform.replace(/translate\([^)]*\)/, translate)
-          : translate + (transform ? ' ' + transform : '')
-        actualEl.setAttribute('transform', newTransform)
+        // Store original transform on first drag move
+        if (state.origTransform === undefined) {
+          state.origTransform = actualEl.getAttribute('transform') || ''
+        }
+        const deltaTranslate = `translate(${dxPxFeedback.toFixed(2)}, ${dyPxFeedback.toFixed(2)})`
+        actualEl.setAttribute('transform', deltaTranslate + (state.origTransform ? ' ' + state.origTransform : ''))
+
+        // Absolute position in SVG px for guide lines and tooltip
+        const newPxX = ptToPx(newXPt)
+        const newPxY = -ptToPx(newYPt)
 
         // Show/hide guide line for Alt+drag axis constraint
         updateGuideLine(state, altKey, newPxX, newPxY, zoomGroup ?? svgElement)
