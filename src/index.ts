@@ -42,6 +42,7 @@ export type {
 export { createD3Editor } from './generators/d3/index.js'
 export type { D3EditorController, D3EditorOptions } from './generators/d3/index.js'
 export { EditorStore } from './generators/d3/editorStore.js'
+export type { EditorState, EditorStoreApi } from './generators/d3/editorStore.js'
 export { D3EditorPanel } from './generators/d3/D3EditorPanel.js'
 export type { D3EditorPanelProps, D3EditorPanelHandle } from './generators/d3/D3EditorPanel.js'
 export { IRInspector } from './generators/d3/IRInspector.js'

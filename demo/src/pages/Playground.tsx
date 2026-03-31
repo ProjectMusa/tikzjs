@@ -74,12 +74,16 @@ export function Playground({ isDark }: { isDark: boolean }) {
       } catch {}
       // Skip re-parse if this change came from the D3 editor — it already
       // has the correct IR and re-parsing would wipe the undo stack.
-      if (suppressReparseSourceRef.current !== null && value === suppressReparseSourceRef.current) {
+      // Keep the suppress ref alive until a DIFFERENT value arrives, because
+      // CodeMirror may fire onChange multiple times for a single update.
+      if (suppressReparseSourceRef.current !== null) {
+        if (value === suppressReparseSourceRef.current) {
+          if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+          return
+        }
+        // Different value — user is typing, clear suppress
         suppressReparseSourceRef.current = null
-        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
-        return
       }
-      suppressReparseSourceRef.current = null
       if (timerRef.current) clearTimeout(timerRef.current)
       timerRef.current = setTimeout(() => doRender(value), DEBOUNCE_MS)
     },

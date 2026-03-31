@@ -23,6 +23,8 @@ import { insertGrid } from './grid.js'
 import { highlightElement as _highlightElement } from './highlight.js'
 import { setupDrag, setupSelection, setupControlPointDrag, setupKeyboard, injectStyles, setShortcutHelp } from './interactions.js'
 import { EditorStore } from './editorStore.js'
+import { defaultD3Registry } from './elementHandlers/index.js'
+import { findElement } from './irMutator.js'
 
 // ── Public API ───────────────────────────────────────────────────────────────
 
@@ -99,10 +101,14 @@ export function createD3Editor(
   let currentNodeRegistry: NodeGeometryRegistry = new NodeGeometryRegistry()
   let zoomBehavior: ZoomBehavior<SVGSVGElement, unknown> | null = null
   let keyboardCleanup: (() => void) | null = null
+  /** JSON snapshot of the diagram taken after each render, before interactions mutate it. */
+  let preMutationSnapshot: string = JSON.stringify(diagram)
 
-  /** Common handler for IR mutations: snapshot, update, re-render, notify. */
-  function handleMutation(updatedDiagram: IRDiagram, forceSnapshot = false) {
-    store.applyMutation(updatedDiagram, forceSnapshot)
+  /** Common handler for IR mutations: commit to store with before/after diff, re-render, notify.
+   *  The diagram has been mutated in-place by the caller. We use the pre-render
+   *  snapshot to give zundo the correct old→new transition for undo/redo. */
+  function handleMutation(updatedDiagram: IRDiagram) {
+    store.applyMutation(preMutationSnapshot, JSON.parse(JSON.stringify(updatedDiagram)))
     render()
     // Re-apply highlight after re-render so selection persists visually
     if (store.highlightedId) {
@@ -118,12 +124,16 @@ export function createD3Editor(
     if (id && !opts.readOnly) {
       const el = currentElementMap.get(id)
       if (el?.getAttribute('data-ir-kind') === 'path') {
-        setupControlPointDrag(svg, store.diagram, (d) => handleMutation(d, true))
+        setupControlPointDrag(svg, store.diagram, handleMutation)
       }
     }
   }
 
   function render() {
+    // Snapshot the diagram BEFORE interactions can mutate it in-place.
+    // This is used by handleMutation to give zundo the pre-mutation state.
+    preMutationSnapshot = JSON.stringify(store.diagram)
+
     // Clean up previous keyboard listener
     if (keyboardCleanup) { keyboardCleanup(); keyboardCleanup = null }
 
@@ -171,8 +181,6 @@ export function createD3Editor(
     // Labels are rendered on top so they're not obscured by edge zones.
     const clickZoneGroup = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
     clickZoneGroup.setAttribute('class', 'd3-click-zones')
-    const NODE_CLICK_PADDING = 6
-    const EDGE_CLICK_STROKE = 12 // transparent stroke width for path/edge click zones
     const clickZoneMap = new Map<string, SVGElement>()
 
     // Two passes: edges/paths first (bottom), then nodes/labels on top
@@ -188,47 +196,20 @@ export function createD3Editor(
 
     for (const id of [...edgeIds, ...nodeIds, ...labelIds]) {
       const el = result.elementMap.get(id)!
-      const kind = el.getAttribute('data-ir-kind')
-      const isEdge = kind === 'edge' || kind === 'path'
+      const kind = el.getAttribute('data-ir-kind') as keyof typeof defaultD3Registry | null
 
       try {
-        if (isEdge) {
-          // For edges/paths: clone <path> elements with a thick transparent stroke
-          // so the click zone follows the curve shape instead of a large bbox rect
-          const paths = el.querySelectorAll('path')
-          if (paths.length === 0) continue
-          const g = doc.createElementNS('http://www.w3.org/2000/svg', 'g')
-          g.setAttribute('class', 'd3-click-zone')
-          g.setAttribute('data-zone-id', id)
-          g.style.cursor = 'pointer'
-          for (const p of Array.from(paths)) {
-            const clone = p.cloneNode(false) as SVGPathElement
-            clone.setAttribute('stroke', 'transparent')
-            clone.setAttribute('stroke-width', String(EDGE_CLICK_STROKE))
-            clone.setAttribute('fill', 'none')
-            clone.removeAttribute('marker-start')
-            clone.removeAttribute('marker-end')
-            clone.removeAttribute('stroke-dasharray')
-            g.appendChild(clone)
-          }
-          clickZoneGroup.appendChild(g)
-          clickZoneMap.set(id, g)
-        } else {
-          // For nodes/labels: use bbox rect as before
-          const pad = NODE_CLICK_PADDING
-          const bbox = (el as SVGGraphicsElement).getBBox()
-          if (bbox.width === 0 && bbox.height === 0) continue
-          const rect = doc.createElementNS('http://www.w3.org/2000/svg', 'rect')
-          rect.setAttribute('x', String(bbox.x - pad))
-          rect.setAttribute('y', String(bbox.y - pad))
-          rect.setAttribute('width', String(bbox.width + pad * 2))
-          rect.setAttribute('height', String(bbox.height + pad * 2))
-          rect.setAttribute('fill', 'transparent')
-          rect.setAttribute('class', 'd3-click-zone')
-          rect.setAttribute('data-zone-id', id)
-          rect.style.cursor = 'pointer'
-          clickZoneGroup.appendChild(rect)
-          clickZoneMap.set(id, rect)
+        const handler = kind ? defaultD3Registry[kind] : null
+        const irElement = handler ? findElement(store.diagram.elements, id) : null
+
+        let zone: SVGElement | null = null
+        if (handler && irElement) {
+          zone = handler.createClickZone(irElement as any, el, doc)
+        }
+
+        if (zone) {
+          clickZoneGroup.appendChild(zone)
+          clickZoneMap.set(id, zone)
         }
       } catch { /* getBBox can throw for hidden elements */ }
     }
