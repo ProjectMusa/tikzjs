@@ -8,6 +8,7 @@ import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { pxToPt, ptToPx, NodeGeometryRegistry } from '../core/coordResolver.js'
 import { moveNode, findNode, findElement, isDraggable, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, duplicateElement, type CpRole } from './irMutator.js'
 import type { D3EditorController } from './index.js'
+import { defaultD3Registry } from './elementHandlers/index.js'
 
 // ── Selection ────────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ export function setupSelection(
   onLabelEdit?: (diagram: IRDiagram) => void,
   clickZoneMap?: Map<string, SVGElement>,
   nodeRegistry?: NodeGeometryRegistry,
+
 ): void {
   const DBLCLICK_THRESHOLD = 400 // ms
 
@@ -143,6 +145,7 @@ export function setupKeyboard(
   onIRChange: (diagram: IRDiagram) => void,
   onSelect?: (id: string | null) => void,
   nodeRegistry?: NodeGeometryRegistry,
+
 ): () => void {
   const NUDGE_PT = 1       // 1pt per arrow key press
   const NUDGE_SHIFT_PT = 5 // 5pt with Shift held
@@ -236,6 +239,7 @@ export function setupKeyboard(
     // Ctrl+D: duplicate selected element
     if (e.key === 'd' && (e.ctrlKey || e.metaKey) && selectedId) {
       e.preventDefault()
+
       const newId = duplicateElement(diagram, selectedId)
       if (newId) {
         onIRChange(diagram)
@@ -250,6 +254,7 @@ export function setupKeyboard(
 
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
       e.preventDefault()
+
       if (removeElement(diagram, selectedId)) {
         controller.highlightElement(null)
         if (onSelect) onSelect(null)
@@ -278,11 +283,12 @@ export function setupKeyboard(
     // Arrow key nudge for selected nodes
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedId) {
       const node = findNode(diagram, selectedId)
-      if (!node || !isDraggable(node)) return
+      if (!node || !defaultD3Registry.node.isDraggable(node)) return
       const coord = node.position.coord
       if (coord.cs !== 'xy') return
 
       e.preventDefault()
+
       const delta = e.shiftKey ? NUDGE_SHIFT_PT : NUDGE_PT
       let newX = coord.x
       let newY = coord.y
@@ -494,6 +500,7 @@ export function setupDrag(
   controller: D3EditorController,
   onIRChange?: (diagram: IRDiagram) => void,
   clickZoneMap?: Map<string, SVGElement>,
+
 ): void {
   const draggables = svgElement.querySelectorAll('.d3-draggable')
 
@@ -502,7 +509,7 @@ export function setupDrag(
     if (!irId) continue
 
     const node = findNode(diagram, irId)
-    if (!node || !isDraggable(node)) continue
+    if (!node || !defaultD3Registry.node.isDraggable(node)) continue
 
     // The drag target is the click zone (if present) since it sits on top
     // and receives mousedown events. Visual feedback is applied to the
@@ -517,6 +524,8 @@ export function setupDrag(
       .container(zoomGroup ?? svgElement as any)
       .on('start', function (event) {
         d3.select(actualEl).classed('d3-dragging', true)
+        // Snapshot BEFORE any in-place mutation so undo captures pre-drag state
+  
         // Store initial IR position
         const coord = node.position.coord
         if (coord.cs === 'xy') {
@@ -829,6 +838,7 @@ export function setupControlPointDrag(
   svg: SVGSVGElement,
   diagram: IRDiagram,
   onIRChange: (diagram: IRDiagram) => void,
+
 ): void {
   const handles = Array.from(svg.querySelectorAll('[data-d3-role="cp-handle"]')) as SVGElement[]
 
@@ -847,6 +857,8 @@ export function setupControlPointDrag(
       .on('start', function (event) {
         event.sourceEvent?.stopPropagation()
         d3.select(this).attr('cursor', 'grabbing')
+        // Snapshot BEFORE mutation so undo captures pre-drag state
+  
 
         const { pathEl, svgCommandType, commandIndex, singleControl } = findPathElAndCommandInfo(svg, pathId, segIdx, diagram)
 
@@ -985,6 +997,7 @@ function openLabelEditor(
   diagram: IRDiagram,
   onIRChange: (diagram: IRDiagram) => void,
   nodeRegistry?: NodeGeometryRegistry,
+
 ): void {
   const doc = svgElement.ownerDocument
   if (!doc) return
@@ -1064,6 +1077,7 @@ function openLabelEditor(
     const newLabel = input.value
     fo.remove()
     if (newLabel !== node.label) {
+
       updateNodeLabel(diagram, id, newLabel)
       onIRChange(diagram)
     }
@@ -1115,6 +1129,7 @@ function openEdgeLabelEditor(
   labelIndex: number,
   diagram: IRDiagram,
   onIRChange: (diagram: IRDiagram) => void,
+
 ): void {
   const doc = svgElement.ownerDocument
   if (!doc) return
@@ -1200,6 +1215,7 @@ function openEdgeLabelEditor(
     const newLabel = input.value
     fo.remove()
     if (newLabel !== currentText) {
+
       updateEdgeLabel(diagram, edgeId, labelIndex, newLabel)
       onIRChange(diagram)
     }

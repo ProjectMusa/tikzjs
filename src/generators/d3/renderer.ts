@@ -10,7 +10,8 @@
 import type { IRDiagram, IRNode } from '../../ir/types.js'
 import { generateSVGElement, SVGGeneratorOptions } from '../svg/index.js'
 import { CoordResolver, NodeGeometryRegistry } from '../core/coordResolver.js'
-import { collectNodes, isDraggable } from './irMutator.js'
+import { collectNodes } from './irMutator.js'
+import { defaultD3Registry } from './elementHandlers/index.js'
 
 export interface RenderResult {
   /** The SVG element inserted into the container. */
@@ -82,7 +83,7 @@ function buildElementMap(
     if (irKind === 'node') {
       const node = nodeById.get(irId)
       if (node) {
-        if (isDraggable(node)) {
+        if (defaultD3Registry.node.isDraggable(node)) {
           el.classList.add('d3-draggable')
         } else {
           el.classList.add('d3-locked')
