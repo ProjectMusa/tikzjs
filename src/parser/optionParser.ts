@@ -388,6 +388,21 @@ function applyOption(opt: RawOption, style: ResolvedStyle, emSizePt = 10): void 
     case 'rotate':
       if (value) style.rotate = parseFloat(value as string)
       break
+    case 'shift': {
+      // shift={(x,y)} — coordinate-space shift. Store raw values; the generator
+      // converts them using the CoordResolver (which knows xUnit/yUnit/xscale/yscale).
+      if (value) {
+        const m = /^\(?\s*([^,]+),\s*([^)]+?)\s*\)?$/.exec(value as string)
+        if (m) {
+          const xVal = parseFloat(m[1])
+          const yVal = parseFloat(m[2])
+          if (!isNaN(xVal) && !isNaN(yVal)) {
+            style.shiftCoord = { x: xVal, y: yVal }
+          }
+        }
+      }
+      break
+    }
     case 'xshift':
       if (value) style.xshift = parseDimension(value as string, emSizePt)
       break

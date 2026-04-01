@@ -333,7 +333,7 @@ export function emitNode(
   const styleWithoutScale: ResolvedStyle = node.style.scale !== undefined || node.style.xscale !== undefined || node.style.yscale !== undefined
     ? { ...node.style, scale: undefined, xscale: undefined, yscale: undefined }
     : node.style
-  const transform = buildTransform(styleWithoutScale, centerX, centerY, resolver.coordScale)
+  const transform = buildTransform(styleWithoutScale, centerX, centerY, resolver.coordScale, resolver.xScale, resolver.yScale)
   if (transform) {
     const existing = g.getAttribute('transform') ?? ''
     g.setAttribute('transform', existing ? existing + ' ' + transform : transform)

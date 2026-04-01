@@ -155,6 +155,7 @@ export interface ResolvedStyle {
   rotate?: number // degrees
   xshift?: number // pt
   yshift?: number // pt
+  shiftCoord?: { x: number; y: number } // coordinate-space shift (raw TikZ coordinate values, not pt)
   xslant?: number // dimensionless shear factor
   yslant?: number // dimensionless shear factor
   scale?: number

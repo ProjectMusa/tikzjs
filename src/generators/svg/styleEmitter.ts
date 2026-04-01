@@ -150,13 +150,27 @@ export function applyAttrs(el: Element, attrs: Record<string, string | undefined
 
 /**
  * Build a transform attribute string from ResolvedStyle.
+ * @param xScale  Coordinate x-scale factor from CoordResolver (for shiftCoord conversion)
+ * @param yScale  Coordinate y-scale factor from CoordResolver (for shiftCoord conversion)
  */
-export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale = 1): string | undefined {
+export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale = 1, xScale = 1, yScale = 1): string | undefined {
   const parts: string[] = []
 
-  if (style.xshift || style.yshift) {
-    const tx = ptToPx((style.xshift ?? 0) * coordScale)
-    const ty = ptToPx((style.yshift ?? 0) * coordScale)
+  // Accumulate shift from both canvas-space (xshift/yshift in pt) and
+  // coordinate-space (shiftCoord in raw TikZ coordinate values).
+  let shiftXPt = (style.xshift ?? 0) * coordScale
+  let shiftYPt = (style.yshift ?? 0) * coordScale
+  if (style.shiftCoord) {
+    // shiftCoord stores raw TikZ coordinate values (no unit applied).
+    // IR coordinates have dim_unit (default 28.4528 = 1cm) already applied,
+    // so we multiply by 28.4528 to match, then apply the same scaling pipeline.
+    const DEFAULT_UNIT = 28.4528
+    shiftXPt += style.shiftCoord.x * DEFAULT_UNIT * coordScale * xScale
+    shiftYPt += style.shiftCoord.y * DEFAULT_UNIT * coordScale * yScale
+  }
+  if (shiftXPt || shiftYPt) {
+    const tx = ptToPx(shiftXPt)
+    const ty = ptToPx(shiftYPt)
     parts.push(`translate(${tx},${-ty})`)
   }
 
