@@ -1,0 +1,15 @@
+\begin{tikzpicture}[every node/.style={draw, rounded corners}, font=\small]
+  \node[text width=3cm, align=center] (A) at (0,3)
+    {Gradient $\nabla f(x)$\\converges to\\$\mathbf{0}$ as $t\to\infty$};
+  \node[text width=2.5cm, align=left] (B) at (5,3)
+    {Step 1: Compute\\Step 2: Verify\\Step 3: Output};
+  \node[circle] (C) at (0,0) {$\alpha$};
+  \node[circle] (D) at (3,0) {$\beta$};
+  \node[rectangle] (E) at (6,0) {Result: $x^2+y^2=r^2$};
+  \draw[->] (C) -- node[above, draw=none] {$f$} (D);
+  \draw[->] (D) -- node[above, draw=none] {$g \circ f$} (E);
+  \draw[->] (A) -- node[left, draw=none] {optimize} (C);
+  \draw[->] (B) -- node[right, draw=none] {validate} (E);
+  \node[text width=3.5cm, align=center] at (3,-2)
+    {Loss: $\mathcal{L}(\theta) = \sum_{i=1}^{n} \ell_i$\\is minimized};
+\end{tikzpicture}

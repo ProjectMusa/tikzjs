@@ -10,7 +10,12 @@ import { CoordResolver, NodeGeometryRegistry, getAnchorPosition, clipToNodeBound
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { buildPathAttrs, applyAttrs, buildTransform } from './styleEmitter.js'
 import { ensureMarker, MarkerRegistry } from './markerDefs.js'
-import { MathRenderer, defaultMathRenderer, scriptMathModeRenderer as defaultScriptMathModeRenderer } from '../../math/index.js'
+import {
+  MathRenderer,
+  defaultMathRenderer,
+  scriptMathModeRenderer as defaultScriptMathModeRenderer,
+} from '../../math/index.js'
+import type { TextMeasurer } from '../../math/textLayout.js'
 import { AbsoluteCoordinate } from './boundingBox.js'
 import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
@@ -30,12 +35,13 @@ export function emitEdge(
   mathRenderer: MathRenderer = defaultMathRenderer,
   constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
   scriptMathModeRenderer: MathRenderer = defaultScriptMathModeRenderer,
+  _textMeasurer?: TextMeasurer,
 ): EdgeRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
 
   const fromGeo = nodeRegistry.getById(edge.from)
-  const toGeo   = nodeRegistry.getById(edge.to)
+  const toGeo = nodeRegistry.getById(edge.to)
 
   if (!fromGeo || !toGeo) {
     // Can't render edge if nodes not yet resolved
@@ -44,9 +50,9 @@ export function emitEdge(
 
   // Determine connection points
   const fromAnchor = edge.fromAnchor ?? 'center'
-  const toAnchor   = edge.toAnchor   ?? 'center'
+  const toAnchor = edge.toAnchor ?? 'center'
   const fromCenter = getAnchorPosition(fromGeo, 'center')
-  const toCenter   = getAnchorPosition(toGeo, 'center')
+  const toCenter = getAnchorPosition(toGeo, 'center')
 
   // Build the path geometry
   const { d, midpoint, bbox } = buildEdgePath(fromGeo, toGeo, fromAnchor, toAnchor, edge.routing, constants)
@@ -62,22 +68,21 @@ export function emitEdge(
     // Apply stroke style
     const color = edge.style.draw ?? '#000000'
     pathEl.setAttribute('stroke', color)
-    pathEl.setAttribute('stroke-width', String(
-      edge.style.drawWidth !== undefined ? ptToPx(edge.style.drawWidth) : 0.8
-    ))
+    pathEl.setAttribute('stroke-width', String(edge.style.drawWidth !== undefined ? ptToPx(edge.style.drawWidth) : 0.8))
 
     if (edge.style.drawDash) {
       const dashMap: Record<string, string> = {
-        'dashed': '6,3', 'dotted': '1.5,2', 'densely dashed': '4,2', 'loosely dashed': '10,5'
+        dashed: '6,3',
+        dotted: '1.5,2',
+        'densely dashed': '4,2',
+        'loosely dashed': '10,5',
       }
       pathEl.setAttribute('stroke-dasharray', dashMap[edge.style.drawDash] ?? edge.style.drawDash)
     }
 
     // Markers — resolve 'default' tip using arrowDefault if set
     const resolveDefaultTip = (tip: import('../../ir/types.js').ArrowTipSpec) =>
-      tip.kind === 'default' && edge.style.arrowDefault
-        ? { ...tip, kind: edge.style.arrowDefault }
-        : tip
+      tip.kind === 'default' && edge.style.arrowDefault ? { ...tip, kind: edge.style.arrowDefault } : tip
     const edgeLwPt = edge.style.drawWidth ?? TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT
     if (edge.style.arrowEnd) {
       const mid = ensureMarker(resolveDefaultTip(edge.style.arrowEnd), markerRegistry, color, edgeLwPt)
@@ -119,14 +124,14 @@ function buildEdgePath(
   fromAnchor: string,
   toAnchor: string,
   routing: EdgeRouting,
-  constants: SVGRenderingConstants
+  constants: SVGRenderingConstants,
 ): { d: string; midpoint: AbsoluteCoordinate; bbox: BoundingBox } {
   const from = getAnchorPosition(fromGeo, fromAnchor === 'center' ? 'center' : fromAnchor)
-  const to   = getAnchorPosition(toGeo,   toAnchor   === 'center' ? 'center' : toAnchor)
+  const to = getAnchorPosition(toGeo, toAnchor === 'center' ? 'center' : toAnchor)
 
   // Clip to node boundaries
   const fromClipped = clipToNodeBoundary(to, from, fromGeo)
-  const toClipped   = clipToNodeBoundary(from, to, toGeo)
+  const toClipped = clipToNodeBoundary(from, to, toGeo)
 
   switch (routing.kind) {
     case 'straight': {
@@ -150,7 +155,7 @@ function buildEdgePath(
       // First compute approx control points from unclipped centers for tangent-clipping.
       const { c1: c1Approx, c2: c2Approx } = computeCubicBendControls(from, to, angle, dir)
       const fromClippedBend = clipToNodeBoundary(c1Approx, from, fromGeo)
-      const toClippedBend   = clipToNodeBoundary(c2Approx, to, toGeo)
+      const toClippedBend = clipToNodeBoundary(c2Approx, to, toGeo)
       const { c1, c2 } = computeCubicBendControls(fromClippedBend, toClippedBend, angle, dir)
       const { x: x0, y: y0 } = fromClippedBend
       const { x: x2, y: y2 } = toClippedBend
@@ -161,8 +166,10 @@ function buildEdgePath(
         d: `M ${x0} ${y0} C ${c1.x} ${c1.y} ${c2.x} ${c2.y} ${x2} ${y2}`,
         midpoint: { x: midX, y: midY },
         bbox: fromCorners(
-          Math.min(x0, c1.x, c2.x, x2), Math.min(y0, c1.y, c2.y, y2),
-          Math.max(x0, c1.x, c2.x, x2), Math.max(y0, c1.y, c2.y, y2)
+          Math.min(x0, c1.x, c2.x, x2),
+          Math.min(y0, c1.y, c2.y, y2),
+          Math.max(x0, c1.x, c2.x, x2),
+          Math.max(y0, c1.y, c2.y, y2),
         ),
       }
     }
@@ -173,8 +180,12 @@ function buildEdgePath(
       return {
         d: loopD,
         midpoint: loopMid,
-        bbox: fromCorners(fromGeo.centerX - fromGeo.halfWidth * 3, fromGeo.centerY - fromGeo.halfHeight * 3,
-                          fromGeo.centerX + fromGeo.halfWidth * 3, fromGeo.centerY + fromGeo.halfHeight * 3),
+        bbox: fromCorners(
+          fromGeo.centerX - fromGeo.halfWidth * 3,
+          fromGeo.centerY - fromGeo.halfHeight * 3,
+          fromGeo.centerX + fromGeo.halfWidth * 3,
+          fromGeo.centerY + fromGeo.halfHeight * 3,
+        ),
       }
     }
 
@@ -194,7 +205,7 @@ function buildEdgePath(
           Math.min(fromClipped.x, c1x, c2x, toClipped.x),
           Math.min(fromClipped.y, c1y, c2y, toClipped.y),
           Math.max(fromClipped.x, c1x, c2x, toClipped.x),
-          Math.max(fromClipped.y, c1y, c2y, toClipped.y)
+          Math.max(fromClipped.y, c1y, c2y, toClipped.y),
         ),
       }
     }
@@ -215,7 +226,7 @@ function computeCubicBendControls(
   from: AbsoluteCoordinate,
   to: AbsoluteCoordinate,
   angle: number,
-  dir: number
+  dir: number,
 ): { c1: AbsoluteCoordinate; c2: AbsoluteCoordinate } {
   const dx = to.x - from.x
   const dy = to.y - from.y
@@ -241,7 +252,7 @@ function computeCubicBendControls(
 
 function buildLoopPath(
   geo: import('./coordResolver.js').NodeGeometry,
-  direction: 'left' | 'right' | 'above' | 'below' | number
+  direction: 'left' | 'right' | 'above' | 'below' | number,
 ): { d: string; midpoint: AbsoluteCoordinate } {
   const { centerX, centerY, halfWidth, halfHeight } = geo
   const DEG = Math.PI / 180
@@ -250,23 +261,31 @@ function buildLoopPath(
   // loop above: out=105, in=75   loop below: out=285, in=255
   // loop left:  out=195, in=165  loop right: out=15,  in=-15
   let outAngle: number, inAngle: number
-  if (direction === 'above')      { outAngle = 105; inAngle = 75 }
-  else if (direction === 'below') { outAngle = 285; inAngle = 255 }
-  else if (direction === 'left')  { outAngle = 195; inAngle = 165 }
-  else if (direction === 'right') { outAngle = 15;  inAngle = -15 }
-  else {
+  if (direction === 'above') {
+    outAngle = 105
+    inAngle = 75
+  } else if (direction === 'below') {
+    outAngle = 285
+    inAngle = 255
+  } else if (direction === 'left') {
+    outAngle = 195
+    inAngle = 165
+  } else if (direction === 'right') {
+    outAngle = 15
+    inAngle = -15
+  } else {
     // Numeric angle: spread ±15° around direction
     outAngle = Number(direction) + 15
-    inAngle  = Number(direction) - 15
+    inAngle = Number(direction) - 15
   }
 
   // Border intersection point at a given TikZ angle
   const borderPoint = (tikzAngle: number) => {
     const rad = tikzAngle * DEG
-    const cos = Math.cos(rad), sin = Math.sin(rad)
+    const cos = Math.cos(rad),
+      sin = Math.sin(rad)
     // Ellipse border: scale unit direction to reach border
-    const r = (halfWidth * halfHeight) /
-      Math.sqrt((sin * halfWidth) ** 2 + (cos * halfHeight) ** 2 + 1e-9)
+    const r = (halfWidth * halfHeight) / Math.sqrt((sin * halfWidth) ** 2 + (cos * halfHeight) ** 2 + 1e-9)
     return {
       x: centerX + r * cos,
       y: centerY - r * sin, // SVG y-down
@@ -274,16 +293,17 @@ function buildLoopPath(
   }
 
   const start = borderPoint(outAngle)
-  const end   = borderPoint(inAngle)
+  const end = borderPoint(inAngle)
 
   // Distance between start and end points
-  const dx = end.x - start.x, dy = end.y - start.y
+  const dx = end.x - start.x,
+    dy = end.y - start.y
   const dist = Math.sqrt(dx * dx + dy * dy)
 
   // TikZ to-path formula: arm = max(0.3915 × distance × looseness, minDistance)
   // For loops: looseness=8, min distance=5mm (14.17pt)
   const looseness = 8
-  const minDistPx = ptToPx(5 * TIKZ_CONSTANTS.PT_PER_CM / 10) // 5mm
+  const minDistPx = ptToPx((5 * TIKZ_CONSTANTS.PT_PER_CM) / 10) // 5mm
   const d = Math.max(TIKZ_CONSTANTS.TO_PATH_LOOSENESS * dist * looseness, minDistPx)
 
   // Control points extend from start/end in the out/in directions
@@ -321,7 +341,7 @@ function emitEdgeLabel(
   to: AbsoluteCoordinate,
   document: Document,
   mathRenderer: MathRenderer,
-  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
 ): { el: Element; bbox: BoundingBox } | null {
   if (!label.text.trim()) return null
 
@@ -371,7 +391,7 @@ function emitEdgeLabel(
       // auto (no swap) = (uy, -ux);  swap (prime) = (-uy, ux)
       const sign = label.swap ? -1 : 1
       const px = sign * uy
-      const py = sign * (-ux)
+      const py = sign * -ux
 
       // Offset magnitude: half the label extent in the perp direction + gap
       const halfExtent = (Math.abs(px) * widthPx + Math.abs(py) * heightPx) / 2

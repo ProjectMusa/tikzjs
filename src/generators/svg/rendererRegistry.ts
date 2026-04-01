@@ -8,15 +8,7 @@
  * override individual kinds by spreading: { ...defaultSVGRegistry, node: myHandler }
  */
 
-import {
-  IRNode,
-  IRPath,
-  IREdge,
-  IRMatrix,
-  IRScope,
-  IRNamedCoordinate,
-  IRKnot,
-} from '../../ir/types.js'
+import { IRNode, IRPath, IREdge, IRMatrix, IRScope, IRNamedCoordinate, IRKnot } from '../../ir/types.js'
 import { ElementRenderResult, RenderContext } from './renderContext.js'
 import { mergeStyles } from './styleEmitter.js'
 import { emitNode } from './nodeEmitter.js'
@@ -28,12 +20,12 @@ import { ensurePattern } from './patternDefs.js'
 
 // ── Handler type aliases ──────────────────────────────────────────────────────
 
-export type KnotHandler       = (el: IRKnot,            ctx: RenderContext) => ElementRenderResult | null
-export type NodeHandler       = (el: IRNode,            ctx: RenderContext) => ElementRenderResult | null
-export type PathHandler       = (el: IRPath,            ctx: RenderContext) => ElementRenderResult | null
-export type EdgeHandler       = (el: IREdge,            ctx: RenderContext) => ElementRenderResult | null
-export type MatrixHandler     = (el: IRMatrix,          ctx: RenderContext) => ElementRenderResult | null
-export type ScopeHandler      = (el: IRScope,           ctx: RenderContext) => ElementRenderResult | null
+export type KnotHandler = (el: IRKnot, ctx: RenderContext) => ElementRenderResult | null
+export type NodeHandler = (el: IRNode, ctx: RenderContext) => ElementRenderResult | null
+export type PathHandler = (el: IRPath, ctx: RenderContext) => ElementRenderResult | null
+export type EdgeHandler = (el: IREdge, ctx: RenderContext) => ElementRenderResult | null
+export type MatrixHandler = (el: IRMatrix, ctx: RenderContext) => ElementRenderResult | null
+export type ScopeHandler = (el: IRScope, ctx: RenderContext) => ElementRenderResult | null
 export type CoordinateHandler = (el: IRNamedCoordinate, ctx: RenderContext) => ElementRenderResult | null
 
 // ── Registry interface ────────────────────────────────────────────────────────
@@ -43,14 +35,14 @@ export type CoordinateHandler = (el: IRNamedCoordinate, ctx: RenderContext) => E
  * Handlers return null when the element has no output in the current pass.
  */
 export interface SVGRendererRegistry {
-  node:            NodeHandler
-  path:            PathHandler
-  edge:            EdgeHandler
-  'tikzcd-arrow':  EdgeHandler
-  matrix:          MatrixHandler
-  scope:           ScopeHandler
-  coordinate:      CoordinateHandler
-  knot:            KnotHandler
+  node: NodeHandler
+  path: PathHandler
+  edge: EdgeHandler
+  'tikzcd-arrow': EdgeHandler
+  matrix: MatrixHandler
+  scope: ScopeHandler
+  coordinate: CoordinateHandler
+  knot: KnotHandler
 }
 
 // ── Default handlers (wrap existing emitter functions) ────────────────────────
@@ -58,7 +50,15 @@ export interface SVGRendererRegistry {
 const defaultNodeHandler: NodeHandler = (el, ctx) => {
   if (ctx.pass !== 1) return null
   const merged = { ...el, style: mergeStyles(ctx.inheritedStyle, el.style) }
-  const result = emitNode(merged, ctx.document, ctx.coordResolver, ctx.nodeRegistry, ctx.mathRenderer, ctx.constants)
+  const result = emitNode(
+    merged,
+    ctx.document,
+    ctx.coordResolver,
+    ctx.nodeRegistry,
+    ctx.mathRenderer,
+    ctx.constants,
+    ctx.textMeasurer,
+  )
   return { pathElements: [], nodeElements: [result.element], bboxes: [result.bbox] }
 }
 
@@ -75,7 +75,15 @@ const defaultPathHandler: PathHandler = (el, ctx) => {
     const acc: ElementRenderResult = { pathElements: [], nodeElements: [], bboxes: [] }
     for (const node of el.inlineNodes) {
       const merged = { ...node, style: mergeStyles(ctx.inheritedStyle, node.style) }
-      const r = emitNode(merged, ctx.document, ctx.coordResolver.clone(), ctx.nodeRegistry, ctx.mathRenderer, ctx.constants)
+      const r = emitNode(
+        merged,
+        ctx.document,
+        ctx.coordResolver.clone(),
+        ctx.nodeRegistry,
+        ctx.mathRenderer,
+        ctx.constants,
+        ctx.textMeasurer,
+      )
       acc.nodeElements.push(r.element)
       acc.bboxes.push(r.bbox)
     }
@@ -101,7 +109,16 @@ const defaultPathHandler: PathHandler = (el, ctx) => {
 const defaultEdgeHandler: EdgeHandler = (el, ctx) => {
   if (ctx.pass !== 2) return null
   const merged = { ...el, style: mergeStyles(ctx.inheritedStyle, el.style) }
-  const result = emitEdge(merged, ctx.document, ctx.nodeRegistry, ctx.markerRegistry, ctx.mathRenderer, ctx.constants, ctx.scriptMathModeRenderer)
+  const result = emitEdge(
+    merged,
+    ctx.document,
+    ctx.nodeRegistry,
+    ctx.markerRegistry,
+    ctx.mathRenderer,
+    ctx.constants,
+    ctx.scriptMathModeRenderer,
+    ctx.textMeasurer,
+  )
   return { pathElements: result.elements, nodeElements: [], bboxes: [result.bbox] }
 }
 
@@ -145,7 +162,7 @@ const defaultCoordinateHandler: CoordinateHandler = (el, ctx) => {
     halfHeight: 0,
     bbox: { minX: pt.x, minY: pt.y, maxX: pt.x, maxY: pt.y },
   })
-  return null  // coordinates contribute no visible elements
+  return null // coordinates contribute no visible elements
 }
 
 // ── Inline-node handling for paths ────────────────────────────────────────────
@@ -166,12 +183,12 @@ const defaultKnotHandler: KnotHandler = (el, ctx) => {
 // ── Default registry export ───────────────────────────────────────────────────
 
 export const defaultSVGRegistry: SVGRendererRegistry = {
-  node:           defaultNodeHandler,
-  path:           defaultPathHandler,
-  edge:           defaultEdgeHandler,
+  node: defaultNodeHandler,
+  path: defaultPathHandler,
+  edge: defaultEdgeHandler,
   'tikzcd-arrow': defaultEdgeHandler,
-  matrix:         defaultMatrixHandler,
-  scope:          defaultScopeHandler,
-  coordinate:     defaultCoordinateHandler,
-  knot:           defaultKnotHandler,
+  matrix: defaultMatrixHandler,
+  scope: defaultScopeHandler,
+  coordinate: defaultCoordinateHandler,
+  knot: defaultKnotHandler,
 }

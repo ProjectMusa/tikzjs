@@ -12,6 +12,7 @@ import { BoundingBox } from '../core/boundingBox.js'
 import { MarkerRegistry } from './markerDefs.js'
 import { PatternRegistry } from './patternDefs.js'
 import { MathRenderer } from '../../math/index.js'
+import type { TextMeasurer } from '../../math/textLayout.js'
 import { SVGRenderingConstants } from './constants.js'
 import type { SVGRendererRegistry } from './rendererRegistry.js'
 
@@ -58,4 +59,6 @@ export interface RenderContext {
   registry: SVGRendererRegistry
   /** Current rendering pass (1 = nodes/matrices, 2 = paths/edges). */
   pass: 1 | 2
+  /** Optional text measurer for hybrid text+math layout (pretext in browser). */
+  textMeasurer?: TextMeasurer
 }
