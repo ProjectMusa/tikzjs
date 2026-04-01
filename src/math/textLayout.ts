@@ -638,20 +638,25 @@ export function renderHybridLabel(
     return { ...result, isHybrid: true }
   }
 
-  // Fast path: if all-text (no math segments), delegate to MathRenderer directly.
+  // Fast path: if all-text with no linebreaks, delegate to MathRenderer directly.
   // MathJax handles plain text with proper font metrics; hybrid <text> would differ.
+  // But if there are linebreaks, we need the hybrid layout for proper multiline rendering.
   const hasMath = segments.some((seg) => seg.kind === 'math')
-  if (!hasMath) {
+  const hasLinebreaks = segments.some((seg) => seg.kind === 'linebreak')
+  if (!hasMath && !hasLinebreaks) {
     const result = mathRenderer(label.trim())
     return { ...result, isHybrid: true }
   }
 
   // If any text segment contains LaTeX backslash commands (e.g. \textcolor, \,, \bf),
   // delegate to MathJax — SVG <text> can't interpret them.
-  const hasLatexCommands = segments.some((seg) => seg.kind === 'text' && /\\[a-zA-Z,;!]/.test(seg.content))
-  if (hasLatexCommands) {
-    const result = mathRenderer(label.trim())
-    return { ...result, isHybrid: true }
+  // But not when there are linebreaks — those need hybrid layout.
+  if (!hasLinebreaks) {
+    const hasLatexCommands = segments.some((seg) => seg.kind === 'text' && /\\[a-zA-Z,;!]/.test(seg.content))
+    if (hasLatexCommands) {
+      const result = mathRenderer(label.trim())
+      return { ...result, isHybrid: true }
+    }
   }
 
   // Measure segments
