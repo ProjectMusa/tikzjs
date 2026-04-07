@@ -13,7 +13,7 @@ import { BoundingBox, fromCorners, mergeBBoxes, transformBBox } from './bounding
 import { buildTransform, applyAttrs } from './styleEmitter.js'
 import { MathRenderer, defaultMathRenderer, renderMath } from '../../math/index.js'
 import type { TextMeasurer } from '../../math/textLayout.js'
-import { renderHybridLabel, parseLabel, isPureMath, isSimpleLabel, buildCSSFont } from '../../math/textLayout.js'
+import { renderHybridLabel, buildCSSFont, heuristicMeasurer } from '../../math/textLayout.js'
 import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
 /** Default inner padding around node content (px). Computed from TikZ spec — does not vary with generator constants. */
@@ -31,7 +31,7 @@ export interface NodeRenderResult {
  * that subsequent coordinate references to this node can resolve anchors.
  *
  * @param mathRenderer  Optional renderer for LaTeX labels. Defaults to MathJax.
- * @param textMeasurer  Optional text measurer for hybrid text+math layout.
+ * @param textMeasurer  Text measurer for hybrid text+math layout. Defaults to heuristicMeasurer.
  */
 export function emitNode(
   node: IRNode,
@@ -40,7 +40,7 @@ export function emitNode(
   nodeRegistry: NodeGeometryRegistry,
   mathRenderer: MathRenderer = defaultMathRenderer,
   constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
-  textMeasurer?: TextMeasurer,
+  textMeasurer: TextMeasurer = heuristicMeasurer,
 ): NodeRenderResult {
   const MIN_HALF_SIZE = constants.MIN_HALF_SIZE_PX
   // Render the label — strip LaTeX font size commands that MathJax doesn't handle
@@ -86,8 +86,9 @@ export function emitNode(
     labelWidth = ptToPx(imgDims.widthPt)
     labelHeight = ptToPx(imgDims.heightPt)
     svgContent = buildImagePlaceholder(labelWidth, labelHeight)
-  } else if (textMeasurer && labelSource.trim()) {
-    // Hybrid text+math rendering: pretext for text, MathJax for math
+  } else if (labelSource.trim()) {
+    // Unified label rendering: renderHybridLabel handles pure text, pure math,
+    // mixed content, and linebreaks via a single code path.
     const textWidthPx = node.style.textWidth !== undefined ? ptToPx(node.style.textWidth) : undefined
     const cssFont = buildCSSFont({ fontSize: node.style.fontSize })
     try {
@@ -102,41 +103,10 @@ export function emitNode(
       labelWidth = result.widthPx
       labelHeight = result.heightPx
     } catch {
-      // Fallback to MathJax-only path
-      try {
-        const result = activeRenderer(labelSource)
-        svgContent = result.svgString
-        labelWidth = result.widthPx
-        labelHeight = result.heightPx
-      } catch {
-        svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
-        labelWidth = labelSource.length * 7
-        labelHeight = 14
-      }
-    }
-  } else if (labelSource.trim()) {
-    // Split on \\ (LaTeX line break) for multiline labels
-    const lineParts = labelSource
-      .split('\\\\')
-      .map((l) => l.trim())
-      .filter((l) => l !== '')
-    if (lineParts.length > 1) {
-      const multi = renderMultilineLabel(lineParts, activeRenderer)
-      svgContent = multi.svgContent
-      labelWidth = multi.labelWidth
-      labelHeight = multi.labelHeight
-    } else {
-      try {
-        const result = activeRenderer(labelSource)
-        svgContent = result.svgString
-        labelWidth = result.widthPx
-        labelHeight = result.heightPx
-      } catch {
-        // Fallback: render as plain text
-        svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
-        labelWidth = labelSource.length * 7
-        labelHeight = 14
-      }
+      // Fallback: render as plain text
+      svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
+      labelWidth = labelSource.length * 7
+      labelHeight = 14
     }
   }
 
@@ -542,35 +512,6 @@ const EXAMPLE_IMAGE_SIZES: Record<string, [number, number]> = {
   'example-image-a3-landscape': [1190.55, 841.89],
   'example-image-letter': [612, 792],
   'example-image-letter-landscape': [792, 612],
-}
-
-/**
- * Render a multiline label (split on \\) as stacked MathJax SVG lines.
- * Each non-empty line is rendered separately; lines are centered horizontally.
- */
-function renderMultilineLabel(
-  lines: string[],
-  renderer: MathRenderer,
-): { svgContent: string; labelWidth: number; labelHeight: number } {
-  const LINE_GAP_PX = 4
-  const rendered = lines.map((line) => {
-    if (!line) return { svgString: '', widthPx: 0, heightPx: 12 }
-    try {
-      return renderer(line)
-    } catch {
-      return { svgString: `<text font-size="12">${escapeXml(line)}</text>`, widthPx: line.length * 7, heightPx: 14 }
-    }
-  })
-  const maxWidth = Math.max(...rendered.map((r) => r.widthPx), 0)
-  const totalHeight = rendered.reduce((s, r) => s + r.heightPx, 0) + LINE_GAP_PX * (rendered.length - 1)
-  let svgContent = ''
-  let yOff = 0
-  for (const r of rendered) {
-    const xOff = (maxWidth - r.widthPx) / 2
-    svgContent += `<g transform="translate(${xOff},${yOff})">${r.svgString}</g>`
-    yOff += r.heightPx + LINE_GAP_PX
-  }
-  return { svgContent, labelWidth: maxWidth, labelHeight: totalHeight }
 }
 
 /** Convert a dimension string with unit to pt. */

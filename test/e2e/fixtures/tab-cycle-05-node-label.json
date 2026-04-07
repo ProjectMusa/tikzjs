@@ -1,0 +1,17 @@
+{
+  "description": "Tab cycles selection in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "none",
+        "target": { "kind": "node", "index": 0 },
+        "args": {}
+      },
+      "uiAction": {
+        "type": "tab-cycle",
+        "target": { "kind": "node", "index": 0 }
+      }
+    }
+  ]
+}

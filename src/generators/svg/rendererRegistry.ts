@@ -65,7 +65,7 @@ const defaultNodeHandler: NodeHandler = (el, ctx) => {
 
 const defaultMatrixHandler: MatrixHandler = (el, ctx) => {
   if (ctx.pass !== 1) return null
-  const result = emitMatrix(el, ctx.document, ctx.coordResolver, ctx.nodeRegistry, ctx.mathModeRenderer, ctx.constants)
+  const result = emitMatrix(el, ctx.document, ctx.coordResolver, ctx.nodeRegistry, ctx.mathModeRenderer, ctx.constants, ctx.textMeasurer)
   return { pathElements: [], nodeElements: result.elements, bboxes: [result.bbox] }
 }
 

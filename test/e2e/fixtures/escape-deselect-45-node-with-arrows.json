@@ -1,0 +1,17 @@
+{
+  "description": "Escape deselects element in 45-node-with-arrows",
+  "goldenFixture": "45-node-with-arrows.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "none",
+        "target": { "kind": "node", "index": 0 },
+        "args": {}
+      },
+      "uiAction": {
+        "type": "escape",
+        "target": { "kind": "node", "index": 0 }
+      }
+    }
+  ]
+}

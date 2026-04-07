@@ -33,6 +33,9 @@ interface FixtureStep {
     newLabel?: string
     labelIndex?: number
     key?: string
+    shiftKey?: boolean
+    /** For undo tests: the preceding action type to perform before undoing */
+    undoAction?: string
   }
 }
 
@@ -124,7 +127,7 @@ async function clickElement(page: Page, selector: string): Promise<void> {
 const fixtures = loadFixtures()
 
 for (const { name, fixture } of fixtures) {
-  const supported = fixture.steps.some(s => ['drag', 'drag-cp', 'edit-label', 'edit-edge-label', 'delete', 'nudge'].includes(s.uiAction.type))
+  const supported = fixture.steps.some(s => ['drag', 'drag-cp', 'edit-label', 'edit-edge-label', 'delete', 'nudge', 'shift-nudge', 'duplicate', 'undo', 'tab-cycle', 'escape'].includes(s.uiAction.type))
   if (!supported) continue
 
   test(`e2e: ${name} — ${fixture.description}`, async ({ page }) => {
@@ -730,6 +733,387 @@ for (const { name, fixture } of fixtures) {
 
         expect(Math.abs(actual.x - setup.expectedX)).toBeLessThan(COORD_TOLERANCE)
         expect(Math.abs(actual.y - setup.expectedY)).toBeLessThan(COORD_TOLERANCE)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Shift+nudge (5pt arrow key nudge)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'shift-nudge') {
+        const arrowKey = step.uiAction.key!
+
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const allNodes = collectAllNodes(ir.elements)
+          if (params.targetIndex >= allNodes.length) {
+            throw new Error(`Node index ${params.targetIndex} out of range`)
+          }
+          const targetNode = allNodes[params.targetIndex]
+          if (targetNode.position.coord.cs !== 'xy') throw new Error('Not draggable')
+
+          const newX = targetNode.position.coord.x + params.deltaXPt
+          const newY = targetNode.position.coord.y + params.deltaYPt
+
+          const irCopy = JSON.parse(JSON.stringify(ir))
+          tikzjs.applyMutation(irCopy, params.action, { nodeId: targetNode.id, x: newX, y: newY })
+          const mutatedNode = findNodeById(irCopy.elements, targetNode.id)
+
+          return {
+            elementId: targetNode.id,
+            expectedX: mutatedNode.position.coord.x,
+            expectedY: mutatedNode.position.coord.y,
+          }
+        }, {
+          targetIndex: step.mutation.target.index,
+          action: step.mutation.action,
+          deltaXPt: step.mutation.args.deltaXPt,
+          deltaYPt: step.mutation.args.deltaYPt,
+        })
+
+        // Click the node to select it
+        const selector = `.editor-overlay svg [data-ir-id="${setup.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+
+        // Press the arrow key with Shift held
+        await page.keyboard.press(`Shift+${arrowKey}`)
+        await page.waitForTimeout(1000)
+
+        // Read resulting IR and compare
+        const actual = await page.evaluate((params) => {
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const node = findNodeById(ir.elements, params.elementId)
+          if (!node) throw new Error(`Node ${params.elementId} not found after shift-nudge`)
+          return { x: node.position.coord.x, y: node.position.coord.y }
+        }, { elementId: setup.elementId })
+
+        expect(Math.abs(actual.x - setup.expectedX)).toBeLessThan(COORD_TOLERANCE)
+        expect(Math.abs(actual.y - setup.expectedY)).toBeLessThan(COORD_TOLERANCE)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Duplicate element (Ctrl+D)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'duplicate') {
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+          function collectByKind(elements: any[], kind: string): any[] {
+            const result: any[] = []
+            for (const el of elements) {
+              if (el.kind === kind) result.push(el)
+              if (el.kind === 'scope') result.push(...collectByKind(el.children, kind))
+            }
+            return result
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          let targetId: string
+          if (params.targetKind === 'node') {
+            const allNodes = collectAllNodes(ir.elements)
+            if (params.targetIndex >= allNodes.length) {
+              throw new Error(`Node index ${params.targetIndex} out of range`)
+            }
+            targetId = allNodes[params.targetIndex].id
+          } else {
+            const items = collectByKind(ir.elements, params.targetKind)
+            if (params.targetIndex >= items.length) {
+              throw new Error(`${params.targetKind} index ${params.targetIndex} out of range`)
+            }
+            targetId = items[params.targetIndex].id
+          }
+
+          const prevCount = ir.elements.length
+
+          return {
+            elementId: targetId,
+            prevElementCount: prevCount,
+          }
+        }, {
+          targetKind: step.mutation.target.kind,
+          targetIndex: step.mutation.target.index,
+        })
+
+        // Click the element to select it
+        const selector = `.editor-overlay svg [data-ir-id="${setup.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+
+        // Press Ctrl+D to duplicate
+        await page.keyboard.press('Control+d')
+        await page.waitForTimeout(1000)
+
+        // Verify the element was duplicated (element count increased)
+        const actual = await page.evaluate((params) => {
+          const ir = (window as any).__tikzjs.getIR()
+          return {
+            elementCount: ir.elements.length,
+          }
+        }, {})
+
+        expect(actual.elementCount).toBe(setup.prevElementCount + 1)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Undo (perform action then Ctrl+Z)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'undo') {
+        // First, capture the pre-action IR state
+        const preState = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const allNodes = collectAllNodes(ir.elements)
+          if (params.targetIndex >= allNodes.length) {
+            throw new Error(`Node index ${params.targetIndex} out of range`)
+          }
+          const targetNode = allNodes[params.targetIndex]
+          if (targetNode.position.coord.cs !== 'xy') throw new Error('Not draggable')
+
+          return {
+            elementId: targetNode.id,
+            originalX: targetNode.position.coord.x,
+            originalY: targetNode.position.coord.y,
+          }
+        }, {
+          targetIndex: step.mutation.target.index,
+        })
+
+        // Perform a nudge (the action to undo)
+        const nudgeKey = step.uiAction.key ?? 'ArrowRight'
+        const selector = `.editor-overlay svg [data-ir-id="${preState.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+        await page.keyboard.press(nudgeKey)
+        await page.waitForTimeout(500)
+
+        // Verify the node moved
+        const afterNudge = await page.evaluate((params) => {
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const node = findNodeById(ir.elements, params.elementId)
+          return { x: node.position.coord.x, y: node.position.coord.y }
+        }, { elementId: preState.elementId })
+
+        // Verify it actually moved (not still at original)
+        const didMove = Math.abs(afterNudge.x - preState.originalX) > 0.1
+          || Math.abs(afterNudge.y - preState.originalY) > 0.1
+        expect(didMove).toBe(true)
+
+        // Now undo with Ctrl+Z
+        await page.keyboard.press('Control+z')
+        await page.waitForTimeout(1000)
+
+        // Verify the node returned to original position
+        const afterUndo = await page.evaluate((params) => {
+          function findNodeById(elements: any[], id: string): any {
+            for (const el of elements) {
+              if (el.kind === 'node' && el.id === id) return el
+              if (el.kind === 'scope') { const f = findNodeById(el.children, id); if (f) return f }
+              if (el.kind === 'path') { for (const n of el.inlineNodes) { if (n.id === id) return n } }
+            }
+            return null
+          }
+          const ir = (window as any).__tikzjs.getIR()
+          const node = findNodeById(ir.elements, params.elementId)
+          if (!node) throw new Error(`Node ${params.elementId} not found after undo`)
+          return { x: node.position.coord.x, y: node.position.coord.y }
+        }, { elementId: preState.elementId })
+
+        expect(Math.abs(afterUndo.x - preState.originalX)).toBeLessThan(COORD_TOLERANCE)
+        expect(Math.abs(afterUndo.y - preState.originalY)).toBeLessThan(COORD_TOLERANCE)
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Tab cycle (Tab key cycles selection)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'tab-cycle') {
+        // Get list of selectable element IDs
+        const elementIds = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          if (!svg) throw new Error('No SVG')
+          return Array.from(svg.querySelectorAll('[data-ir-id]'))
+            .map(el => el.getAttribute('data-ir-id')!)
+            .filter(id => id && !id.includes(':label:'))
+        })
+
+        expect(elementIds.length).toBeGreaterThan(1)
+
+        // Dispatch Tab keydown directly on document (bypasses browser focus trap)
+        await page.evaluate(() => {
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Tab', code: 'Tab', bubbles: true, cancelable: true,
+          }))
+        })
+        await page.waitForTimeout(300)
+
+        // Check that an element is highlighted
+        const firstHighlight = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          const overlay = svg?.querySelector('.d3-highlight-group')
+          return overlay !== null
+        })
+        expect(firstHighlight).toBe(true)
+
+        // Read the highlight group's bounding position before second Tab
+        const firstBBox = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          const g = svg?.querySelector('.d3-highlight-group') as SVGGraphicsElement | null
+          if (!g) return null
+          const b = g.getBBox()
+          return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }
+        })
+
+        // Dispatch Tab again — selection should change
+        await page.evaluate(() => {
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Tab', code: 'Tab', bubbles: true, cancelable: true,
+          }))
+        })
+        await page.waitForTimeout(300)
+
+        const secondBBox = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          const g = svg?.querySelector('.d3-highlight-group') as SVGGraphicsElement | null
+          if (!g) return null
+          const b = g.getBBox()
+          return { x: Math.round(b.x), y: Math.round(b.y), w: Math.round(b.width), h: Math.round(b.height) }
+        })
+
+        // Verify highlight moved (selection changed)
+        expect(secondBBox).not.toBeNull()
+        if (elementIds.length > 1 && firstBBox && secondBBox) {
+          const posChanged = firstBBox.x !== secondBBox.x || firstBBox.y !== secondBBox.y
+            || firstBBox.w !== secondBBox.w || firstBBox.h !== secondBBox.h
+          expect(posChanged).toBe(true)
+        }
+      }
+
+      // ════════════════════════════════════════════════════════════════════
+      // Escape (deselect)
+      // ════════════════════════════════════════════════════════════════════
+      if (step.uiAction.type === 'escape') {
+        // First select an element
+        const setup = await page.evaluate((params) => {
+          function collectAllNodes(elements: any[]): any[] {
+            const nodes: any[] = []
+            for (const el of elements) {
+              if (el.kind === 'node') nodes.push(el)
+              if (el.kind === 'scope') nodes.push(...collectAllNodes(el.children))
+              if (el.kind === 'path') nodes.push(...el.inlineNodes)
+              if (el.kind === 'matrix') {
+                for (const row of el.rows) for (const cell of row) if (cell) nodes.push(cell)
+              }
+            }
+            return nodes
+          }
+
+          const tikzjs = (window as any).__tikzjs
+          const ir = tikzjs.getIR()
+          if (!ir) throw new Error('No IR available')
+
+          const allNodes = collectAllNodes(ir.elements)
+          if (params.targetIndex >= allNodes.length) {
+            throw new Error(`Node index ${params.targetIndex} out of range`)
+          }
+          return { elementId: allNodes[params.targetIndex].id }
+        }, { targetIndex: step.mutation.target.index })
+
+        // Click the element to select it
+        const selector = `.editor-overlay svg [data-ir-id="${setup.elementId}"]`
+        await expect(page.locator(selector).first()).toBeVisible({ timeout: 3000 })
+        await clickElement(page, selector)
+        await page.waitForTimeout(300)
+
+        // Verify element is highlighted
+        const isHighlighted = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          return svg?.querySelector('.d3-highlight-group') !== null
+        })
+        expect(isHighlighted).toBe(true)
+
+        // Press Escape to deselect (dispatch on document to ensure handler fires)
+        await page.evaluate(() => {
+          document.dispatchEvent(new KeyboardEvent('keydown', {
+            key: 'Escape', code: 'Escape', bubbles: true, cancelable: true,
+          }))
+        })
+        await page.waitForTimeout(300)
+
+        // Verify no element is highlighted
+        const isDeselected = await page.evaluate(() => {
+          const svg = document.querySelector('.editor-overlay svg') as SVGSVGElement
+          return svg?.querySelector('.d3-highlight-group') === null
+        })
+        expect(isDeselected).toBe(true)
       }
     }
   })

@@ -13,6 +13,8 @@ import { CoordResolver, NodeGeometryRegistry, ptToPx } from './coordResolver.js'
 import { BoundingBox, fromCorners, mergeBBoxes } from './boundingBox.js'
 import { emitNode } from './nodeEmitter.js'
 import { MathRenderer, mathModeRenderer } from '../../math/index.js'
+import type { TextMeasurer } from '../../math/textLayout.js'
+import { heuristicMeasurer } from '../../math/textLayout.js'
 import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
 /** Default tikzcd separations (matching TikZ defaults). */
@@ -35,7 +37,8 @@ export function emitMatrix(
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
   mathRenderer: MathRenderer = mathModeRenderer,
-  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
+  textMeasurer: TextMeasurer = heuristicMeasurer,
 ): MatrixRenderResult {
   const elements: Element[] = []
   const bboxes: BoundingBox[] = []
@@ -122,7 +125,7 @@ export function emitMatrix(
         },
       }
 
-      const result = emitNode(patchedNode, document, resolver, nodeRegistry, mathRenderer, constants)
+      const result = emitNode(patchedNode, document, resolver, nodeRegistry, mathRenderer, constants, textMeasurer)
       elements.push(result.element)
       bboxes.push(result.bbox)
     }

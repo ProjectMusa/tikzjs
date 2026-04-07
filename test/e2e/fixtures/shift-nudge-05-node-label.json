@@ -1,0 +1,19 @@
+{
+  "description": "Shift+nudge first node up by 5pt in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveNode",
+        "target": { "kind": "node", "index": 0 },
+        "args": { "deltaXPt": 0, "deltaYPt": 5 }
+      },
+      "uiAction": {
+        "type": "shift-nudge",
+        "target": { "kind": "node", "index": 0 },
+        "key": "ArrowUp",
+        "shiftKey": true
+      }
+    }
+  ]
+}
