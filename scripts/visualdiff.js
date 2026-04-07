@@ -202,7 +202,7 @@ async function run() {
 
   const allFixtures = fs.readdirSync(FIXTURES_DIR)
     .filter(f => f.endsWith('.tikz'))
-    .sort()
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map(f => f.replace('.tikz', ''))
 
   const fixtures = args.length

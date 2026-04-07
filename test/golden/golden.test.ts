@@ -25,7 +25,7 @@ const REFS_DIR = path.join(__dirname, 'refs')
 // Get all fixture files
 const fixtures = fs.readdirSync(FIXTURES_DIR)
   .filter(f => f.endsWith('.tikz'))
-  .sort()
+  .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
 
 describe('Golden tests', () => {
   for (const fixture of fixtures) {
