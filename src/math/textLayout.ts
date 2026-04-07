@@ -638,24 +638,36 @@ export function renderHybridLabel(
     return { ...result, isHybrid: true }
   }
 
-  // Fast path: if all-text with no linebreaks, delegate to MathRenderer directly.
-  // MathJax handles plain text with proper font metrics; hybrid <text> would differ.
-  // But if there are linebreaks, we need the hybrid layout for proper multiline rendering.
+  // Fast path: if all-text with no linebreaks and no wrapping needed,
+  // delegate to MathRenderer directly (applying scale if needed).
   const hasMath = segments.some((seg) => seg.kind === 'math')
   const hasLinebreaks = segments.some((seg) => seg.kind === 'linebreak')
-  if (!hasMath && !hasLinebreaks) {
+  const needsWrapping = options.maxWidthPx !== undefined
+  if (!hasMath && !hasLinebreaks && !needsWrapping) {
     const result = mathRenderer(label.trim())
-    return { ...result, isHybrid: true }
+    return {
+      svgString: scale !== 1 ? `<g transform="scale(${scale})">${result.svgString}</g>` : result.svgString,
+      widthPx: result.widthPx * scale,
+      heightPx: result.heightPx * scale,
+      verticalOffsetPx: result.verticalOffsetPx * scale,
+      isHybrid: true,
+    }
   }
 
   // If any text segment contains LaTeX backslash commands (e.g. \textcolor, \,, \bf),
   // delegate to MathJax — SVG <text> can't interpret them.
-  // But not when there are linebreaks — those need hybrid layout.
-  if (!hasLinebreaks) {
+  // But not when there are linebreaks or wrapping that need the hybrid engine.
+  if (!hasLinebreaks && !needsWrapping) {
     const hasLatexCommands = segments.some((seg) => seg.kind === 'text' && /\\[a-zA-Z,;!]/.test(seg.content))
     if (hasLatexCommands) {
       const result = mathRenderer(label.trim())
-      return { ...result, isHybrid: true }
+      return {
+        svgString: scale !== 1 ? `<g transform="scale(${scale})">${result.svgString}</g>` : result.svgString,
+        widthPx: result.widthPx * scale,
+        heightPx: result.heightPx * scale,
+        verticalOffsetPx: result.verticalOffsetPx * scale,
+        isHybrid: true,
+      }
     }
   }
 
