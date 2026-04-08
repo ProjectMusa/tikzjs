@@ -407,13 +407,9 @@ export function layoutSegments(
 
       for (const seg of rawLine) {
         if (seg.kind === 'math') {
-          // Math: unbreakable inline box
-          if (currentX + seg.widthPx > maxWidthPx && currentLineSegs.length > 0) {
-            // Doesn't fit — push current line and start new one
-            lines.push(finishLine(currentLineSegs, currentX, lineHeightPx))
-            currentLineSegs = []
-            currentX = 0
-          }
+          // Math: unbreakable inline box — never break before math.
+          // In TeX, inline math doesn't trigger line breaks; it stays on
+          // the current line and overflows text width if necessary.
           currentLineSegs.push({
             kind: 'math',
             x: currentX,
@@ -556,7 +552,9 @@ export function layoutSegments(
       if (seg.kind === 'text' && seg.text) {
         // SVG <text> y attribute = baseline position
         const textY = y + line.baselinePx
-        svgContent += `<text x="${sx}" y="${textY}" font-size="${fontSize}" font-family="serif">${escapeXml(seg.text)}</text>`
+        // xml:space="preserve" prevents SVG from stripping leading/trailing whitespace
+        // (needed for spaces between math and text segments like "$x$ as $y$")
+        svgContent += `<text x="${sx}" y="${textY}" font-size="${fontSize}" font-family="serif" xml:space="preserve">${escapeXml(seg.text)}</text>`
       } else if (seg.kind === 'math' && seg.svgString) {
         // Position math SVG so its internal baseline aligns with the line baseline.
         // MathJax descent below baseline = verticalOffsetPx - BASE_SHIFT_PX
