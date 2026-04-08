@@ -9,6 +9,7 @@ With no arguments, runs all fixtures found in test/golden/fixtures/.
 """
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -43,7 +44,9 @@ def main(argv: list[str] | None = None) -> int:
     if positional:
         names = [a.replace('.tikz', '') for a in positional]
     else:
-        names = sorted(p.stem for p in FIXTURES_DIR.glob('*.tikz'))
+        def _natural_key(s: str) -> list:
+            return [int(c) if c.isdigit() else c.lower() for c in re.split(r'(\d+)', s)]
+        names = sorted((p.stem for p in FIXTURES_DIR.glob('*.tikz')), key=_natural_key)
 
     if not names:
         print('No fixtures found.', file=sys.stderr)
