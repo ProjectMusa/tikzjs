@@ -1019,7 +1019,12 @@ identifier = $([a-zA-Z_][a-zA-Z0-9_\-]*)
 
 // Node names allow a leading digit (e.g. \node (1) ... is valid TikZ), trailing primes (A', B'),
 // and embedded arithmetic chars (ar+1, r-1).
-node_name = $([a-zA-Z0-9_][a-zA-Z0-9_\-+']*)
+// TikZ has special multi-word node names like "current bounding box" and "current path bounding box".
+node_name
+  = $('current' ws 'path' ws 'bounding' ws 'box')
+  / $('current' ws 'bounding' ws 'box')
+  / $('current' ws 'subpath' ws 'start')
+  / $([a-zA-Z0-9_][a-zA-Z0-9_\-+']*)
 
 number "number"
   = s:$[+\-]? ws i:$[0-9]+ '.' f:$[0-9]*

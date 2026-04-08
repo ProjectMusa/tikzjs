@@ -303,9 +303,11 @@ export function emitPath(
         const cx = pendingMove ? pendingMove.x : lastPos.x
         const cy = pendingMove ? pendingMove.y : lastPos.y
         pendingMove = null
-        // Circle radius is affected by coordinate transforms (scale, x/y units)
+        // Circle radius is affected by coordinate transforms (scale, x/y units).
+        // TikZ uses x-unit for circle radius. IR stores radius * dim_unit (28.4528),
+        // so xScale (= xUnit/28.4528 * xscale) correctly converts.
         const cScale = resolver.coordScale
-        const r = ptToPx((seg as any).radius * cScale)
+        const r = ptToPx((seg as any).radius * cScale * Math.abs(resolver.xScale))
         d += `M ${cx - r} ${cy} A ${r} ${r} 0 1 0 ${cx + r} ${cy} A ${r} ${r} 0 1 0 ${cx - r} ${cy} Z `
         worldBboxes.push(rotatedEllipseBBox(cx, cy, r, r, path.style.rotate ?? 0))
         lastPos = { x: cx, y: cy }
@@ -316,10 +318,10 @@ export function emitPath(
         const cx = pendingMove ? pendingMove.x : lastPos.x
         const cy = pendingMove ? pendingMove.y : lastPos.y
         pendingMove = null
-        // Ellipse radii are affected by coordinate transforms
+        // Ellipse radii use respective x/y coordinate units.
         const eScale = resolver.coordScale
-        const rx = ptToPx((seg as any).xRadius * eScale)
-        const ry = ptToPx((seg as any).yRadius * eScale)
+        const rx = ptToPx((seg as any).xRadius * eScale * Math.abs(resolver.xScale))
+        const ry = ptToPx((seg as any).yRadius * eScale * Math.abs(resolver.yScale))
         d += `M ${cx - rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx + rx} ${cy} A ${rx} ${ry} 0 1 0 ${cx - rx} ${cy} Z `
         worldBboxes.push(rotatedEllipseBBox(cx, cy, rx, ry, path.style.rotate ?? 0))
         lastPos = { x: cx, y: cy }
@@ -447,14 +449,14 @@ export function emitPath(
 
     applyAttrs(pathEl, buildPathAttrs(path.style, markerIds))
 
-    const transform = buildTransform(path.style, 0, 0, resolver.coordScale)
+    const transform = buildTransform(path.style, 0, 0, resolver.coordScale, resolver.xScale, resolver.yScale)
     if (transform) pathEl.setAttribute('transform', transform)
 
     elements.push(pathEl)
   }
 
   const rawBBox = mergeBBoxes(bboxes)
-  const transform = buildTransform(path.style, 0, 0, resolver.coordScale)
+  const transform = buildTransform(path.style, 0, 0, resolver.coordScale, resolver.xScale, resolver.yScale)
 
   // Expand bbox by half the stroke width so thick lines don't clip the viewBox.
   const strokeHalfPx = ptToPx(
@@ -469,7 +471,7 @@ export function emitPath(
 
   return {
     elements,
-    bbox: mergeBBoxes([transformBBox(expandedBBox, transform), ...worldBboxes]),
+    bbox: mergeBBoxes([transformBBox(expandedBBox, transform), ...worldBboxes.map(bb => transformBBox(bb, transform))]),
   }
 }
 

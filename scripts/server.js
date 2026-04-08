@@ -27,7 +27,7 @@ const REFS_DIR = process.env.TIKZJS_REFS_DIR || path.join(ROOT, 'test/golden/ref
 function fixtures() {
   return fs.readdirSync(FIXTURES_DIR)
     .filter(f => f.endsWith('.tikz'))
-    .sort()
+    .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
     .map(f => f.replace('.tikz', ''))
 }
 

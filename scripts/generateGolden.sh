@@ -63,6 +63,12 @@ for tikz_file in "$FIXTURES_DIR"/*.tikz; do
   if echo "$FIXTURE_CONTENT" | grep -qE 'ellipse|regular polygon|star|trapezium|semicircle|cylinder|diamond'; then
     TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}shapes.geometric"
   fi
+  if echo "$FIXTURE_CONTENT" | grep -qE 'decoration|markings|decorate'; then
+    TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}decorations.markings"
+  fi
+  if echo "$FIXTURE_CONTENT" | grep -qE '\$\(|\(\$|calc'; then
+    TIKZ_LIBRARIES="${TIKZ_LIBRARIES:+$TIKZ_LIBRARIES,}calc"
+  fi
 
   if echo "$FIXTURE_CONTENT" | grep -q '\\begin{tikzcd}'; then
     USE_PACKAGES="\\usepackage{tikz}\\usepackage{tikz-cd}"

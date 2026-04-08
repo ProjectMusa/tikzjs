@@ -1,0 +1,15 @@
+\begin{tikzpicture}[decoration={markings, mark= at position 0.75 with {\arrow{triangle 45}[scale=4]}}]
+              \coordinate (0) at (0,0);
+              \coordinate (1) at (-1.732, 1);
+              \coordinate (2) at (-1.732, -1);
+              \coordinate (3) at (0, -2);
+              \node at (0.25,0) {$0$};
+              \node at (-2,1) {$1$};
+              \node at (-2,-1) {$2$};
+              \node at (0.25, -2) {$3$};
+              \draw (0) -- (1) -- (2) -- (0);
+              \draw[fill=black] (0) circle (2pt);
+              \draw[fill=black] (1) circle (2pt);
+              \draw[fill=black] (2) circle (2pt);
+              \draw[fill=black] (3) circle (2pt);
+          \end{tikzpicture}

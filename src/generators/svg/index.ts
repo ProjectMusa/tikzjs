@@ -16,11 +16,25 @@
  */
 
 import { IRDiagram, IRElement, ResolvedStyle } from '../../ir/types.js'
-import { CoordResolver, NodeGeometryRegistry, ptToPx, pxToPt, DEFAULT_NODE_DISTANCE_PT, DEFAULT_COORD_UNIT_PT } from './coordResolver.js'
+import {
+  CoordResolver,
+  NodeGeometryRegistry,
+  ptToPx,
+  pxToPt,
+  DEFAULT_NODE_DISTANCE_PT,
+  DEFAULT_COORD_UNIT_PT,
+} from './coordResolver.js'
 import { MarkerRegistry, renderMarkerDefs } from './markerDefs.js'
 import { PatternRegistry, renderPatternDefs } from './patternDefs.js'
 import { BoundingBox, mergeBBoxes, padBBox, toViewBox, isValidBBox } from './boundingBox.js'
-import { MathRenderer, defaultMathRenderer, mathModeRenderer as defaultMathModeRenderer, scriptMathModeRenderer as defaultScriptMathModeRenderer } from '../../math/index.js'
+import {
+  MathRenderer,
+  defaultMathRenderer,
+  mathModeRenderer as defaultMathModeRenderer,
+  scriptMathModeRenderer as defaultScriptMathModeRenderer,
+} from '../../math/index.js'
+import type { TextMeasurer } from '../../math/textLayout.js'
+import { heuristicMeasurer } from '../../math/textLayout.js'
 import { DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 import { RenderContext, ElementRenderResult } from './renderContext.js'
 import { SVGRendererRegistry, defaultSVGRegistry } from './rendererRegistry.js'
@@ -43,6 +57,13 @@ export interface SVGGeneratorOptions {
    * Defaults to JSDOM in Node.js environments.
    */
   document?: Document
+  /**
+   * Optional text measurer for hybrid text+math label layout.
+   * When provided, plain-text portions of labels use native SVG <text>
+   * elements measured with this (e.g. pretext), while math uses MathJax.
+   * Enables accurate `text width` wrapping and better bbox computation.
+   */
+  textMeasurer?: TextMeasurer
 }
 
 /** Result of generating an SVG DOM element from an IRDiagram. */
@@ -58,10 +79,12 @@ export interface SVGElementResult {
  */
 export function generateSVGElement(diagram: IRDiagram, opts: SVGGeneratorOptions = {}): SVGElementResult {
   // Use provided document (browser) or fall back to JSDOM (Node.js)
-  const document = opts.document ?? (() => {
-    const { JSDOM } = require('jsdom')
-    return new JSDOM('<!DOCTYPE html><html><body></body></html>').window.document
-  })()
+  const document =
+    opts.document ??
+    (() => {
+      const { JSDOM } = require('jsdom')
+      return new JSDOM('<!DOCTYPE html><html><body></body></html>').window.document
+    })()
 
   const C: SVGRenderingConstants = { ...DEFAULT_CONSTANTS, ...(opts.constants ?? {}) }
   const nodeRegistry = new NodeGeometryRegistry()
@@ -81,9 +104,10 @@ export function generateSVGElement(diagram: IRDiagram, opts: SVGGeneratorOptions
   const coordScale = globalStyle.scale ?? 1
   const coordXScale = globalStyle.xscale ?? 1
   const coordYScale = globalStyle.yscale ?? 1
-  const inheritedStyle: ResolvedStyle = (coordScale !== 1 || coordXScale !== 1 || coordYScale !== 1)
-    ? { ...globalStyle, scale: undefined, xscale: undefined, yscale: undefined }
-    : globalStyle
+  const inheritedStyle: ResolvedStyle =
+    coordScale !== 1 || coordXScale !== 1 || coordYScale !== 1
+      ? { ...globalStyle, scale: undefined, xscale: undefined, yscale: undefined }
+      : globalStyle
 
   const nodeDistancePt = globalStyle.nodeDistance ?? DEFAULT_NODE_DISTANCE_PT
   // Custom x/y coordinate unit vectors (e.g. x=1.5em, y=0.75pt).
@@ -106,6 +130,7 @@ export function generateSVGElement(diagram: IRDiagram, opts: SVGGeneratorOptions
     inheritedStyle,
     registry,
     pass: 1,
+    textMeasurer: opts.textMeasurer ?? heuristicMeasurer,
   }
 
   const r1 = renderPass(diagram.elements, { ...baseCtx, pass: 1 })
@@ -122,13 +147,13 @@ export function generateSVGElement(diagram: IRDiagram, opts: SVGGeneratorOptions
   // Build SVG root — set width/height in pt so browsers render at the same physical
   // size as dvisvgm output (which also uses pt), enabling fair side-by-side comparison.
   const [, , vwStr, vhStr] = viewBox.split(' ')
-  const widthPt  = pxToPt(parseFloat(vwStr))
+  const widthPt = pxToPt(parseFloat(vwStr))
   const heightPt = pxToPt(parseFloat(vhStr))
 
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
   svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg')
-  svg.setAttribute('width',   `${widthPt}pt`)
-  svg.setAttribute('height',  `${heightPt}pt`)
+  svg.setAttribute('width', `${widthPt}pt`)
+  svg.setAttribute('height', `${heightPt}pt`)
   svg.setAttribute('viewBox', viewBox)
   // Propagate `color=X` from the tikzpicture options via CSS so that child
   // elements using stroke/fill="currentColor" inherit the correct colour.

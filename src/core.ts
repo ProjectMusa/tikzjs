@@ -26,8 +26,25 @@ export type { SVGRendererRegistry } from './generators/svg/rendererRegistry.js'
 export type { RenderContext, ElementRenderResult } from './generators/svg/renderContext.js'
 export type { MathRenderer, MathResult } from './math/index.js'
 export { defaultMathRenderer } from './math/index.js'
+export type { TextMeasurer } from './math/textLayout.js'
+export { parseLabel, renderHybridLabel, heuristicMeasurer, buildCSSFont } from './math/textLayout.js'
+export { initPretext, createPretextMeasurer } from './math/pretextMeasurer.js'
 // irMutator has no d3 dependency — safe to re-export
-export { moveNode, findNode, isDraggable, collectNodes, findElement, updateCurveControl, moveSegmentEndpoint, updateNodeLabel, updateEdgeLabel, removeElement, addNode, duplicateElement, setStyleProp } from './generators/d3/irMutator.js'
+export {
+  moveNode,
+  findNode,
+  isDraggable,
+  collectNodes,
+  findElement,
+  updateCurveControl,
+  moveSegmentEndpoint,
+  updateNodeLabel,
+  updateEdgeLabel,
+  removeElement,
+  addNode,
+  duplicateElement,
+  setStyleProp,
+} from './generators/d3/irMutator.js'
 
 export function parse(tikzSource: string): IRDiagram {
   const doc = preprocess(tikzSource)

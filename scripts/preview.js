@@ -53,7 +53,7 @@ if (fixturePath) {
   console.log('       echo "\\\\draw (0,0) -- (1,1);" | node scripts/preview.js')
   console.log()
   console.log('Fixtures:')
-  fs.readdirSync(FIXTURES_DIR).filter(f => f.endsWith('.tikz')).sort().forEach(f => {
+  fs.readdirSync(FIXTURES_DIR).filter(f => f.endsWith('.tikz')).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach(f => {
     console.log('  ' + f.replace('.tikz', ''))
   })
   process.exit(0)

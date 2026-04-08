@@ -12,6 +12,8 @@ import { CoordResolver, NodeGeometryRegistry, NodeGeometry, getAnchorPosition, p
 import { BoundingBox, fromCorners, mergeBBoxes, transformBBox } from './boundingBox.js'
 import { buildTransform, applyAttrs } from './styleEmitter.js'
 import { MathRenderer, defaultMathRenderer, renderMath } from '../../math/index.js'
+import type { TextMeasurer } from '../../math/textLayout.js'
+import { renderHybridLabel, buildCSSFont, heuristicMeasurer } from '../../math/textLayout.js'
 import { TIKZ_CONSTANTS, DEFAULT_CONSTANTS, SVGRenderingConstants } from './constants.js'
 
 /** Default inner padding around node content (px). Computed from TikZ spec — does not vary with generator constants. */
@@ -29,6 +31,7 @@ export interface NodeRenderResult {
  * that subsequent coordinate references to this node can resolve anchors.
  *
  * @param mathRenderer  Optional renderer for LaTeX labels. Defaults to MathJax.
+ * @param textMeasurer  Text measurer for hybrid text+math layout. Defaults to heuristicMeasurer.
  */
 export function emitNode(
   node: IRNode,
@@ -36,14 +39,17 @@ export function emitNode(
   resolver: CoordResolver,
   nodeRegistry: NodeGeometryRegistry,
   mathRenderer: MathRenderer = defaultMathRenderer,
-  constants: SVGRenderingConstants = DEFAULT_CONSTANTS
+  constants: SVGRenderingConstants = DEFAULT_CONSTANTS,
+  textMeasurer: TextMeasurer = heuristicMeasurer,
 ): NodeRenderResult {
   const MIN_HALF_SIZE = constants.MIN_HALF_SIZE_PX
   // Render the label — strip LaTeX font size commands that MathJax doesn't handle
-  const rawLabel = (node.label || '')
+  const rawLabel = node.label || ''
   const labelHasMath = /\$|\\\(|\\\[|\\begin\{/.test(rawLabel)
-  let labelSource = rawLabel
-    .replace(/\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b\s*/g, '')
+  let labelSource = rawLabel.replace(
+    /\\(?:tiny|scriptsize|footnotesize|small|normalsize|large|Large|LARGE|huge|Huge)\b\s*/g,
+    '',
+  )
   // Only strip \textXX font commands in text-mode labels. Inside $...$, MathJax handles them natively.
   if (!labelHasMath) {
     labelSource = labelSource.replace(/\\(?:textrm|textit|textbf|texttt|textsf|textsc|emph)\{([^}]*)\}/g, '$1')
@@ -52,10 +58,17 @@ export function emitNode(
   if (labelSource.startsWith('{') && labelSource.endsWith('}')) {
     const inner = labelSource.slice(1, -1)
     // Only strip if braces are balanced (not nested unmatched)
-    let depth = 0, balanced = true
+    let depth = 0,
+      balanced = true
     for (const ch of inner) {
       if (ch === '{') depth++
-      else if (ch === '}') { depth--; if (depth < 0) { balanced = false; break } }
+      else if (ch === '}') {
+        depth--
+        if (depth < 0) {
+          balanced = false
+          break
+        }
+      }
     }
     if (balanced && depth === 0) labelSource = inner
   }
@@ -65,54 +78,55 @@ export function emitNode(
 
   // Scale label rendering when node font sets a non-default font size
   const fontScale = node.style.fontSize !== undefined ? node.style.fontSize / 10 : 1
-  const activeRenderer: MathRenderer = fontScale !== 1
-    ? (latex: string) => renderMath(latex, false, false, fontScale)
-    : mathRenderer
+  const activeRenderer: MathRenderer =
+    fontScale !== 1 ? (latex: string) => renderMath(latex, false, false, fontScale) : mathRenderer
 
   const imgDims = parseIncludegraphics(labelSource)
   if (imgDims) {
-    labelWidth  = ptToPx(imgDims.widthPt)
+    labelWidth = ptToPx(imgDims.widthPt)
     labelHeight = ptToPx(imgDims.heightPt)
-    svgContent  = buildImagePlaceholder(labelWidth, labelHeight)
+    svgContent = buildImagePlaceholder(labelWidth, labelHeight)
   } else if (labelSource.trim()) {
-    // Split on \\ (LaTeX line break) for multiline labels
-    const lineParts = labelSource.split('\\\\').map(l => l.trim()).filter(l => l !== '')
-    if (lineParts.length > 1) {
-      const multi = renderMultilineLabel(lineParts, activeRenderer)
-      svgContent = multi.svgContent
-      labelWidth = multi.labelWidth
-      labelHeight = multi.labelHeight
-    } else {
-      try {
-        const result = activeRenderer(labelSource)
-        svgContent = result.svgString
-        labelWidth = result.widthPx
-        labelHeight = result.heightPx
-      } catch {
-        // Fallback: render as plain text
-        svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
-        labelWidth = labelSource.length * 7
-        labelHeight = 14
-      }
+    // Unified label rendering: renderHybridLabel handles pure text, pure math,
+    // mixed content, and linebreaks via a single code path.
+    const textWidthPx = node.style.textWidth !== undefined ? ptToPx(node.style.textWidth) : undefined
+    const cssFont = buildCSSFont({ fontSize: node.style.fontSize })
+    try {
+      const result = renderHybridLabel(labelSource, activeRenderer, textMeasurer, {
+        font: cssFont,
+        maxWidthPx: textWidthPx,
+        lineGapPx: 4,
+        align: node.style.align ?? 'center',
+        scale: fontScale !== 1 ? fontScale : undefined,
+      })
+      svgContent = result.svgString
+      labelWidth = result.widthPx
+      labelHeight = result.heightPx
+    } catch {
+      // Fallback: render as plain text
+      svgContent = `<text font-size="12">${escapeXml(labelSource)}</text>`
+      labelWidth = labelSource.length * 7
+      labelHeight = 14
     }
   }
 
   // Compute node geometry.
   // TikZ `scale` on a node applies a transform to the entire node (text + shape + sep).
   // We compute the unscaled size first, then multiply by scale.
-  const nodeScale  = (node.style.scale ?? 1) * (node.style.xscale ?? 1)
+  const nodeScale = (node.style.scale ?? 1) * (node.style.xscale ?? 1)
   const nodeScaleY = (node.style.scale ?? 1) * (node.style.yscale ?? 1)
 
-  const innerSep = node.style.innerSep !== undefined
-    ? ptToPx(node.style.innerSep)
-    : DEFAULT_INNER_SEP_PX
+  const innerSep = node.style.innerSep !== undefined ? ptToPx(node.style.innerSep) : DEFAULT_INNER_SEP_PX
   const innerXSep = node.style.innerXSep !== undefined ? ptToPx(node.style.innerXSep) : innerSep
   const innerYSep = node.style.innerYSep !== undefined ? ptToPx(node.style.innerYSep) : innerSep
 
   // ── fit library: compute bounding box of referenced nodes ──
   let fitBBox: { minX: number; minY: number; maxX: number; maxY: number } | null = null
   if (node.style.fit && node.style.fit.length > 0) {
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity
     for (const refName of node.style.fit) {
       const refGeo = nodeRegistry.getByName(refName)
       if (refGeo) {
@@ -143,12 +157,12 @@ export function emitNode(
     halfWidth = Math.max(
       MIN_HALF_SIZE,
       textWidthPx !== undefined ? textWidthPx / 2 + innerXSep : labelWidth / 2 + innerXSep,
-      node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0
+      node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0,
     )
     halfHeight = Math.max(
       MIN_HALF_SIZE,
       labelHeight / 2 + innerYSep,
-      node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
+      node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0,
     )
     // TikZ circle shape: force equal half-dimensions (largest wins)
     if (node.style.shape === 'circle') {
@@ -162,17 +176,13 @@ export function emitNode(
     if (node.style.shape === 'regular polygon') {
       const n = node.style.regularPolygonSides ?? 5
       // Content-based incircle radius (label + innerSep, excluding minimumWidth/Height)
-      const contentR = Math.max(
-        MIN_HALF_SIZE,
-        labelWidth / 2 + innerXSep,
-        labelHeight / 2 + innerYSep
-      )
+      const contentR = Math.max(MIN_HALF_SIZE, labelWidth / 2 + innerXSep, labelHeight / 2 + innerYSep)
       // Convert content incircle to circumradius
       const contentCircumR = contentR / Math.cos(Math.PI / n)
       // minimum size = circumcircle diameter directly
       const minR = Math.max(
         node.style.minimumWidth !== undefined ? ptToPx(node.style.minimumWidth) / 2 : 0,
-        node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0
+        node.style.minimumHeight !== undefined ? ptToPx(node.style.minimumHeight) / 2 : 0,
       )
       const finalR = Math.max(contentCircumR, minR)
       halfWidth = finalR
@@ -180,12 +190,12 @@ export function emitNode(
     }
 
     // Apply node-level scale (TikZ `scale` on a node scales the entire shape)
-    if (nodeScale !== 1)  halfWidth  *= nodeScale
+    if (nodeScale !== 1) halfWidth *= nodeScale
     if (nodeScaleY !== 1) halfHeight *= nodeScaleY
 
     // `transform shape` makes node shapes scale with the tikzpicture coordinate transform
     if (node.style.transformShape && resolver.coordScale !== 1) {
-      halfWidth  *= resolver.coordScale
+      halfWidth *= resolver.coordScale
       halfHeight *= resolver.coordScale
     }
 
@@ -202,7 +212,7 @@ export function emitNode(
     halfWidth,
     halfHeight,
     bbox: fromCorners(centerX - halfWidth, centerY - halfHeight, centerX + halfWidth, centerY + halfHeight),
-    shape: (node.style.shape === 'circle') ? 'circle' : (node.style.shape === 'ellipse') ? 'ellipse' : 'rectangle',
+    shape: node.style.shape === 'circle' ? 'circle' : node.style.shape === 'ellipse' ? 'ellipse' : 'rectangle',
   }
 
   // Register geometry for anchor resolution
@@ -223,7 +233,8 @@ export function emitNode(
       // 1. First pass: stroke-width = doubleDistance + 2*lineWidth (in the draw color)
       // 2. Second pass: stroke-width = doubleDistance (in white) to erase the middle
       // This creates the visual effect of two thin parallel lines.
-      const lineWidthPx = node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
+      const lineWidthPx =
+        node.style.drawWidth !== undefined ? ptToPx(node.style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
       const gapPx = ptToPx(node.style.doubleDistance ?? 0.6)
       // Outer stroke in draw color (total width = gap + 2*line)
       const outerWidth = gapPx + 2 * lineWidthPx
@@ -277,39 +288,51 @@ export function emitNode(
     try {
       lblResult = activeRenderer(lbl.text)
     } catch {
-      lblResult = { svgString: `<text font-size="12">${escapeXml(lbl.text)}</text>`, widthPx: lbl.text.length * 7, heightPx: 14 }
+      lblResult = {
+        svgString: `<text font-size="12">${escapeXml(lbl.text)}</text>`,
+        widthPx: lbl.text.length * 7,
+        heightPx: 14,
+      }
     }
     let tx: number, ty: number
     switch (lbl.position) {
-      case 'below': case 'south':
+      case 'below':
+      case 'south':
         tx = centerX - lblResult.widthPx / 2
         ty = centerY + halfHeight + LABEL_GAP
         break
-      case 'above': case 'north':
+      case 'above':
+      case 'north':
         tx = centerX - lblResult.widthPx / 2
         ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
         break
-      case 'right': case 'east':
+      case 'right':
+      case 'east':
         tx = centerX + halfWidth + LABEL_GAP
         ty = centerY - lblResult.heightPx / 2
         break
-      case 'left': case 'west':
+      case 'left':
+      case 'west':
         tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
         ty = centerY - lblResult.heightPx / 2
         break
-      case 'above right': case 'north east':
+      case 'above right':
+      case 'north east':
         tx = centerX + halfWidth + LABEL_GAP
         ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
         break
-      case 'above left': case 'north west':
+      case 'above left':
+      case 'north west':
         tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
         ty = centerY - halfHeight - LABEL_GAP - lblResult.heightPx
         break
-      case 'below right': case 'south east':
+      case 'below right':
+      case 'south east':
         tx = centerX + halfWidth + LABEL_GAP
         ty = centerY + halfHeight + LABEL_GAP
         break
-      case 'below left': case 'south west':
+      case 'below left':
+      case 'south west':
         tx = centerX - halfWidth - LABEL_GAP - lblResult.widthPx
         ty = centerY + halfHeight + LABEL_GAP
         break
@@ -330,10 +353,18 @@ export function emitNode(
   // Apply transform from style (rotate, shift) — but NOT scale/xscale/yscale.
   // Node scale only affects content size (already factored into halfWidth/halfHeight above).
   // Applying scale as an SVG transform would incorrectly shrink the drawn shape.
-  const styleWithoutScale: ResolvedStyle = node.style.scale !== undefined || node.style.xscale !== undefined || node.style.yscale !== undefined
-    ? { ...node.style, scale: undefined, xscale: undefined, yscale: undefined }
-    : node.style
-  const transform = buildTransform(styleWithoutScale, centerX, centerY, resolver.coordScale)
+  const styleWithoutScale: ResolvedStyle =
+    node.style.scale !== undefined || node.style.xscale !== undefined || node.style.yscale !== undefined
+      ? { ...node.style, scale: undefined, xscale: undefined, yscale: undefined }
+      : node.style
+  const transform = buildTransform(
+    styleWithoutScale,
+    centerX,
+    centerY,
+    resolver.coordScale,
+    resolver.xScale,
+    resolver.yScale,
+  )
   if (transform) {
     const existing = g.getAttribute('transform') ?? ''
     g.setAttribute('transform', existing ? existing + ' ' + transform : transform)
@@ -354,15 +385,24 @@ export function emitNode(
 /** Compute the offset from the anchor point to the center of the node. */
 function anchorOffsetFromAnchor(anchor: string, hw: number, hh: number): { dx: number; dy: number } {
   switch (anchor) {
-    case 'north':      return { dx: 0,   dy: -hh }
-    case 'south':      return { dx: 0,   dy: hh }
-    case 'east':       return { dx: hw,  dy: 0 }
-    case 'west':       return { dx: -hw, dy: 0 }
-    case 'north east': return { dx: hw,  dy: -hh }
-    case 'north west': return { dx: -hw, dy: -hh }
-    case 'south east': return { dx: hw,  dy: hh }
-    case 'south west': return { dx: -hw, dy: hh }
-    default:           return { dx: 0,   dy: 0 }  // center
+    case 'north':
+      return { dx: 0, dy: -hh }
+    case 'south':
+      return { dx: 0, dy: hh }
+    case 'east':
+      return { dx: hw, dy: 0 }
+    case 'west':
+      return { dx: -hw, dy: 0 }
+    case 'north east':
+      return { dx: hw, dy: -hh }
+    case 'north west':
+      return { dx: -hw, dy: -hh }
+    case 'south east':
+      return { dx: hw, dy: hh }
+    case 'south west':
+      return { dx: -hw, dy: hh }
+    default:
+      return { dx: 0, dy: 0 } // center
   }
 }
 
@@ -374,11 +414,12 @@ function buildBorderElement(
   cy: number,
   hw: number,
   hh: number,
-  style: ResolvedStyle
+  style: ResolvedStyle,
 ): Element {
   const stroke = style.draw && style.draw !== 'none' ? style.draw : 'none'
   const fill = style.fill && style.fill !== 'none' ? style.fill : 'none'
-  const strokeWidth = style.drawWidth !== undefined ? ptToPx(style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
+  const strokeWidth =
+    style.drawWidth !== undefined ? ptToPx(style.drawWidth) : ptToPx(TIKZ_CONSTANTS.DEFAULT_LINE_WIDTH_PT)
 
   if (shape === 'circle' || shape === 'ellipse') {
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'ellipse')
@@ -395,8 +436,7 @@ function buildBorderElement(
   if (shape === 'diamond') {
     // Diamond (rhombus): vertices at N, E, S, W of the bounding box
     const el = document.createElementNS('http://www.w3.org/2000/svg', 'polygon')
-    el.setAttribute('points',
-      `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`)
+    el.setAttribute('points', `${cx},${cy - hh} ${cx + hw},${cy} ${cx},${cy + hh} ${cx - hw},${cy}`)
     el.setAttribute('stroke', stroke)
     el.setAttribute('fill', fill)
     if (stroke !== 'none') el.setAttribute('stroke-width', String(strokeWidth))
@@ -445,74 +485,50 @@ function buildBorderElement(
 }
 
 function escapeXml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 // ── \includegraphics placeholder ──────────────────────────────────────────────
 
 /** Natural sizes (width × height in pt) for mwe example-image variants. */
 const EXAMPLE_IMAGE_SIZES: Record<string, [number, number]> = {
-  'example-image':            [320, 240],
-  'example-image-a':          [320, 240],
-  'example-image-b':          [320, 240],
-  'example-image-c':          [320, 240],
-  'example-image-plain':      [320, 240],
-  'example-image-empty':      [320, 240],
-  'example-image-1x1':        [200, 200],
-  'example-image-4x3':        [160, 120],
-  'example-image-16x10':      [320, 200],
-  'example-image-16x9':       [320, 180],
-  'example-image-10x16':      [200, 320],
-  'example-image-9x16':       [180, 320],
-  'example-image-golden':     [323.607, 200],
+  'example-image': [320, 240],
+  'example-image-a': [320, 240],
+  'example-image-b': [320, 240],
+  'example-image-c': [320, 240],
+  'example-image-plain': [320, 240],
+  'example-image-empty': [320, 240],
+  'example-image-1x1': [200, 200],
+  'example-image-4x3': [160, 120],
+  'example-image-16x10': [320, 200],
+  'example-image-16x9': [320, 180],
+  'example-image-10x16': [200, 320],
+  'example-image-9x16': [180, 320],
+  'example-image-golden': [323.607, 200],
   'example-image-golden-upright': [200, 323.607],
-  'example-image-a4':         [595.276, 841.89],
+  'example-image-a4': [595.276, 841.89],
   'example-image-a4-landscape': [841.89, 595.276],
-  'example-image-a3':         [841.89, 1190.55],
+  'example-image-a3': [841.89, 1190.55],
   'example-image-a3-landscape': [1190.55, 841.89],
-  'example-image-letter':     [612, 792],
+  'example-image-letter': [612, 792],
   'example-image-letter-landscape': [792, 612],
-}
-
-/**
- * Render a multiline label (split on \\) as stacked MathJax SVG lines.
- * Each non-empty line is rendered separately; lines are centered horizontally.
- */
-function renderMultilineLabel(
-  lines: string[],
-  renderer: MathRenderer,
-): { svgContent: string; labelWidth: number; labelHeight: number } {
-  const LINE_GAP_PX = 4
-  const rendered = lines.map(line => {
-    if (!line) return { svgString: '', widthPx: 0, heightPx: 12 }
-    try { return renderer(line) }
-    catch { return { svgString: `<text font-size="12">${escapeXml(line)}</text>`, widthPx: line.length * 7, heightPx: 14 } }
-  })
-  const maxWidth = Math.max(...rendered.map(r => r.widthPx), 0)
-  const totalHeight = rendered.reduce((s, r) => s + r.heightPx, 0) + LINE_GAP_PX * (rendered.length - 1)
-  let svgContent = ''
-  let yOff = 0
-  for (const r of rendered) {
-    const xOff = (maxWidth - r.widthPx) / 2
-    svgContent += `<g transform="translate(${xOff},${yOff})">${r.svgString}</g>`
-    yOff += r.heightPx + LINE_GAP_PX
-  }
-  return { svgContent, labelWidth: maxWidth, labelHeight: totalHeight }
 }
 
 /** Convert a dimension string with unit to pt. */
 function dimToPt(val: number, unit: string): number {
   switch (unit.toLowerCase()) {
-    case 'cm':  return val * TIKZ_CONSTANTS.PT_PER_CM
-    case 'mm':  return val * TIKZ_CONSTANTS.PT_PER_CM / 10
-    case 'in':  return val * 72.27
-    case 'pt':  return val
-    case 'em':  return val * 10
-    default:    return val
+    case 'cm':
+      return val * TIKZ_CONSTANTS.PT_PER_CM
+    case 'mm':
+      return (val * TIKZ_CONSTANTS.PT_PER_CM) / 10
+    case 'in':
+      return val * 72.27
+    case 'pt':
+      return val
+    case 'em':
+      return val * 10
+    default:
+      return val
   }
 }
 
@@ -524,30 +540,30 @@ export function parseIncludegraphics(label: string): { widthPt: number; heightPt
   const m = label.trim().match(/^\\includegraphics(?:\s*\[([^\]]*)\])?\s*\{([^}]+)\}$/)
   if (!m) return null
 
-  const opts     = m[1] ?? ''
+  const opts = m[1] ?? ''
   const filename = m[2].trim()
-  const natural  = EXAMPLE_IMAGE_SIZES[filename] ?? [320, 240]
+  const natural = EXAMPLE_IMAGE_SIZES[filename] ?? [320, 240]
 
-  let widthPt  = natural[0]
+  let widthPt = natural[0]
   let heightPt = natural[1]
 
   const scaleM = opts.match(/\bscale\s*=\s*([\d.]+)/)
   if (scaleM) {
     const s = parseFloat(scaleM[1])
-    widthPt  *= s
+    widthPt *= s
     heightPt *= s
   }
 
   const wM = opts.match(/\bwidth\s*=\s*([\d.]+)\s*(cm|mm|in|pt|em)?/)
   if (wM) {
-    widthPt  = dimToPt(parseFloat(wM[1]), wM[2] ?? 'pt')
-    heightPt = widthPt * natural[1] / natural[0]
+    widthPt = dimToPt(parseFloat(wM[1]), wM[2] ?? 'pt')
+    heightPt = (widthPt * natural[1]) / natural[0]
   }
 
   const hM = opts.match(/\bheight\s*=\s*([\d.]+)\s*(cm|mm|in|pt|em)?/)
   if (hM) {
     heightPt = dimToPt(parseFloat(hM[1]), hM[2] ?? 'pt')
-    if (!wM) widthPt = heightPt * natural[0] / natural[1]
+    if (!wM) widthPt = (heightPt * natural[0]) / natural[1]
   }
 
   return { widthPt, heightPt }
@@ -560,13 +576,13 @@ export function parseIncludegraphics(label: string): { widthPt: number; heightPt
  *   gray fill + X/cross lines + border + "Image" label.
  */
 export function buildImagePlaceholder(widthPx: number, heightPx: number): string {
-  const w   = widthPx.toFixed(3)
-  const h   = heightPx.toFixed(3)
-  const cx  = (widthPx / 2).toFixed(3)
-  const cy  = (heightPx / 2).toFixed(3)
+  const w = widthPx.toFixed(3)
+  const h = heightPx.toFixed(3)
+  const cx = (widthPx / 2).toFixed(3)
+  const cy = (heightPx / 2).toFixed(3)
   // Reference uses ~0.12pt thin lines and ~0.24pt border; convert to px
-  const swThin   = (0.12 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3)  // ≈ 0.219 px
-  const swBorder = (0.24 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3)  // ≈ 0.437 px
+  const swThin = (0.12 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3) // ≈ 0.219 px
+  const swBorder = (0.24 * DEFAULT_CONSTANTS.PT_TO_PX).toFixed(3) // ≈ 0.437 px
   const fontSize = Math.max(6, Math.min(11, widthPx * 0.13)).toFixed(1)
   return (
     `<rect x="0" y="0" width="${w}" height="${h}" fill="#bfbfbf"/>` +

@@ -1,0 +1,17 @@
+{
+  "description": "Duplicate first node in 45-node-with-arrows via Ctrl+D",
+  "goldenFixture": "45-node-with-arrows.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "duplicateElement",
+        "target": { "kind": "node", "index": 0 },
+        "args": {}
+      },
+      "uiAction": {
+        "type": "duplicate",
+        "target": { "kind": "node", "index": 0 }
+      }
+    }
+  ]
+}

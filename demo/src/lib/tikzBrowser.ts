@@ -1,6 +1,20 @@
-import { parse, generateFromIR } from 'tikzjs'
-import type { IRDiagram, SVGGeneratorOptions } from 'tikzjs'
+import { parse, generateFromIR, initPretext, createPretextMeasurer } from 'tikzjs'
+import type { IRDiagram, SVGGeneratorOptions, TextMeasurer } from 'tikzjs'
 import { browserMathRenderer, browserMathModeRenderer, browserScriptMathModeRenderer } from './browserMath.js'
+
+let _textMeasurer: TextMeasurer | undefined
+
+/**
+ * Initialize the pretext text measurer for hybrid text+math layout.
+ * Call once at app startup. Safe to call multiple times.
+ */
+export async function initTextLayout(): Promise<boolean> {
+  const ok = await initPretext()
+  if (ok) {
+    _textMeasurer = createPretextMeasurer() ?? undefined
+  }
+  return ok
+}
 
 function browserSvgOptions(): SVGGeneratorOptions {
   return {
@@ -8,6 +22,7 @@ function browserSvgOptions(): SVGGeneratorOptions {
     mathRenderer: browserMathRenderer,
     mathModeRenderer: browserMathModeRenderer,
     scriptMathModeRenderer: browserScriptMathModeRenderer,
+    textMeasurer: _textMeasurer,
   }
 }
 

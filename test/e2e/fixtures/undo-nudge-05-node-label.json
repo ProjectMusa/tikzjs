@@ -1,0 +1,18 @@
+{
+  "description": "Nudge first node then undo in 05-node-label",
+  "goldenFixture": "05-node-label.tikz",
+  "steps": [
+    {
+      "mutation": {
+        "action": "moveNode",
+        "target": { "kind": "node", "index": 0 },
+        "args": {}
+      },
+      "uiAction": {
+        "type": "undo",
+        "target": { "kind": "node", "index": 0 },
+        "key": "ArrowRight"
+      }
+    }
+  ]
+}
