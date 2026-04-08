@@ -175,7 +175,11 @@ export function buildTransform(style: ResolvedStyle, cx = 0, cy = 0, coordScale 
   }
 
   if (style.rotate) {
-    parts.push(`rotate(${-style.rotate},${cx},${cy})`)
+    // TikZ rotates CCW (y-up), SVG rotates CW (y-down), so negate the angle.
+    // But if yScale is negative (yscale=-1), the y-axis is already flipped,
+    // which mirrors the rotation direction — so don't negate in that case.
+    const ySign = yScale < 0 ? -1 : 1
+    parts.push(`rotate(${-style.rotate * ySign},${cx},${cy})`)
   }
 
   const sx = (style.scale ?? 1) * (style.xscale ?? 1)
