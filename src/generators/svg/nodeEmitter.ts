@@ -95,7 +95,7 @@ export function emitNode(
       const result = renderHybridLabel(labelSource, activeRenderer, textMeasurer, {
         font: cssFont,
         maxWidthPx: textWidthPx,
-        lineGapPx: 4,
+        lineGapPx: 0,
         align: node.style.align ?? 'center',
         scale: fontScale !== 1 ? fontScale : undefined,
       })

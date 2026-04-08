@@ -379,11 +379,14 @@ export function layoutSegments(
   textMeasurer: TextMeasurer,
   font: string,
   maxWidthPx?: number,
-  lineGapPx = 4,
+  lineGapPx = 0,
   align: 'left' | 'center' | 'right' = 'left',
 ): HybridLayoutResult {
   const fontSize = parseFontSize(font)
-  const lineHeightPx = fontSize * 1.4
+  // TeX baselineskip ≈ fontSize × 1.2 for standard sizes (e.g. 10pt → 12pt skip).
+  // baseline-to-baseline = lineHeightPx + lineGapPx, so with lineGapPx=0 this
+  // gives the correct TeX-like spacing.
+  const lineHeightPx = fontSize * 1.2
 
   // Phase 1: Split into lines at explicit linebreaks
   const rawLines: MeasuredSegment[][] = [[]]
