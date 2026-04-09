@@ -241,7 +241,10 @@ export function emitPath(
           d += `M ${from.x} ${from.y} `
         }
         // For 'to', handle bend/loop options to produce bezier approximation
-        const bendPath = buildBendPath(from, to, seg.rawOptions)
+        // Merge path-level options (e.g. \draw[bend left]) with segment-level options (e.g. to[bend left])
+        // Segment-level options take precedence (appended last)
+        const mergedToOpts = [...path.rawOptions, ...seg.rawOptions]
+        const bendPath = buildBendPath(from, to, mergedToOpts)
         d += bendPath.d
         bboxes.push(bendPath.bbox)
         lastPos = to
