@@ -4,6 +4,9 @@
   "description": "",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "bin": {
+    "tikzjs-mcp": "./dist/mcp/server.js"
+  },
   "scripts": {
     "test": "jest --silent=false",
     "test:unit": "jest --silent=false --testPathPattern='test/unit'",
@@ -18,12 +21,14 @@
     "preview": "node scripts/preview.js",
     "serve": "node scripts/server.js",
     "diff": "node scripts/visualdiff.js",
+    "mcp": "node dist/mcp/server.js",
     "postinstall": "npm run gen && npm run build"
   },
   "author": "Linax Dio",
   "license": "ISC",
   "dependencies": {
     "@chenglou/pretext": "^0.0.3",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/bezier-js": "^4.1.3",
     "@types/d3-zoom": "^3.0.8",
     "bezier-js": "^6.1.4",
