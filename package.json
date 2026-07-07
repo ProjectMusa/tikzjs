@@ -28,7 +28,7 @@
   "author": "Linax Dio",
   "license": "ISC",
   "dependencies": {
-    "@chenglou/pretext": "^0.0.3",
+    "@chenglou/pretext": "^0.0.8",
     "@modelcontextprotocol/ext-apps": "^1.7.4",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/bezier-js": "^4.1.3",
