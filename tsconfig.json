@@ -14,6 +14,13 @@
     "declarationMap": true,
     "strict": true,
     "esModuleInterop": true,
+    // ext-apps exposes /server only via package.json "exports", which classic
+    // (node10) resolution cannot see; map the types explicitly. Runtime
+    // require() resolves the subpath natively.
+    "baseUrl": ".",
+    "paths": {
+      "@modelcontextprotocol/ext-apps/server": ["node_modules/@modelcontextprotocol/ext-apps/dist/src/server/index"]
+    },
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
     "skipLibCheck": true
