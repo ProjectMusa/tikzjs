@@ -21,6 +21,7 @@ export function setupSelection(
   onLabelEdit?: (diagram: IRDiagram) => void,
   clickZoneMap?: Map<string, SVGElement>,
   nodeRegistry?: NodeGeometryRegistry,
+  mode: 'edit' | 'present' = 'edit',
 
 ): void {
   const DBLCLICK_THRESHOLD = 400 // ms
@@ -49,7 +50,7 @@ export function setupSelection(
     // Check if this is a double-click: two mousedowns within threshold,
     // mouse didn't move much between them
     const moved = lastPos ? Math.hypot(event.clientX - lastPos.x, event.clientY - lastPos.y) : 0
-    if (now - lastTime < DBLCLICK_THRESHOLD && moved < DBLCLICK_MOVE_THRESHOLD && onLabelEdit) {
+    if (mode === 'edit' && now - lastTime < DBLCLICK_THRESHOLD && moved < DBLCLICK_MOVE_THRESHOLD && onLabelEdit) {
       lastMousedownTime.delete(id)
       lastMousedownPos.delete(id)
 
@@ -145,6 +146,7 @@ export function setupKeyboard(
   onIRChange: (diagram: IRDiagram) => void,
   onSelect?: (id: string | null) => void,
   nodeRegistry?: NodeGeometryRegistry,
+  mode: 'edit' | 'present' = 'edit',
 
 ): () => void {
   const NUDGE_PT = 1       // 1pt per arrow key press
@@ -157,7 +159,7 @@ export function setupKeyboard(
     const selectedId = getSelectedId()
 
     // F2 or Enter: edit label of selected element (like spreadsheets)
-    if ((e.key === 'F2' || e.key === 'Enter') && selectedId) {
+    if (mode === 'edit' && (e.key === 'F2' || e.key === 'Enter') && selectedId) {
       e.preventDefault()
       // Check if it's an edge label
       const edgeLabelMatch = selectedId.match(/^(.+):label:(\d+)$/)
@@ -222,22 +224,22 @@ export function setupKeyboard(
     }
 
     // Undo: Ctrl+Z (or Cmd+Z on Mac)
-    if (e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
+    if (mode === 'edit' && e.key === 'z' && (e.ctrlKey || e.metaKey) && !e.shiftKey) {
       e.preventDefault()
       controller.undo()
       return
     }
 
     // Redo: Ctrl+Y or Ctrl+Shift+Z (or Cmd+Shift+Z on Mac)
-    if ((e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
-        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey)) {
+    if (mode === 'edit' && ((e.key === 'y' && (e.ctrlKey || e.metaKey)) ||
+        (e.key === 'z' && (e.ctrlKey || e.metaKey) && e.shiftKey))) {
       e.preventDefault()
       controller.redo()
       return
     }
 
     // Ctrl+D: duplicate selected element
-    if (e.key === 'd' && (e.ctrlKey || e.metaKey) && selectedId) {
+    if (mode === 'edit' && e.key === 'd' && (e.ctrlKey || e.metaKey) && selectedId) {
       e.preventDefault()
 
       const newId = duplicateElement(diagram, selectedId)
@@ -252,7 +254,7 @@ export function setupKeyboard(
       return
     }
 
-    if ((e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
+    if (mode === 'edit' && (e.key === 'Delete' || e.key === 'Backspace') && selectedId) {
       e.preventDefault()
 
       if (removeElement(diagram, selectedId)) {
@@ -281,7 +283,7 @@ export function setupKeyboard(
     }
 
     // Arrow key nudge for selected nodes
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedId) {
+    if (mode === 'edit' && ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key) && selectedId) {
       const node = findNode(diagram, selectedId)
       if (!node || !defaultD3Registry.node.isDraggable(node)) return
       const coord = node.position.coord

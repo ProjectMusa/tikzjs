@@ -15,6 +15,12 @@ export interface D3EditorPanelProps {
   highlightElementId?: string | null
   /** Called when user clicks an element on the canvas. */
   onElementSelect?: (elementId: string | null) => void
+  /**
+   * Interaction level (default: 'edit'). Pass 'present' for a simplified
+   * viewer that still allows dragging nodes/control points and pan/zoom,
+   * but disables label editing, delete/duplicate, undo/redo, and nudge.
+   */
+  interactionMode?: 'edit' | 'present'
 }
 
 export interface D3EditorPanelHandle {
@@ -22,7 +28,7 @@ export interface D3EditorPanelHandle {
 }
 
 export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>(
-  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, showHelp, highlightElementId, onElementSelect }, ref) {
+  function D3EditorPanel({ diagram, onDiagramChange, svgOptions, showGrid, showHelp, highlightElementId, onElementSelect, interactionMode }, ref) {
     const containerRef = useRef<HTMLDivElement>(null)
     const controllerRef = useRef<D3EditorController | null>(null)
     // EditorStore persists across editor destroy/recreate cycles,
@@ -83,6 +89,7 @@ export const D3EditorPanel = forwardRef<D3EditorPanelHandle, D3EditorPanelProps>
         onElementSelect: (id) => onElementSelectRef.current?.(id),
         svgOptions: svgOptionsRef.current,
         showGrid: showGrid !== false,
+        interactionMode,
       })
 
       // Re-apply highlight if there was one

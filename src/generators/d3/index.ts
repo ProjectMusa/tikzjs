@@ -35,6 +35,15 @@ export interface D3EditorOptions {
   onElementSelect?: (elementId: string | null) => void
   /** Disable editing — render-only mode. */
   readOnly?: boolean
+  /**
+   * Interaction level when not read-only (default: 'edit').
+   * - 'edit': full editor — drag, label editing, delete/duplicate, undo/redo, nudge.
+   * - 'present': drag (nodes + control points) and pan/zoom/select only — no
+   *   structural mutation (no label editing, delete, duplicate, undo/redo, nudge).
+   *   Intended for embedding a diagram viewer that still lets a reader reposition
+   *   nodes without exposing full editing affordances.
+   */
+  interactionMode?: 'edit' | 'present'
   /** SVG generator options (math renderer, constants, etc.). */
   svgOptions?: SVGGeneratorOptions
   /** Show coordinate grid on initial render (default: true). */
@@ -260,12 +269,13 @@ export function createD3Editor(
 
     // Attach interactions unless read-only
     if (!opts.readOnly) {
-      setupSelection(svgEl, result.elementMap, controller, store.diagram, opts.onElementSelect, handleMutation, clickZoneMap, currentNodeRegistry)
+      const mode = opts.interactionMode ?? 'edit'
+      setupSelection(svgEl, result.elementMap, controller, store.diagram, opts.onElementSelect, handleMutation, clickZoneMap, currentNodeRegistry, mode)
       setupDrag(svgEl, result.elementMap, store.diagram, controller, handleMutation, clickZoneMap)
       keyboardCleanup = setupKeyboard(
         svgEl, store.diagram, controller,
         () => store.highlightedId, handleMutation, opts.onElementSelect,
-        currentNodeRegistry,
+        currentNodeRegistry, mode,
       )
     }
   }
