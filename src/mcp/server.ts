@@ -153,6 +153,12 @@ registerAppTool(
     inputSchema: {
       source: z.string().describe('TikZ source code (e.g. \\begin{tikzpicture}...\\end{tikzpicture})'),
     },
+    // Declaring the output schema is what makes hosts forward structuredContent
+    // to the app iframe; without it some hosts drop the structured payload.
+    outputSchema: {
+      source: z.string(),
+      diagram: z.record(z.string(), z.unknown()).describe('tikzjs IR diagram (JSON)'),
+    },
     _meta: { ui: { resourceUri: VIEWER_URI } },
   },
   async ({ source }: { source: string }) => {

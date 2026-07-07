@@ -11,6 +11,8 @@
 import { App } from '@modelcontextprotocol/ext-apps'
 import { createD3Editor, D3EditorController } from '../../generators/d3/index.js'
 import { generateTikZ } from '../../generators/tikz/index.js'
+import { preprocess } from '../../preprocessor/index.js'
+import { parseExpanded } from '../../parser/index.js'
 import type { IRDiagram } from '../../ir/types.js'
 import {
   browserMathRenderer,
@@ -77,22 +79,50 @@ copyBtn.addEventListener('click', async () => {
   }
 })
 
+/** Render from whatever data the host forwarded: prefer the pre-parsed IR
+ *  from structuredContent, fall back to parsing TikZ source in the iframe
+ *  (hosts differ in whether they forward structured output vs. tool input). */
+function renderFromData(data: { source?: unknown; diagram?: unknown } | undefined): boolean {
+  if (data?.diagram && typeof data.diagram === 'object') {
+    const diagram = data.diagram as IRDiagram
+    original = structuredClone(diagram)
+    render(structuredClone(diagram))
+    return true
+  }
+  if (typeof data?.source === 'string' && data.source.trim()) {
+    try {
+      const diagram = parseExpanded(preprocess(data.source))
+      original = structuredClone(diagram)
+      render(diagram)
+      return true
+    } catch (err) {
+      statusEl.textContent = `TikZ parse error: ${err instanceof Error ? err.message : String(err)}`
+      return true // handled — show the error rather than "no data"
+    }
+  }
+  return false
+}
+
 async function main(): Promise<void> {
   const app = new App({ name: 'tikzjs-viewer', version: '0.1.0' })
 
-  // Register before connect() so the initial notification is not missed.
+  // Register before connect() so the initial notifications are not missed.
+  // Tool input arrives first and carries the raw source — enough to render
+  // even on hosts that do not forward structuredContent.
+  app.ontoolinput = (params) => {
+    renderFromData(params.arguments as { source?: unknown } | undefined)
+  }
+
   app.ontoolresult = (params) => {
-    const sc = params.structuredContent as { source?: string; diagram?: IRDiagram } | undefined
-    if (params.isError || !sc?.diagram) {
-      statusEl.textContent = 'No diagram data received.'
-      return
-    }
-    original = structuredClone(sc.diagram)
-    render(structuredClone(sc.diagram))
+    if (renderFromData(params.structuredContent as { source?: unknown; diagram?: unknown } | undefined)) return
+    if (controller) return // already rendered from tool input
+    statusEl.textContent = params.isError
+      ? 'Tool call failed — see the conversation for the error.'
+      : 'No diagram data received from the host.'
   }
 
   await app.connect()
-  statusEl.textContent = 'Waiting for diagram…'
+  if (!controller) statusEl.textContent = 'Waiting for diagram…'
 }
 
 main().catch((err) => {
