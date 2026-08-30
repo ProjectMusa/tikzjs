@@ -97,13 +97,18 @@ function parseTikzcdCell(content: string, row: number, col: number): TikzcdCell 
   const arrows: TikzcdArrow[] = []
 
   while (!scanner.done) {
+    // The skip is here to find \ar / \arrow tokens, but the whitespace it eats
+    // may be load-bearing: a space is what terminates a TeX control word. Note
+    // whether any was consumed so it can be put back for label content — TeX
+    // collapses a run of whitespace to a single space, so one space suffices.
+    const wsStart = scanner.save()
     scanner.skipWhitespaceAndComments()
+    const skippedWhitespace = scanner.save() !== wsStart
     if (scanner.done) break
 
     const ch = scanner.peek()
 
     if (ch === '\\') {
-      const tokenStart = scanner.save()
       const token = scanner.readControlSequence()
 
       if (token === '\\ar' || token === '\\arrow') {
@@ -112,11 +117,14 @@ function parseTikzcdCell(content: string, row: number, col: number): TikzcdCell 
         continue
       }
 
-      // Not an \ar — part of the label
+      // Not an \ar — part of the label. Restore the separator, or `\circ` + `a`
+      // would be welded into the undefined control word `\circa`.
+      if (skippedWhitespace && label !== '') label += ' '
       label += token
       continue
     }
 
+    if (skippedWhitespace && label !== '') label += ' '
     label += scanner.consume()
   }
 

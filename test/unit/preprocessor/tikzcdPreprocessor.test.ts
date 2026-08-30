@@ -56,6 +56,25 @@ describe('parseTikzcdBody', () => {
     const middleCell = grid.cells.find(c => c.col === 1)
     expect(middleCell?.label).toBe('')
   })
+
+  test('keeps the space that terminates a control word', () => {
+    // Regression: the whitespace skip used to find \ar also ate the space that
+    // ends a TeX control word, welding `\circ` onto the next token (`\circa`),
+    // which MathJax then rejects as an undefined macro.
+    const grid = parseTikzcdBody('D(\\alpha)\\circ p_j\\circ a \\ar[r] & B', '')
+    expect(grid.cells[0].label).toBe('D(\\alpha)\\circ p_j\\circ a')
+    expect(grid.cells[0].arrows).toHaveLength(1)
+  })
+
+  test('collapses whitespace runs but keeps one separator', () => {
+    const grid = parseTikzcdBody('X   \\otimes   Y & B', '')
+    expect(grid.cells[0].label).toBe('X \\otimes Y')
+  })
+
+  test('does not introduce a space where the source had none', () => {
+    const grid = parseTikzcdBody('X\\otimes{}Y & B', '')
+    expect(grid.cells[0].label).toBe('X\\otimes{}Y')
+  })
 })
 
 describe('extractTikzcdEnvironments', () => {
